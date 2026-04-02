@@ -1,0 +1,26 @@
+query GetProfile($userId: String!) {
+  profile(userId: $userId) {
+    userId
+    fullName
+    userType
+    mobileNo
+    email
+    avatar
+    lastPasswordChanged
+    securityPIN
+    entities {
+      code
+      name
+      title
+      location
+    }
+  }
+}
+
+mutation SetProfile($userId: String!, $input: ProfileUpdateInput!) {
+  setProfile(userId: $userId, input: $input) {
+    success
+    message
+  }
+}
+

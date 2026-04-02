@@ -1,0 +1,9 @@
+query GetGroupDetails($category: String!, $codes: String) {
+  groupDetails(category: $category, codes: $codes) {
+    code
+    category
+    name
+    value
+    extraValue
+  }
+}

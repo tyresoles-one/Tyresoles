@@ -1,0 +1,12 @@
+mutation UpdateCalendarEvent($eventId: UUID!, $input: UpdateEventInput!) {
+  updateCalendarEvent(eventId: $eventId, input: $input) {
+    id
+    title
+    startUtc
+    endUtc
+    eventTypeId
+    eventTypeName
+    tags { tagType tagKey displayName }
+    reminders { id remindAtUtc channel }
+  }
+}

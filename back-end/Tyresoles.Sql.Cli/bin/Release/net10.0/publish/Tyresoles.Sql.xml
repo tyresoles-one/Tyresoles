@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Tyresoles.Sql</name>
+    </assembly>
+    <members>
+        <member name="M:Tyresoles.Sql.SqlServer.Extensions.AddTyresolesSql(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers Tyresoles.Sql services with SQL Server. Call Configure&lt;DataverseOptions&gt; or bind from config first.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.SqlServer.Extensions.AddTyresolesSql(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Registers Tyresoles.Sql with configuration bound from the "Tyresoles" or "tenants" section.
+            </summary>
+        </member>
+    </members>
+</doc>

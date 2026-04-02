@@ -1,0 +1,14 @@
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\bin\Release\net10.0\Tyresoles.Easebuzz.deps.json
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\bin\Release\net10.0\Tyresoles.Easebuzz.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\bin\Release\net10.0\Tyresoles.Easebuzz.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\bin\Release\net10.0\Tyresoles.Easebuzz.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.csproj.AssemblyReference.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.GeneratedMSBuildEditorConfig.editorconfig
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.AssemblyInfoInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.AssemblyInfo.cs
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.csproj.CoreCompileInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\refint\Tyresoles.Easebuzz.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\ref\Tyresoles.Easebuzz.dll

@@ -1,0 +1,9 @@
+query GetEventTypes {
+  getEventTypes {
+    id
+    name
+    color
+    icon
+    sortOrder
+  }
+}

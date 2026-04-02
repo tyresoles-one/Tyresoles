@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Tyresoles.Sql.Generators -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\bin\Debug\netstandard2.0\Tyresoles.Sql.Generators.dll
+  Tyresoles.Logger -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\bin\Debug\net10.0\Tyresoles.Logger.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(11,84): warning CS1570: XML comment has badly formed XML -- 'An identifier was expected.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(12,11): warning CS1570: XML comment has badly formed XML -- 'End tag 'summary' does not match the start tag ''.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(13,1): warning CS1570: XML comment has badly formed XML -- 'Expected an end tag for element 'summary'.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Core\Dataverse.cs(30,9): error CS0103: The name '_logger' does not exist in the current context [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Core\Dataverse.cs(40,60): error CS0103: The name '_logger' does not exist in the current context [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+
+Build FAILED.
+
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(11,84): warning CS1570: XML comment has badly formed XML -- 'An identifier was expected.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(12,11): warning CS1570: XML comment has badly formed XML -- 'End tag 'summary' does not match the start tag ''.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Dialects\NavDialect\NavFilterParserExtensions.cs(13,1): warning CS1570: XML comment has badly formed XML -- 'Expected an end tag for element 'summary'.' [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Core\Dataverse.cs(30,9): error CS0103: The name '_logger' does not exist in the current context [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Core\Dataverse.cs(40,60): error CS0103: The name '_logger' does not exist in the current context [D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\Tyresoles.Sql.csproj]
+    3 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:01.08

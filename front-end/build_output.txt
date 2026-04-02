@@ -1,0 +1,293 @@
+
+> front-end@0.1.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding ssr environment for production...[36m[39m
+transforming...
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:765:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+763:                               class="col-span-1 md:col-span-4 space-y-1.5 md:space-y-0"
+764:                             >
+765:                               <label
+                                    ^
+766:                                 class="block md:hidden text-xs font-medium text-muted-foreground"
+767:                                 >Responsibility Center</label
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:784:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+782:                               class="col-span-1 md:col-span-4 space-y-1.5 md:space-y-0"
+783:                             >
+784:                               <label
+                                    ^
+785:                                 class="block md:hidden text-xs font-medium text-muted-foreground"
+786:                                 >Employee Code</label
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:803:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+801:                               class="col-span-1 md:col-span-2 space-y-1.5 md:space-y-0"
+802:                             >
+803:                               <label
+                                    ^
+804:                                 class="block md:hidden text-xs font-medium text-muted-foreground"
+805:                                 >Type</label
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:934:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+932:                           >
+933:                             <div class="col-span-1 md:col-span-4 space-y-1.5 md:space-y-0">
+934:                               <label class="block md:hidden text-xs font-medium text-muted-foreground">Responsibility Center</label>
+                                                                                                                                         ^
+935:                               <VenSelect
+936:                                 options={respCenterSelectOptions}
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:946:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+944:                             </div>
+945:                             <div class="col-span-1 md:col-span-6 space-y-1.5 md:space-y-0">
+946:                               <label class="block md:hidden text-xs font-medium text-muted-foreground">Posting Date Range</label>
+                                                                                                                                      ^
+947:                               <DatePicker
+948:                                 mode="range"
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:1101:30 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1099:                                 ></div>
+1100:                               {/if}
+1101:                               <label
+                                     ^
+1102:                                 class="md:hidden text-xs font-medium text-muted-foreground block mb-2"
+1103:                                 >Role</label
+2:51:18 pm [vite-plugin-svelte] src/routes/(user)/(admin)/users/[userId]/+page.svelte:1152:32 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+1150:                             >
+1151:                               <div class="w-full space-y-1.5 md:space-y-0">
+1152:                                 <label
+                                       ^
+1153:                                   class="md:hidden text-xs font-medium text-muted-foreground block"
+1154:                                   >Scope Values</label
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/customers/+page.svelte:265:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+263:       <div class="cust-filter-grid">
+264:         <div class="cust-filter-field">
+265:           <label class="cust-filter-label">Customer Name</label>
+                                                                     ^
+266:           <div class="cust-input-wrap">
+267:             <Icon name="search" class="cust-input-icon" />
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/customers/+page.svelte:272:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+270:         </div>
+271:         <div class="cust-filter-field">
+272:           <label class="cust-filter-label">Customer ID</label>
+                                                                   ^
+273:           <div class="cust-input-wrap">
+274:             <Icon name="hash" class="cust-input-icon" />
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/customers/+page.svelte:279:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+277:         </div>
+278:         <div class="cust-filter-field">
+279:           <label class="cust-filter-label">City</label>
+                                                            ^
+280:           <div class="cust-input-wrap">
+281:             <Icon name="map-pin" class="cust-input-icon" />
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:461:12 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+459:               />
+460:             </div>
+461:             <div onclick={() => handleSort('no')} class="cell-head cell-head-doc sortable">
+                       ^
+462:               Document No
+463:               {#if sortField === 'no'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:461:12 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+459:               />
+460:             </div>
+461:             <div onclick={() => handleSort('no')} class="cell-head cell-head-doc sortable">
+                       ^
+462:               Document No
+463:               {#if sortField === 'no'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:467:12 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+465:               {/if}
+466:             </div>
+467:             <div onclick={() => handleSort('date')} class="cell-head cell-head-date sortable">
+                       ^
+468:               Date
+469:               {#if sortField === 'date'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:467:12 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+465:               {/if}
+466:             </div>
+467:             <div onclick={() => handleSort('date')} class="cell-head cell-head-date sortable">
+                       ^
+468:               Date
+469:               {#if sortField === 'date'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:476:14 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+474:             <div class="cell-head cell-head-name">Name</div>
+475:             {#if view !== 'Claim'}
+476:               <div onclick={() => handleSort('amount')} class="cell-head cell-head-amount sortable">
+                         ^
+477:                 Amount
+478:                 {#if sortField === 'amount'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:476:14 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+474:             <div class="cell-head cell-head-name">Name</div>
+475:             {#if view !== 'Claim'}
+476:               <div onclick={() => handleSort('amount')} class="cell-head cell-head-amount sortable">
+                         ^
+477:                 Amount
+478:                 {#if sortField === 'amount'}
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:488:14 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+486:           <div class="list-body">
+487:             {#each sortedDocs() as doc}
+488:               <div 
+                         ^
+489:                 class="doc-row" 
+490:                 class:selected={selectedNos.has(doc.no)} 
+2:51:19 pm [vite-plugin-svelte] src/routes/(user)/salesdocs/+page.svelte:488:14 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+486:           <div class="list-body">
+487:             {#each sortedDocs() as doc}
+488:               <div 
+                         ^
+489:                 class="doc-row" 
+490:                 class:selected={selectedNos.has(doc.no)} 
+2:51:19 pm [vite-plugin-svelte] src/routes/ven-ui-dev/pdf-viewer/+page.svelte:11:23 This reference only captures the initial value of `pdfUrl`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ 9:     let fileName = $state('document.pdf');
+10:     
+11:   let inputUrl = $state(pdfUrl);
+                                  ^
+12:     let isLoadingData = $state(false);
+13: 
+2:51:20 pm [vite-plugin-svelte] src/lib/components/venUI/report-viewer/ReportViewer.svelte:57:48 This reference only captures the initial value of `defaultExportFormat`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+55:   let accordionValue = $state(["filter", "report"]);
+56:   let wasLoading = $state(false);
+57:   let exportFormat = $state<ReportOutputFormat>(defaultExportFormat);
+                                                                       ^
+58:   let dataObjectUrl = $state<string | null>(null);
+59: 
+2:51:20 pm [vite-plugin-svelte] src/lib/components/Settings.svelte:329:2 Unused CSS selector ".icon-prefix"
+https://svelte.dev/e/css_unused_selector
+327:     align-items: center;
+328:   }
+329:   .icon-prefix {
+                   ^
+330:     position: absolute;
+331:     left: 12px;
+2:51:20 pm [vite-plugin-svelte] src/lib/components/Settings.svelte:434:2 Unused CSS selector ".mr-2"
+https://svelte.dev/e/css_unused_selector
+432:   }
+433: 
+434:   .mr-2 {
+            ^
+435:     margin-right: 8px;
+436:   }
+2:51:20 pm [vite-plugin-svelte] src/lib/components/Settings.svelte:437:2 Unused CSS selector ".mr-1"
+https://svelte.dev/e/css_unused_selector
+435:     margin-right: 8px;
+436:   }
+437:   .mr-1 {
+            ^
+438:     margin-right: 4px;
+439:   }
+2:51:23 pm [vite-plugin-svelte] src/lib/components/venUI/calendar-view/CalendarView.svelte:311:6 Elements with the 'gridcell' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus
+309:             {@const dayEvs = day ? eventsForDay(day) : []}
+310:             {@const isWeekend = col === 0 || col === 6}
+311:             <div
+                      ^
+312:           class={cn(
+313:             'group relative min-h-[72px] border-b border-r border-border p-1 transition-colors sm:min-h-[88px]',
+2:51:23 pm [vite-plugin-svelte] src/lib/components/venUI/calendar-view/WeeklyEventDashboardWidget.svelte:340:16 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+338:               <!-- Task List (Multi-level) -->
+339:               {#if event.tasks?.length > 0}
+340:                 <div class="mt-2 space-y-1 pl-1" onclick={(e) => e.stopPropagation()}>
+                           ^
+341:                   {#each event.tasks as task}
+342:                     {@render renderTask(task, 0)}
+2:51:23 pm [vite-plugin-svelte] src/lib/components/venUI/calendar-view/WeeklyEventDashboardWidget.svelte:340:16 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+338:               <!-- Task List (Multi-level) -->
+339:               {#if event.tasks?.length > 0}
+340:                 <div class="mt-2 space-y-1 pl-1" onclick={(e) => e.stopPropagation()}>
+                           ^
+341:                   {#each event.tasks as task}
+342:                     {@render renderTask(task, 0)}
+2:51:23 pm [vite-plugin-svelte] src/lib/components/venUI/date-picker/date-picker.svelte:137:39 This reference only captures the initial value of `picker`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+135:   // The "Current View" determining which grid is shown (year, month, date)
+136:   // Should initialize to 'picker'
+137:   let currentView = $state<PickerMode>(picker);
+                                                  ^
+138: 
+139:   // Watch for open change to reset view
+2:51:28 pm [vite-plugin-svelte] src/lib/components/ui/toggle-group/toggle-group.svelte:36:2 This reference only captures the initial value of `variant`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+34: 
+35:   setToggleGroupCtx({
+36:     variant,
+               ^
+37:     size,
+38:     spacing,
+2:51:28 pm [vite-plugin-svelte] src/lib/components/ui/toggle-group/toggle-group.svelte:37:2 This reference only captures the initial value of `size`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+35:   setToggleGroupCtx({
+36:     variant,
+37:     size,
+            ^
+38:     spacing,
+39:   });
+2:51:28 pm [vite-plugin-svelte] src/lib/components/ui/toggle-group/toggle-group.svelte:38:2 This reference only captures the initial value of `spacing`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+36:     variant,
+37:     size,
+38:     spacing,
+               ^
+39:   });
+40: </script>
+2:51:29 pm [vite-plugin-svelte] src/lib/components/venUI/date-picker/date-input.svelte:48:0 `<div>` with a mouseenter or mouseleave handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+46:     - Hover: Border-primary
+47: -->
+48: <div
+         ^
+49:   class={cn(
+50:     "border-input bg-background dark:bg-input/30 ring-offset-background placeholder:text-muted-foreground flex h-9 w-full min-w-0 items-center justify-between rounded-md border px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm",
+2:51:30 pm [vite-plugin-svelte] src/lib/components/ui/menubar/menubar-item.svelte:18:35 This reference only captures the initial value of `className`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+16:   const baseClass =
+17:     "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:ps-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+18:   const mergedClass = cn(baseClass, className);
+                                                 ^
+19: </script>
+20: 
+2:51:32 pm [vite-plugin-svelte] src/lib/components/ui/chart/chart-container.svelte:20:26 This reference only captures the initial value of `id`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+18:   } = $props();
+19: 
+20:   const chartId = `chart-${id || uid.replace(/:/g, "")}`;
+                                 ^
+21: 
+22:   setChartContext({
+[32mΓ£ô[39m 5243 modules transformed.
+Γ£ù Build failed in 16.32s
+error during build:
+src/routes/(user)/(admin)/users/+page.svelte (24:11): "GetUsersDocument" is not exported by "src/lib/services/graphql/generated/types.ts", imported by "src/routes/(user)/(admin)/users/+page.svelte".
+file: D:/Work Desk/Tyresoles/front-end/src/routes/(user)/(admin)/users/+page.svelte:24:11
+
+22: 
+23:   // GraphQL & utils
+24:   import { GetUsersDocument } from "$lib/services/graphql/generated/types";
+               ^
+25:   import type { GetUsersQuery } from "$lib/services/graphql/generated/types";
+26:   import { cn, getInitials } from "$lib/utils";
+
+    at getRollupError (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at error (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/parseAst.js:398:42)
+    at Module.error (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:17040:16)
+    at Module.traceVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:17452:29)
+    at ModuleScope.findVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:15070:39)
+    at FunctionScope.findVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at FunctionBodyScope.findVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at ReturnValueScope.findVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at FunctionBodyScope.findVariable (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at Identifier.bind (file:///D:/Work%20Desk/Tyresoles/front-end/node_modules/rollup/dist/es/shared/node-entry.js:5447:40)

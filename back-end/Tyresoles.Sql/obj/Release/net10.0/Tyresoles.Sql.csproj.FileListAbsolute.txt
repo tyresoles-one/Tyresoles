@@ -1,0 +1,14 @@
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\bin\Release\net10.0\Tyresoles.Sql.deps.json
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\bin\Release\net10.0\Tyresoles.Sql.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\bin\Release\net10.0\Tyresoles.Sql.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\bin\Release\net10.0\Tyresoles.Sql.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.csproj.AssemblyReference.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.GeneratedMSBuildEditorConfig.editorconfig
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.AssemblyInfoInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.AssemblyInfo.cs
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.csproj.CoreCompileInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\refint\Tyresoles.Sql.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\ref\Tyresoles.Sql.dll

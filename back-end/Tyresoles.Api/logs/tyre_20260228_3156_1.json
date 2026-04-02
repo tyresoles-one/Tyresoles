@@ -1,0 +1,5 @@
+{"timestamp":"2026-02-28T15:06:01.0983973Z","level":"Information","category":"Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager","eventId":63,"message":"User profile is available. Using \u0027C:\\Users\\mades\\AppData\\Local\\ASP.NET\\DataProtection-Keys\u0027 as key repository and Windows DPAPI to encrypt keys at rest."}
+{"timestamp":"2026-02-28T15:06:01.2027195Z","level":"Information","category":"Microsoft.Hosting.Lifetime","eventId":14,"message":"Now listening on: http://localhost:5092"}
+{"timestamp":"2026-02-28T15:06:01.2037215Z","level":"Information","category":"Microsoft.Hosting.Lifetime","eventId":0,"message":"Application started. Press Ctrl\u002BC to shut down."}
+{"timestamp":"2026-02-28T15:06:01.2039958Z","level":"Information","category":"Microsoft.Hosting.Lifetime","eventId":0,"message":"Hosting environment: Development"}
+{"timestamp":"2026-02-28T15:06:01.2040114Z","level":"Information","category":"Microsoft.Hosting.Lifetime","eventId":0,"message":"Content root path: d:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Api"}

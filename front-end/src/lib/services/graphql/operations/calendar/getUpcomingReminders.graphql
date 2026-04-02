@@ -1,0 +1,14 @@
+query GetUpcomingReminders($untilUtc: DateTime) {
+  getUpcomingReminders(untilUtc: $untilUtc) {
+    id
+    title
+    startUtc
+    endUtc
+    reminders {
+      id
+      remindAtUtc
+      channel
+      snoozeUntilUtc
+    }
+  }
+}

@@ -1,0 +1,3 @@
+mutation DeleteCalendarEvent($eventId: UUID!) {
+  deleteCalendarEvent(eventId: $eventId)
+}

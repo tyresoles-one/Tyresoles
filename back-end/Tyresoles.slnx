@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="Tyresoles.Data/Tyresoles.Data.csproj" />
+  <Project Path="Tyresoles.Easebuzz/Tyresoles.Easebuzz.csproj" />
+  <Project Path="Tyresoles.Logger/Tyresoles.Logger.csproj" />
+  <Project Path="Tyresoles.Protean/Tyresoles.Protean.csproj" />
+  <Project Path="Tyresoles.Reporting/Tyresoles.Reporting.csproj" />
+  <Project Path="Tyresoles.Sql.Cli/Tyresoles.Sql.Cli.csproj" />
+  <Project Path="Tyresoles.Sql.Generators/Tyresoles.Sql.Generators.csproj" />
+  <Project Path="Tyresoles.Sql/Tyresoles.Sql.csproj" />
+  <Project Path="Tyresoles.Web/Tyresoles.Web.csproj" />
+</Solution>

@@ -1,0 +1,12 @@
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\bin\Release\net10.0\Tyresoles.Logger.deps.json
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\bin\Release\net10.0\Tyresoles.Logger.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\bin\Release\net10.0\Tyresoles.Logger.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.csproj.AssemblyReference.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.GeneratedMSBuildEditorConfig.editorconfig
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.AssemblyInfoInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.AssemblyInfo.cs
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.csproj.CoreCompileInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\refint\Tyresoles.Logger.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\Tyresoles.Logger.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Release\net10.0\ref\Tyresoles.Logger.dll

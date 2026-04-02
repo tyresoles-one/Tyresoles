@@ -1,0 +1,3 @@
+mutation SnoozeReminder($reminderId: UUID!, $snoozeUntilUtc: DateTime!) {
+  snoozeReminder(reminderId: $reminderId, snoozeUntilUtc: $snoozeUntilUtc)
+}

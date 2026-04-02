@@ -1,0 +1,5 @@
+D:\Work Desk\Tyresoles\back-end\TestQuery\obj\Debug\net10.0\TestQuery.csproj.AssemblyReference.cache
+D:\Work Desk\Tyresoles\back-end\TestQuery\obj\Debug\net10.0\TestQuery.GeneratedMSBuildEditorConfig.editorconfig
+D:\Work Desk\Tyresoles\back-end\TestQuery\obj\Debug\net10.0\TestQuery.AssemblyInfoInputs.cache
+D:\Work Desk\Tyresoles\back-end\TestQuery\obj\Debug\net10.0\TestQuery.AssemblyInfo.cs
+D:\Work Desk\Tyresoles\back-end\TestQuery\obj\Debug\net10.0\TestQuery.csproj.CoreCompileInputs.cache

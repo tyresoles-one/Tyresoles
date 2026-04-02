@@ -1,0 +1,40 @@
+query GetCalendarEventById($eventId: UUID!) {
+  getCalendarEventById(eventId: $eventId) {
+    id
+    ownerUserId
+    eventTypeId
+    eventTypeName
+    eventTypeColor
+    title
+    description
+    startUtc
+    endUtc
+    isAllDay
+    timeZoneId
+    location
+    recurrenceRuleId
+    parentEventId
+    tags {
+      tagType
+      tagKey
+      displayName
+    }
+    reminders {
+      id
+      remindAtUtc
+      channel
+      isSent
+      snoozeUntilUtc
+    }
+    recurrence {
+      frequency
+      interval
+      daysOfWeek
+      dayOfMonth
+      monthOfYear
+      endByDate
+      occurrenceCount
+      rRule
+    }
+  }
+}

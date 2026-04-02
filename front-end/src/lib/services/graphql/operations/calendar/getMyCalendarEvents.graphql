@@ -1,0 +1,40 @@
+query GetMyCalendarEvents(
+  $fromUtc: DateTime!
+  $toUtc: DateTime!
+  $tagType: EventTagType
+  $tagKey: String
+) {
+  getMyCalendarEvents(
+    fromUtc: $fromUtc
+    toUtc: $toUtc
+    tagType: $tagType
+    tagKey: $tagKey
+  ) {
+    id
+    ownerUserId
+    eventTypeId
+    eventTypeName
+    eventTypeColor
+    title
+    description
+    startUtc
+    endUtc
+    isAllDay
+    timeZoneId
+    location
+    recurrenceRuleId
+    parentEventId
+    tags {
+      tagType
+      tagKey
+      displayName
+    }
+    reminders {
+      id
+      remindAtUtc
+      channel
+      isSent
+      snoozeUntilUtc
+    }
+  }
+}

@@ -1,0 +1,144 @@
+INF [EventDefinition`6.Log] Executed DbCommand (99ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+SELECT 1
+INF [EventDefinition`6.Log] Executed DbCommand (166ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND [o].[object_id] NOT IN (SELECT [ep].[major_id]
+        FROM [sys].[extended_properties] AS [ep]
+        WHERE [ep].[minor_id] = 0
+            AND [ep].[class] = 1
+            AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+INF [EventDefinition`6.Log] Executed DbCommand (75ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+
+            IF OBJECT_ID('dbo.Notifications', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[Notifications] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Title] nvarchar(500) NOT NULL,
+                    [Message] nvarchar(4000) NOT NULL,
+                    [Type] int NOT NULL,
+                    [Link] nvarchar(1000) NULL,
+                    [IsRead] bit NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_Notifications] PRIMARY KEY ([Id])
+                );
+                CREATE INDEX [IX_Notifications_IsRead] ON dbo.[Notifications] ([IsRead]);
+                CREATE INDEX [IX_Notifications_UserId_CreatedAt] ON dbo.[Notifications] ([UserId], [CreatedAt]);
+            END
+
+            IF OBJECT_ID('dbo.NotificationPreferences', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[NotificationPreferences] (
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Channel] int NOT NULL,
+                    [DefaultMinutesBefore] int NOT NULL,
+                    [EmailEnabled] bit NOT NULL,
+                    [PushEnabled] bit NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_NotificationPreferences] PRIMARY KEY ([UserId], [Channel])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CalendarAuditLogs', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CalendarAuditLogs] (
+                    [Id] bigint NOT NULL IDENTITY,
+                    [EventId] uniqueidentifier NOT NULL,
+                    [Action] int NOT NULL,
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Payload] nvarchar(4000) NULL,
+                    [CreatedAtUtc] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CalendarAuditLogs] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CalendarTasks', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CalendarTasks] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [EventId] uniqueidentifier NOT NULL,
+                    [ParentTaskId] uniqueidentifier NULL,
+                    [Title] nvarchar(500) NOT NULL,
+                    [IsCompleted] bit NOT NULL,
+                    [SortOrder] int NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CalendarTasks] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CalendarTasks_CalendarEvents_EventId] FOREIGN KEY ([EventId]) REFERENCES dbo.[CalendarEvents] ([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_CalendarTasks_CalendarTasks_ParentTaskId] FOREIGN KEY ([ParentTaskId]) REFERENCES dbo.[CalendarTasks] ([Id]) ON DELETE NO ACTION
+                );
+                CREATE INDEX [IX_CalendarTasks_EventId] ON dbo.[CalendarTasks] ([EventId]);
+                CREATE INDEX [IX_CalendarTasks_ParentTaskId] ON dbo.[CalendarTasks] ([ParentTaskId]);
+            END
+INF [EventDefinition`6.Log] Executed DbCommand (119ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [dbo].[EventTypes] AS [e]) THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+INF [ReminderBackgroundService.ExecuteAsync] Reminder Background Service is starting.
+INF [GenericWebHostService.StartAsync] Now listening on: https://localhost:5002
+INF [GenericWebHostService.StartAsync] Now listening on: http://localhost:5001
+INF [ConsoleLifetime.OnApplicationStarted] Application started. Press Ctrl+C to shut down.
+INF [ConsoleLifetime.OnApplicationStarted] Hosting environment: Production
+INF [ExecutionContext.RunInternal] Content root path: D:\Work Desk\Tyresoles\back-end\Tyresoles.Web
+SQL INF [<>c__DisplayClass0_0.<<Main>$>b__8] Query logging active. Run a GraphQL mutation (e.g. login) to see SQL entries.
+INF [EventDefinition`6.Log] Executed DbCommand (239ms) [Parameters=[@now='?' (DbType = DateTime2), @now1='?' (DbType = DateTime2)], CommandType='Text', CommandTimeout='300']
+SELECT [r].[Id], [r].[Channel], [r].[EventId], [r].[IsSent], [r].[RemindAtUtc], [r].[SentAt], [r].[SnoozeUntilUtc], [c].[Id], [c].[CalendarId], [c].[CreatedAt], [c].[CreatedByUserId], [c].[Description], [c].[EndUtc], [c].[EventTypeId], [c].[ExceptionOccurrenceStartUtc], [c].[IsAllDay], [c].[IsDeleted], [c].[Location], [c].[MeetingLink], [c].[OwnerUserId], [c].[ParentEventId], [c].[RecurrenceRuleId], [c].[ShowAs], [c].[StartUtc], [c].[Status], [c].[TimeZoneId], [c].[Title], [c].[UpdatedAt], [c].[UpdatedByUserId], [c].[Visibility]
+FROM [dbo].[Reminders] AS [r]
+INNER JOIN [dbo].[CalendarEvents] AS [c] ON [r].[EventId] = [c].[Id]
+WHERE [r].[IsSent] = CAST(0 AS bit) AND [r].[RemindAtUtc] <= @now AND ([r].[SnoozeUntilUtc] IS NULL OR [r].[SnoozeUntilUtc] <= @now1)
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE ([EWaybill Enabled] = 1) AND [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Customer] t0 WHERE [No_] IN ('BCUS000001883')
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$D_C Line (Posted)] t0 WHERE [Invoice No_] IN (SELECT [No_] AS [No] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$D_C Header (Posted)] t0 WHERE ([Skip E Way Bill] = 0)
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Line] t0 WHERE [Document No_] IN (SELECT [No_] AS [No] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.FetchStatesByCodesAsync] [QueryAsync] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[State] WHERE [Code] IN ('KA')
+SQL INF [ProteanDataService.FetchStatesByCodesAsync] [QueryAsync] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[State] WHERE [Code] IN ('MH')
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03261547","docDate":"27/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"URP","toTrdName":"MUJAWAR TOURS \u0026 TRAVELS ","toAddr1":"I.C. COLONY NEW LINK ROAD","toAddr2":"BORIWALI WEST.","toPlace":"Borivali West","toPincode":"400092","toStateCode":"","actToStateCode":"","transactionType":"1","totalValue":24406.76,"cgstValue":0,"sgstValue":0,"igstValue":4393.20,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":28800.00,"transMode":"1","transDistance":0,"transporterName":"SHANKAR GUJANAL","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"KA492488","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":998729,"quantity":4,"qtyUnit":"NOS","taxableAmount":24406.76,"sgstRate":0,"cgstRate":0,"igstRate":18.00,"cessRate":0,"cessNonadvol":0},{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":0,"qtyUnit":"","taxableAmount":0,"sgstRate":0,"cgstRate":0,"igstRate":0,"cessRate":0,"cessNonadvol":0}]}}
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 505.6074ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 534.6746ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1ws5N8ImHgGTNbLOLinDbsBWZ","sek":"tvr/6cI5MBvB9zjwZ165mQvOYlDMcvOWspYw5HU1bGi9knE8EY11WSc8dWxzFgBk"}
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 23:51:04 +00:00
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03261547
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 265.3207ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 266.3112ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiMTAwIn0=","info":null}
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03261547: EWaybill error for BSINVP03261547 — 100: Invalid Json
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03261547 — 100: Invalid Json
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at Tyresoles.Data.Features.Sales.ProteanService.<>c__DisplayClass12_0.<<RunEWBProcessAsync>b__0>d.MoveNext() in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 528
+SQL INF [ProteanDataService.WriteEWaybillResultAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03261547')
+SQL INF [ProteanDataService.WriteEWaybillResultAsync] [Update] Tenant=NavLive Executable Query:
+UPDATE [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] SET [Sell-to Customer No_] = 'BCUS000001883', [Bill-to Customer No_] = 'BCUS000001883', [Bill-to Name] = 'Mujawar Tours & Travels', [Bill-to Name 2] = '', [Bill-to Address] = 'I.C. COLONY NEW LINK ROAD', [Bill-to Address 2] = 'BORIWALI WEST.', [Bill-to City] = 'Borivali West', [Bill-to Contact] = '', [Your Reference] = '', [Ship-to Code] = '', [Ship-to Name] = 'Mujawar Tours & Travels', [Ship-to Name 2] = '', [Ship-to Address] = 'I.C. COLONY NEW LINK ROAD', [Ship-to Address 2] = 'BORIWALI WEST.', [Ship-to City] = 'Borivali West', [Ship-to Contact] = '', [Order Date] = '2026-03-26 00:00:00.000', [Posting Date] = '2026-03-27 00:00:00.000', [Shipment Date] = '2026-03-26 00:00:00.000', [Posting Description] = 'Order BSORD03261498', [Payment Terms Code] = '', [Due Date] = '2026-03-27 00:00:00.000', [Payment Discount _] = 0.00000000000000000000, [Pmt_ Discount Date] = '1753-01-01 00:00:00.000', [Shipment Method Code] = '', [Location Code] = 'BGM-INVENT', [Shortcut Dimension 1 Code] = '', [Shortcut Dimension 2 Code] = '', [Customer Posting Group] = 'RETD', [Currency Code] = '', [Currency Factor] = 0.00000000000000000000, [Customer Price Group] = 'BCUS01883', [Prices Including VAT] = 0, [Invoice Disc_ Code] = 'BCUS000001883', [Customer Disc_ Group] = '', [Language Code] = '', [Dealer Code] = 'BCUS06767', [Order No_] = 'BSORD03261498', [No_ Printed] = 0, [On Hold] = '', [Applies-to Doc_ Type] = 0, [Applies-to Doc_ No_] = '', [Bal_ Account No_] = '', [VAT Registration No_] = '', [Reason Code] = '', [Gen_ Bus_ Posting Group] = 'SALES', [EU 3-Party Trade] = 0, [Transaction Type] = '', [Transport Method] = '', [VAT Country_Region Code] = 'IN', [Sell-to Customer Name] = 'MUJAWAR TOURS & TRAVELS ', [Sell-to Customer Name 2] = '', [Sell-to Address] = 'I.C. COLONY NEW LINK ROAD', [Sell-to Address 2] = 'BORIWALI WEST.', [Sell-to City] = 'Borivali West', [Sell-to Contact] = '', [Bill-to Post Code] = '400 092', [Bill-to County] = '', [Bill-to Country_Region Code] = 'IN', [Sell-to Post Code] = '400 092', [Sell-to County] = '', [Sell-to Country_Region Code] = 'IN', [Ship-to Post Code] = '400 092', [Ship-to County] = '', [Ship-to Country_Region Code] = 'IN', [Bal_ Account Type] = 0, [Exit Point] = '', [Correction] = 0, [Document Date] = '2026-03-27 00:00:00.000', [External Document No_] = '41830', [Area] = 'B0192101', [Transaction Specification] = '', [Payment Method Code] = '', [Shipping Agent Code] = '', [Package Tracking No_] = '', [Pre-Assigned No_ Series] = '', [No_ Series] = 'BSINVP', [Order No_ Series] = 'BSORD', [Pre-Assigned No_] = '', [User ID] = 'TYRESOLES\SHRIKANT.B', [Source Code] = 'SALES', [Tax Area Code] = '', [Tax Liable] = 0, [VAT Bus_ Posting Group] = 'NOTAX', [VAT Base Discount _] = 0.00000000000000000000, [Prepayment No_ Series] = '', [Prepayment Invoice] = 0, [Prepayment Order No_] = '', [Quote No_] = '', [Dimension Set ID] = 0, [Credit Card No_] = '', [Direct Debit Mandate ID] = '', [Canceled By] = '', [Cust_ Ledger Entry No_] = 1912763045, [Campaign No_] = '', [Sell-to Contact No_] = '', [Bill-to Contact No_] = '', [Responsibility Center] = 'BEL', [Allow Line Disc_] = 0, [Get Shipment Used] = 0, [Excise Bus_ Posting Group] = '', [Bill to Customer State] = 'MH', [Form Code] = '', [Form No_] = '', [Transit Document] = 0, [State] = 'MH', [LC No_] = '', [Structure] = 'SALES', [Free Supply] = 0, [Export or Deemed Export] = 0, [VAT Exempted] = 0, [PLA Entry No_] = '', [Trading] = 0, [Transaction No_ Serv_ Tax] = 0, [Re-Dispatch] = 0, [Return Re-Dispatch Rcpt_ No_] = '', [RG 23 A Entry No_] = '', [RG 23 C Entry No_] = '', [Calc_ Inv_ Discount (_)] = 0, [Time of Removal] = '1754-01-01 16:44:59.207', [LR_RR No_] = '', [LR_RR Date] = '1753-01-01 00:00:00.000', [Vehicle No_] = '', [Mode of Transport] = '', [ST Pure Agent] = 0, [Nature of Services] = 0, [Service Tax Rounding Precision] = 0.00000000000000000000, [Service Tax Rounding Type] = 0, [PoT] = 0, [Nature of Supply] = 1, [GST Customer Type] = 2, [GST Without Payment of Duty] = 0, [Invoice Type] = 0, [Bill Of Export No_] = '', [Bill Of Export Date] = '1753-01-01 00:00:00.000', [e-Commerce Customer] = '', [e-Commerce Merchant Id] = '', [GST Bill-to State Code] = 'MH', [GST Ship-to State Code] = '', [Location State Code] = 'KA', [GST Rounding Precision] = 0.00000000000000000000, [GST Rounding Type] = 0, [Zero Repairs] = 1, [GST Registration No_] = '', [Partial Posted] = 0, [Mode Of Creation] = 0, [Ship-to GST Registration No_] = '', [Order No_ 2] = '', [Party No_] = '', [Service Resp_ Center] = '', [Can Attach Parties] = 0, [P_O No_] = '', [Skip Structure For GST on Appl] = 0, [Area (Sq Mtr)] = 0.00000000000000000000, [Freight Amount] = 0.00000000000000000000, [Freight _] = 0, [E-Inv Ack No_] = '', [E-Inv Ack Date] = '1753-01-01 00:00:00.000', [E-Inv IRN No_] = '', [E-Inv Json] = (), [E-Inv Signed QRCode] = (), [E-Inv Skip] = 0, [E-WBill No_] = '', [E-WBill Date] = '1753-01-01 00:00:00.000', [E-WBill Expiry] = '1753-01-01 00:00:00.000', [E-WBill Veh Upd Date] = '1753-01-01 00:00:00.000', [E-WBill Cons_ No_] = '', [E-WBill Cons_ Date] = '1753-01-01 00:00:00.000', [Creator User ID] = '', [Is Cancelled] = 0, [Cr_ Order No_] = '', [Cr_ Memo No_] = '', [Sale_ Order No_] = '', [Sale_ Invoice No_] = '', [E-WBill Cancel Date] = '1753-01-01 00:00:00.000', [E-WBill Cancel Reason] = '', [E-WBill Cancel Remark] = '', [E-WBill Cancelled] = 0, [E-WBill Trans_ ID] = '', [E-WBill Trans_ ID Date] = '1753-01-01 00:00:00.000', [E-WBill Status] = 4 WHERE [No_] = 'BSINVP03261547'
+INF [EventDefinition`6.Log] Executed DbCommand (95ms) [Parameters=[@now='?' (DbType = DateTime2), @now1='?' (DbType = DateTime2)], CommandType='Text', CommandTimeout='300']
+SELECT [r].[Id], [r].[Channel], [r].[EventId], [r].[IsSent], [r].[RemindAtUtc], [r].[SentAt], [r].[SnoozeUntilUtc], [c].[Id], [c].[CalendarId], [c].[CreatedAt], [c].[CreatedByUserId], [c].[Description], [c].[EndUtc], [c].[EventTypeId], [c].[ExceptionOccurrenceStartUtc], [c].[IsAllDay], [c].[IsDeleted], [c].[Location], [c].[MeetingLink], [c].[OwnerUserId], [c].[ParentEventId], [c].[RecurrenceRuleId], [c].[ShowAs], [c].[StartUtc], [c].[Status], [c].[TimeZoneId], [c].[Title], [c].[UpdatedAt], [c].[UpdatedByUserId], [c].[Visibility]
+FROM [dbo].[Reminders] AS [r]
+INNER JOIN [dbo].[CalendarEvents] AS [c] ON [r].[EventId] = [c].[Id]
+WHERE [r].[IsSent] = CAST(0 AS bit) AND [r].[RemindAtUtc] <= @now AND ([r].[SnoozeUntilUtc] IS NULL OR [r].[SnoozeUntilUtc] <= @now1)

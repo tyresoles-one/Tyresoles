@@ -1,0 +1,58 @@
+query GetMyVendors(
+  $respCenter: String
+  $categories: [String!]
+  $ecoMgr: String
+  $after: String
+  $before: String
+  $first: Int
+  $last: Int
+  $where: VendorFilterInput
+  $order: [VendorSortInput!]
+) {
+  myVendors(
+    respCenter: $respCenter
+    categories: $categories
+    ecoMgr: $ecoMgr
+    after: $after
+    before: $before
+    first: $first
+    last: $last
+    where: $where
+    order: $order
+  ) {
+    items: nodes {
+      no
+      name
+      city
+      address
+      address2
+      postCode
+      stateCode
+      contact
+      gstRegistrationNo
+      gstStatus
+      panNo
+      nameOnInvoice
+      bankName
+      bankACNo
+      bankIFSCCode
+      bankBranch
+      groupCategory
+      groupDetails
+      ecomileProcMgr
+      territoryCode
+      phoneNo
+      email: eMail
+      responsibilityCenter
+      blocked
+      balance
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    totalCount
+  }
+}

@@ -1,0 +1,261 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Tyresoles.Protean</name>
+    </assembly>
+    <members>
+        <member name="T:Tyresoles.Protean.Constants">
+            <summary>
+            Hardcoded Protean GSP configuration (E-Invoice / E-Waybill).
+            Mirrors Tyresoles.Live backend Tyresoles.One.Data.Services.Protean.Constants.
+            </summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Constants.Environment">
+            <summary>Use Sandbox for test endpoints; Production for live NIC IRP. Can be set via env PROTEAN_SANDBOX=true or Protean__Sandbox=true.</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Constants.UrlVerifySignedInvoice">
+            <summary>NIC portal to verify signed invoice JSON (upload JSON, export PDF). Mirrors Live <c>Services.Protean.Constants.URL_Verify_Signed_Inv</c>.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Encryption.IProteanEncryptor">
+            <summary>All cryptographic operations required by the Protean GSP API.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.GenerateSecureKey">
+            <summary>Generate a random 32-byte AES app key.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.EncryptRsa(System.String,System.String)">
+            <summary>
+            Encrypt <paramref name="plaintext"/> using the public key.
+            Legacy implementation used RSACryptoServiceProvider with fOAEP: false.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.EncryptAes(System.Byte[],System.Byte[])">
+            <summary>
+            AES-256-ECB encrypt <paramref name="data"/> bytes using <paramref name="key"/> bytes.
+            Returns base-64 ciphertext string (as expected by the Protean API).
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.DecryptAes(System.String,System.Byte[])">
+            <summary>
+            AES-256-ECB decrypt <paramref name="base64Ciphertext"/> using <paramref name="key"/> bytes.
+            Returns decrypted UTF-8 string.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.DecryptAesBytes(System.String,System.Byte[])">
+            <summary>
+            AES-256-ECB decrypt returning raw bytes (for cases where the inner payload is JSON).
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.SignData(System.Byte[],System.String)">
+            <summary>
+            RSA-SHA256 sign <paramref name="data"/> using the ASP private key XML.
+            Returns base-64 signature.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.IProteanEncryptor.Base64Decode(System.String)">
+            <summary>Base-64 decode helper (convenience).</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Encryption.ProteanEncryptor">
+            <summary>
+            Default implementation – pure BCL, no external crypto libs.
+            Registered as singleton; all methods are thread-safe.
+            AES symmetric paths match Tyresoles.Live <c>Encryptor.EncryptBySymmetricKey</c> /
+            <c>DecryptBySymmerticKeyBytes</c> (AES-256-ECB, PKCS7).
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.ProteanEncryptor.EncryptRsa(System.String,System.String)">
+            <summary>
+            Encrypt <paramref name="plaintext"/> using the public key.
+            Legacy implementation used RSACryptoServiceProvider with fOAEP: false.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.ProteanEncryptor.EncryptAes(System.Byte[],System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.ProteanEncryptor.EncryptBySymmetricKey(System.Byte[],System.Byte[])">
+            <summary>
+            Bit-for-bit equivalent to Tyresoles.Live <c>Utilities.Encryptor.EncryptBySymmetricKey</c>
+            (replaces legacy <c>AesManaged</c> with <see cref="M:System.Security.Cryptography.Aes.Create"/>, same parameters).
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Encryption.ProteanEncryptor.DecryptBySymmetricKeyBytes(System.String,System.Byte[])">
+            <summary>
+            Equivalent to Tyresoles.Live <c>Utilities.Encryptor.DecryptBySymmerticKeyBytes</c> (raw plaintext bytes).
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.IProteanHttpClient">
+            <summary>Typed HTTP client for the Protean EInvoice (IRP) API.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.IProteanEWbHttpClient">
+            <summary>Typed HTTP client for the Protean EWaybill API.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.LongToStringConverter">
+            <summary>
+            A System.Text.Json converter that allows reading JSON number values as strings.
+            Useful for Protean APIs that sometimes return numeric data for string properties.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.ProteanHttpClientBase">
+            <summary>
+            Shared async HTTP helper. Handles:
+            • Building query-strings for GET
+            • Attaching headers
+            • JSON serialise / deserialise (System.Text.Json)
+            • Structured logging of round-trip
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.EInvoiceUrls">
+            <summary>Protean IRP (EInvoice v1.04) URL constants.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.EWaybillUrls">
+            <summary>Protean EWaybill (v1.03) URL constants.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Http.EWaybillActions">
+            <summary>EWaybill action codes.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Models.EInvoice.EInvoiceRequest">
+            <summary>
+            Top-level wrapper sent by callers. The inner <see cref="P:Tyresoles.Protean.Models.EInvoice.EInvoiceRequest.Request"/> is
+            serialised + AES-encrypted before being sent to the IRP.
+            </summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Models.EInvoice.EInvoiceRequest.Request">
+            <summary>EInvoice payload per GST schema v1.1.</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Models.EInvoice.EInvoiceRequest.Document">
+            <summary>Optional: document reference for logging (type + number).</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Models.EInvoice.EInvoiceRequest.Irn">
+            <summary>Optional: fetch by existing IRN instead of generating new one.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Models.EInvoice.EInvoiceResult">
+            <summary>Decrypted EInvoice IRN response from IRP.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Models.EWaybill.EWaybillRequest">
+            <summary>Caller-facing wrapper for all EWaybill operations.</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Models.EWaybill.EWaybillRequest.Action">
+            <summary>Action to perform (e.g. "Generate").</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Models.EWaybill.EWaybillRequest.Request">
+            <summary>Content payload for the specific action.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Models.Gstin.GstinDetails">
+            <summary>GSTIN details returned from the IRP master data API.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.ProteanException">
+            <summary>Base exception for all Protean GSP errors.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.DuplicateIrnException">
+            <summary>
+            Thrown when the IRP returns error code 2150 (duplicate IRN).
+            The caller can read <see cref="P:Tyresoles.Protean.DuplicateIrnException.IrnInfo"/> to obtain the existing IRN details.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.DuplicateIrnInfo">
+            <summary>IRN detail returned inside error 2150.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.DuplicateIrnInfo.#ctor(System.String,System.String,System.String)">
+            <summary>IRN detail returned inside error 2150.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.EWaybillGenerateException">
+            <summary>
+            Thrown when the EWaybill API returns validation error codes.
+            The dictionary maps error code → human-readable message.
+            </summary>
+        </member>
+        <member name="P:Tyresoles.Protean.EWaybillGenerateException.Message">
+            <summary>
+            Includes decoded Protean error codes and mapped messages so generic <c>catch</c> / Serilog
+            show the same detail as <see cref="P:Tyresoles.Protean.EWaybillGenerateException.Errors"/> (base constructor message alone did not).
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.ProteanServiceCollectionExtensions">
+            <summary>
+            Extension methods for registering all Protean GSP services into the DI container.
+            Configuration is read from <see cref="T:Tyresoles.Protean.Constants"/> (hardcoded); set <see cref="P:Tyresoles.Protean.Constants.Environment"/> for Sandbox vs Production.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.ProteanServiceCollectionExtensions.AddProtean(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Register Tyresoles.Protean services. Uses <see cref="T:Tyresoles.Protean.Constants"/> for config (no appsettings).
+            To use sandbox, set <c>Constants.Environment = ProteanEnvironment.Sandbox</c> before or at startup.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Services.EInvoiceService">
+            <summary>
+            EInvoice service implementation (IRP API v1.04 via Protean GSP).
+            Async-first, no static state; session management delegated to <see cref="T:Tyresoles.Protean.Session.IProteanSessionService"/>.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.EInvoiceService.#ctor(Tyresoles.Protean.Http.IProteanHttpClient,Tyresoles.Protean.Session.IProteanSessionService,Tyresoles.Protean.Encryption.IProteanEncryptor,Microsoft.Extensions.Logging.ILogger{Tyresoles.Protean.Services.EInvoiceService})">
+            <summary>
+            EInvoice service implementation (IRP API v1.04 via Protean GSP).
+            Async-first, no static state; session management delegated to <see cref="T:Tyresoles.Protean.Session.IProteanSessionService"/>.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Services.EWaybillService">
+            <summary>
+            EWaybill service implementation (Protean GSP API v1.03).
+            Async-first, session-managed, no static state.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.EWaybillService.#ctor(Tyresoles.Protean.Http.IProteanEWbHttpClient,Tyresoles.Protean.Session.IProteanSessionService,Tyresoles.Protean.Encryption.IProteanEncryptor,Microsoft.Extensions.Logging.ILogger{Tyresoles.Protean.Services.EWaybillService})">
+            <summary>
+            EWaybill service implementation (Protean GSP API v1.03).
+            Async-first, session-managed, no static state.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Services.EwbErrorMessages">
+            <summary>
+            Static lookup for Protean EWaybill error codes → human-readable messages.
+            Populated directly from the official error code list.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Services.IEInvoiceService">
+            <summary>
+            High-level EInvoice service (IRP v1.04).
+            All methods are fully async and cancellation-aware.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.IEInvoiceService.GenerateIrnAsync(Tyresoles.Protean.Models.EInvoice.EInvoiceRequest,System.Threading.CancellationToken)">
+            <summary>Generate a new IRN for the given invoice.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.IEInvoiceService.GetIrnAsync(Tyresoles.Protean.Models.EInvoice.EInvoiceRequest,System.Threading.CancellationToken)">
+            <summary>Retrieve an existing IRN by IRN hash.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.IEInvoiceService.GetIrnByDocumentAsync(Tyresoles.Protean.Models.EInvoice.EInvoiceRequest,System.Threading.CancellationToken)">
+            <summary>Retrieve an existing IRN by document type/number/date (last 2 days only).</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.IEInvoiceService.GetGstinAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Fetch live GSTIN details from the IRP master.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Services.IEInvoiceService.SyncGstinAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Force-sync GSTIN details from the IRP master.</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Services.IEWaybillService">
+            <summary>
+            High-level EWaybill service (v1.03).
+            All methods are fully async and cancellation-aware.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Session.ProteanSession">
+            <summary>Cached Protean GSP session (per GSTIN).</summary>
+        </member>
+        <member name="P:Tyresoles.Protean.Session.ProteanSession.Sek">
+            <summary>Session Encryption Key (base-64 AES-256).</summary>
+        </member>
+        <member name="T:Tyresoles.Protean.Session.IProteanSessionService">
+            <summary>
+            Manages Protean GSP sessions for both EInvoice and EWaybill APIs.
+            Sessions are cached in-memory keyed by (gstin + apiKind).
+            Thread-safe via IMemoryCache.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Session.IProteanSessionService.InvalidateEInvoiceSession(System.String)">
+            <summary>Removes cached EInvoice session for the given GSTIN so the next request fetches a fresh session.</summary>
+        </member>
+        <member name="M:Tyresoles.Protean.Session.IProteanSessionService.InvalidateEWaybillSession(System.String)">
+            <summary>Removes cached E-Waybill session for the given GSTIN (mirrors Live RemoveExpiredSession on invalid token).</summary>
+        </member>
+    </members>
+</doc>

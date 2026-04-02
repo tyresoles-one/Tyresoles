@@ -1,0 +1,13 @@
+mutation CreateCalendarEvent($input: CreateEventInput!) {
+  createCalendarEvent(input: $input) {
+    id
+    title
+    startUtc
+    endUtc
+    eventTypeId
+    eventTypeName
+    eventTypeColor
+    tags { tagType tagKey displayName }
+    reminders { id remindAtUtc channel }
+  }
+}

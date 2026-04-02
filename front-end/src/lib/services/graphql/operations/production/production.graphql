@@ -1,0 +1,287 @@
+query GetProductionItemNos($param: FetchParamsInput!) {
+  productionItemNos(param: $param) {
+    code
+    minRate
+    maxRate
+    category
+  }
+}
+
+query GetProductionMakes($param: FetchParamsInput!) {
+  productionMakes(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionMakeSubMake($param: FetchParamsInput!) {
+  productionMakeSubMake(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionVendorsCodeNames($param: FetchParamsInput!) {
+  productionVendorsCodeNames(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionInspectorCodeNames($param: FetchParamsInput!) {
+  productionInspectorCodeNames(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionProcurementInspection($param: FetchParamsInput!) {
+  productionProcurementInspection(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionProcurementMarkets($param: FetchParamsInput!) {
+  productionProcurementMarkets(param: $param) {
+    code
+    name
+  }
+}
+
+query GetProductionVendors($param: FetchParamsInput!) {
+  productionVendors(param: $param) {
+    no
+    name
+    address
+    address2
+    city
+    category
+    detail
+    respCenter
+    mobileNo
+    ecoMgrCode
+    nameOnInvoice
+    bankName
+    bankIFSC
+    bankAccNo
+    postCode
+    bankBranch
+    selfInvoice
+    panNo
+    adhaarNo
+    balance
+    stateCode
+  }
+}
+
+query GetProductionEcomileLastNewNumber($respCenter: String!) {
+  productionEcomileLastNewNumber(respCenter: $respCenter)
+}
+
+query GetProductionProcurementOrdersInfo($param: FetchParamsInput!) {
+  productionProcurementOrdersInfo(param: $param) {
+    orderNo
+    supplier
+    supplierCode
+    respCenter
+    status
+    location
+    managerCode
+    date
+    manager
+    qty
+    amount
+  }
+}
+
+query GetProductionProcurementOrderLinesDispatch($param: FetchParamsInput!) {
+  productionProcurementOrderLinesDispatch(param: $param) {
+    orderNo
+    lineNo
+    no
+    make
+    serialNo
+    dispatchOrderNo
+    dispatchDate
+    dispatchDestination
+    dispatchVehicleNo
+    dispatchMobileNo
+    dispatchTransporter
+    button
+    model
+    factInspection
+    newSerialNo
+    rejectionReason
+    supplier
+    location
+    sortNo
+    date
+    inspection
+    orderStatus
+    inspector
+    factInspector
+    factInspectorFinal
+    remark
+  }
+}
+
+query GetProductionProcurementOrderLinesNewNumbering($param: FetchParamsInput!) {
+  productionProcurementOrderLinesNewNumbering(param: $param) {
+    orderNo
+    lineNo
+    no
+    make
+    serialNo
+    dispatchOrderNo
+    dispatchDate
+    dispatchDestination
+    dispatchVehicleNo
+    dispatchMobileNo
+    dispatchTransporter
+    button
+    model
+    factInspection
+    newSerialNo
+    rejectionReason
+    supplier
+    location
+    sortNo
+    date
+    inspection
+    orderStatus
+    inspector
+    factInspector
+    factInspectorFinal
+    remark
+  }
+}
+
+query GetProductionProcurementOrderLines($param: OrderInfoInput!) {
+  productionProcurementOrderLines(param: $param) {
+    no
+    lineNo
+    vendorNo
+    itemNo
+    make
+    serialNo
+    amount
+    subMake
+    inspectorCode
+    sortNo
+    inspection
+    inspector
+  }
+}
+
+query GetProductionProcurementDispatchOrders($param: FetchParamsInput!) {
+  productionProcurementDispatchOrders(param: $param) {
+    no
+    mobileNo
+    vehicleNo
+    destination
+    date
+    tyres
+    status
+  }
+}
+
+query GetProductionProcMarkets($param: FetchParamsInput!) {
+  productionProcMarkets(param: $param)
+}
+
+query GetProductionEcomileProcurementTiles($param: FetchParamsInput!) {
+  productionEcomileProcurementTiles(param: $param) {
+    label
+    value
+    description
+  }
+}
+
+query GetProductionShipmentOrderForMerger($param: FetchParamsInput!) {
+  productionShipmentOrderForMerger(param: $param) {
+    no
+    destination
+    mobileNo
+    transport
+    vehicleNo
+    date
+  }
+}
+
+mutation UpdateProductionCasing($param: FetchParamsInput!) {
+  updateProductionCasing(param: $param) {
+    success
+    message
+  }
+}
+
+mutation InsertProductionCasingItems($casingItems: [CasingItemInput!]!) {
+  insertProductionCasingItems(casingItems: $casingItems) {
+    success
+    message
+  }
+}
+
+mutation UpdateProductionVendor($param: VendorModelInput!) {
+  updateProductionVendor(param: $param) {
+    success
+    message
+  }
+}
+
+mutation CreateProductionVendor($param: FetchParamsInput!) {
+  createProductionVendor(param: $param)
+}
+
+mutation NewProductionProcurementOrder($param: FetchParamsInput!) {
+  newProductionProcurementOrder(param: $param)
+}
+
+mutation UpdateProductionProcurementOrder($order: OrderInfoInput!) {
+  updateProductionProcurementOrder(order: $order)
+}
+
+mutation NewProductionProcShipNo($param: FetchParamsInput!) {
+  newProductionProcShipNo(param: $param)
+}
+
+mutation GenerateProductionGRAs($param: FetchParamsInput!) {
+  generateProductionGRAs(param: $param)
+}
+
+mutation InsertProductionProcurementOrderLine($order: OrderLineInput!) {
+  insertProductionProcurementOrderLine(order: $order)
+}
+
+mutation UpdateProductionProcurementOrderLine($order: OrderLineInput!) {
+  updateProductionProcurementOrderLine(order: $order)
+}
+
+mutation UpdateProductionProcOrdLineDispatch($lines: [OrderLineDispatchInput!]!) {
+  updateProductionProcOrdLineDispatch(lines: $lines)
+}
+
+mutation UpdateProductionProcOrdLineDispatchSingle($line: OrderLineDispatchInput!) {
+  updateProductionProcOrdLineDispatchSingle(line: $line)
+}
+
+mutation UpdateProductionProcOrdLineReceipt($lines: [OrderLineDispatchInput!]!) {
+  updateProductionProcOrdLineReceipt(lines: $lines)
+}
+
+mutation UpdateProductionProcOrdLineRemove($lines: [OrderLineDispatchInput!]!) {
+  updateProductionProcOrdLineRemove(lines: $lines)
+}
+
+mutation UpdateProductionProcOrdLineDrop($lines: [OrderLineDispatchInput!]!) {
+  updateProductionProcOrdLineDrop(lines: $lines)
+}
+
+mutation DeleteProductionProcurementOrderLine($order: OrderLineInput!) {
+  deleteProductionProcurementOrderLine(order: $order)
+}
+
+mutation DeleteProductionProcurementOrder($order: OrderInfoInput!) {
+  deleteProductionProcurementOrder(order: $order)
+}

@@ -1,0 +1,6 @@
+query GetMyBalance($entityType: String, $entityCode: String, $respCenter: String) {
+  myBalance(entityType: $entityType, entityCode: $entityCode, respCenter: $respCenter) {
+    code
+    balance
+  }
+}

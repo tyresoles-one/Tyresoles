@@ -1,0 +1,32 @@
+query GetTransactionsPage(
+  $entityType: String
+  $entityCode: String
+  $respCenter: String
+  $first: Int
+  $after: String
+  $order: [AccountTransactionSortInput!]
+) {
+  myTransactions(
+    entityType: $entityType
+    entityCode: $entityCode
+    respCenter: $respCenter
+    first: $first
+    after: $after
+    order: $order
+  ) {
+    totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      date
+      type
+      documentNo
+      amount
+      customerNo
+      customerName
+      balance
+    }
+  }
+}

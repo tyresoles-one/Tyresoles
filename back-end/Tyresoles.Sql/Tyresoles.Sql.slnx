@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="../Tyresoles.Data/Tyresoles.Data.csproj" />
+  <Project Path="../Tyresoles.Logger/Tyresoles.Logger.csproj" Id="ae8e1b8d-62de-493e-ae41-b3b2d0eec914" />
+  <Project Path="../Tyresoles.Sql.Cli/Tyresoles.Sql.Cli.csproj" />
+  <Project Path="../Tyresoles.Sql.Generators/Tyresoles.Sql.Generators.csproj" />
+  <Project Path="../Tyresoles.Web/Tyresoles.Web.csproj" />
+  <Project Path="Tyresoles.Sql.csproj" />
+</Solution>

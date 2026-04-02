@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Tyresoles.Easebuzz</name>
+    </assembly>
+    <members>
+        <member name="T:Tyresoles.Easebuzz.EasebuzzOptions">
+            <summary>
+            Configuration for Easebuzz payment gateway. Bind to "Easebuzz" in appsettings.json.
+            Key and Salt are obtained from the Easebuzz merchant dashboard (https://dashboard.easebuzz.in).
+            Do not commit Key/Salt; use User Secrets, environment variables, or Key Vault in production.
+            </summary>
+        </member>
+        <member name="F:Tyresoles.Easebuzz.EasebuzzOptions.Section">
+            <summary>Configuration section name for appsettings.json.</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.Key">
+            <summary>Merchant key from Easebuzz dashboard.</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.Salt">
+            <summary>Merchant salt from Easebuzz dashboard. Never send to client; used server-side only for hash generation.</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.Sandbox">
+            <summary>Use sandbox/test environment when true; production when false.</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.EnableIframe">
+            <summary>Enable iframe payment flow when true.</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.BaseUrl">
+            <summary>Optional override for API base URL. When null, derived from Sandbox (test vs production).</summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.EasebuzzOptions.TimeoutSeconds">
+            <summary>HTTP timeout for Easebuzz API calls in seconds.</summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.EasebuzzServiceCollectionExtensions">
+            <summary>
+            Extension methods for registering Tyresoles.Easebuzz services in the DI container.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.EasebuzzServiceCollectionExtensions.AddEasebuzz(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Action{Tyresoles.Easebuzz.EasebuzzOptions})">
+            <summary>
+            Registers Easebuzz payment gateway services. Binds configuration from "Easebuzz" section.
+            Key and Salt must be set (from Easebuzz dashboard); validation runs at startup.
+            </summary>
+            <example>
+            In Program.cs: builder.Services.AddEasebuzz();
+            Or: builder.Services.AddEasebuzz(o => o.Sandbox = true);
+            </example>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.EasebuzzUrls">
+            <summary>
+            Easebuzz API base URLs. Confirm from https://docs.easebuzz.in/docs/payment-gateway/ if endpoints change.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Hash.EasebuzzHashProvider">
+            <summary>
+            SHA-512 hash for Easebuzz request signing. Stateless and thread-safe.
+            Field order per Easebuzz/PayU-style: key|txnid|amount|productinfo|firstname|email|||||||||||SALT
+            Confirm from https://docs.easebuzz.in/docs/payment-gateway/
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Hash.IEasebuzzHashProvider">
+            <summary>
+            Stateless, thread-safe provider for Easebuzz request hash (SHA-512).
+            Salt is never exposed; used only when computing the hash server-side.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.Hash.IEasebuzzHashProvider.ComputeInitiatePaymentHash(System.String,System.String,System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Computes the payment initiation hash. Field order must match Easebuzz docs.
+            See https://docs.easebuzz.in/docs/payment-gateway/ (Initiate Payment API).
+            Formula: sha512(key|txnid|amount|productinfo|firstname|email|||||||||||salt).
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Http.EasebuzzPaymentClient">
+            <summary>
+            Typed HTTP client for Easebuzz Initiate Payment and Transaction APIs.
+            Endpoint paths per https://docs.easebuzz.in/docs/payment-gateway/
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Http.IEasebuzzPaymentClient">
+            <summary>
+            Typed HTTP client for Easebuzz payment APIs. Used by IEasebuzzPaymentService.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.Http.IEasebuzzPaymentClient.InitiatePaymentAsync(Tyresoles.Easebuzz.Models.InitiatePaymentRequest,System.Threading.CancellationToken)">
+            <summary>
+            POST to initiate payment; returns result containing access_key or data.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.Http.IEasebuzzPaymentClient.GetTransactionStatusAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Fetches transaction status by transaction ID or reference.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.IEasebuzzPaymentService">
+            <summary>
+            High-level Easebuzz payment service. Inject this where you need to initiate payments or check transaction status.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.IEasebuzzPaymentService.InitiatePaymentAsync(Tyresoles.Easebuzz.Models.InitiatePaymentInput,System.Threading.CancellationToken)">
+            <summary>
+            Initiates a payment: computes hash server-side and calls Easebuzz API; returns result with access_key for payment UI.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.IEasebuzzPaymentService.GetTransactionStatusAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Fetches transaction status by transaction ID or reference. Returns null if not found or on error.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Easebuzz.IEasebuzzPaymentService.VerifyWebhookSignature(System.String,System.String)">
+            <summary>
+            Verifies webhook signature (hash) against payload. Use when processing Easebuzz callbacks.
+            Confirm verification algorithm from https://docs.easebuzz.in/docs/payment-gateway/
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Models.InitiatePaymentInput">
+            <summary>
+            Input for initiating a payment. Hash is computed by the service; do not pass Key/Salt from client.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Models.InitiatePaymentRequest">
+            <summary>
+            Request to initiate a payment. Field names aligned with Easebuzz Initiate Payment API where applicable.
+            See https://docs.easebuzz.in/docs/payment-gateway/
+            </summary>
+        </member>
+        <member name="P:Tyresoles.Easebuzz.Models.InitiatePaymentRequest.Hash">
+            <summary>Hash generated server-side (key|txnid|amount|productinfo|firstname|email|...|salt). Never send salt to client.</summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Models.InitiatePaymentResult">
+            <summary>
+            Response from Easebuzz Initiate Payment API. Contains access_key used to open payment UI.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Models.TransactionStatusResult">
+            <summary>
+            Transaction status from Easebuzz Transaction API. Confirm field names from https://docs.easebuzz.in/docs/payment-gateway/
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Easebuzz.Services.EasebuzzPaymentService">
+            <summary>
+            Easebuzz payment service: initiates payments (with server-side hash) and fetches transaction status.
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,859 @@
+using System.Security.Claims;
+using Dataverse.NavLive;
+using HotChocolate;
+using HotChocolate.Data;
+using Microsoft.AspNetCore.Authorization;
+using Tyresoles.Data;
+using Tyresoles.Data.Features.Admin.Session;
+using Tyresoles.Data.Features.Admin.User;
+using Tyresoles.Data.Features.Calendar;
+using Tyresoles.Data.Features.Calendar.Entities;
+using Tyresoles.Data.Features.Sales;
+using Tyresoles.Data.Features.Sales.Reports;
+using Tyresoles.Data.Features.Sales.Reports.Models;
+using Tyresoles.Data.Features.Purchase;
+using Tyresoles.Data.Features.Procurement;
+using Tyresoles.Data.Features.Production;
+using Tyresoles.Data.Features.Production.Models;
+using Tyresoles.Data.Features.Common;
+using Tyresoles.Sql.Abstractions;
+using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
+
+namespace Tyresoles.Web;
+
+public class Query
+{
+    public string Version => "1.0";
+
+    /// <summary>Get profile for a user by userId (UserName or MobileNo). Returns null if not found. Requires authentication.</summary>
+    [Authorize]
+    public async Task<ProfileResult?> GetProfile(
+        string userId,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        return await userService.GetProfileAsync(userId, cancellationToken);
+    }
+
+    public async Task<List<Tyresoles.Data.Features.Protean.EInvoiceCandidate>> GetSalesInvLinesForInvoiceAsync([Service] IProteanService proteanService, [Service] IDataverseDataService dataService, CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        return await proteanService.GetSalesLinesForEInvoiceAsync(scope, cancellationToken);
+    }
+     /// <summary>Search app users by name or username for the attendee picker. Returns userId, fullName, userType, avatar. Requires authentication.</summary>
+    [GraphQLName("searchUsers")]
+    [Authorize]
+    public async Task<IReadOnlyList<UserSearchResult>> SearchUsers(
+        string? search,
+        int? take,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        return await userService.SearchUsersAsync(search, take ?? 20, cancellationToken);
+    }
+
+    /// <summary>List active sessions. Optional filter by userId. Requires authentication.</summary>
+    [Authorize]
+    public async Task<IReadOnlyList<SessionInfo>> GetSessions(
+        string? userId,
+        [Service] ISessionStore sessionStore,
+        CancellationToken cancellationToken = default)
+    {
+        return await sessionStore.ListAsync(userId, cancellationToken);
+    }
+
+    /// <summary>
+    /// List of entity balances (Code, Balance) from Detailed Cust. Ledger Entry for the caller's scope.
+    /// Customer/Partner: one item keyed by entityCode. PartnerGroup: one item per dealer in the group.
+    /// </summary>
+    [Authorize]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Sales.EntityBalance>> GetMyBalance(
+        string? entityType,
+        string? entityCode,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await salesService.GetMyBalanceAsync(scope, entityType, entityCode, respCenter, cancellationToken);
+    }
+
+    /// <summary>Latest account transactions (Date, Type, DocumentNo, Amount, CustomerNo) from Detailed Cust. Ledger Entry. EntityType: Partner or PartnerGroup only. Fully paged, ordered by date descending.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<AccountTransaction> GetMyTransactions(
+        string? entityType,
+        string? entityCode,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyTransactionsQuery(scope, entityType, entityCode, respCenter);
+    }
+
+    /// <summary>My customers scoped by entity type/code/department. Partner/PartnerGroup filtered by dealer code.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Customer> GetMyCustomers(
+        string? entityType,
+        string? entityCode,
+        string? department,
+        string? respCenter,
+        string? dealerCode,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyCustomersQuery(scope, entityType, entityCode, department, respCenter, dealerCode);
+    }
+
+    /// <summary>My dealers (SalespersonPurchaser) scoped by entity type/code/department.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<SalespersonPurchaser> GetMyDealers(
+        string? entityType,
+        string? entityCode,
+        string? department,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyDealersQuery(scope, entityType, entityCode, department, respCenter);
+    }
+
+    /// <summary>My areas. Optional respCenter filters by Responsibility Center. Employee: areas by Team (Team Salesperson). Partner: areas from customers' Area Code (Dealer Code).</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Area> GetMyAreas(
+        string? entityType,
+        string? entityCode,
+        string? department,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        
+        
+            var scope = dataService.ForTenant("NavLive");
+            httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+            return salesService.GetMyAreasQuery(scope, entityType, entityCode, department, respCenter);
+        
+    }
+    /// <summary>My regions (Territery) scoped by entity type/code/department.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Territory> GetMyRegions(
+        string? entityType,
+        string? entityCode,
+        string? department,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyRegionsQuery(scope, entityType, entityCode, department, respCenter);
+    }
+
+    /// <summary>Get a single dealer by code.</summary>
+    [Authorize]
+    [GraphQLName("dealerByCode")]
+    public SalespersonPurchaser GetDealerByCode(
+        string code,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetDealerQuery(scope, code, cancellationToken);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<ResponsibilityCenter> GetMyRespCenters(
+        string type,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Query> logger)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+
+        logger.LogInformation("Fetch myRespCenters for user: {UserId}, type: {Type}", userId, type);
+
+        return salesService.GetMyRespCentersQuery(scope, userId, type);
+    }
+
+    /// <summary>Get report metadata for sales category. Optional comma-separated report codes filter.</summary>
+    [Authorize]
+    public async Task<List<ReportMeta>> GetReportSalesMeta(
+        string? reports,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesReportService salesReportService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        var list = await salesReportService.GetReportMetaAsync(scope, reports, cancellationToken);
+        return list ?? new List<ReportMeta>();
+    }
+
+    /// <summary>Vehicles (transporters) scoped by entity type/code/department. Active/inactive status included as raw int.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 200)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.Vehicles> GetMyVehicles(
+        string? entityType,
+        string? entityCode,
+        string? department,
+        string? respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyVehiclesQuery(scope, entityType, entityCode, department, respCenter);
+    }
+   
+    /// <summary>NAV Post Code master (PIN, city, state, country). Paged, filterable, sortable for reference UIs.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 200)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.PostCode> GetPostCodes(
+        [Service] IDataverseDataService dataService,
+        [Service] ICommonDataService commonService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return commonService.GetPostCodesQuery(scope);
+    }
+
+    /// <summary>My vendors scoped by responsibility centers and group categories. Fully compatible with GraphQL projection, filters, sorting, and paging.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.Vendor> GetMyVendors(
+        string? respCenter,
+        string[]? categories,
+        string? ecoMgr,
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.MyVendors(scope, respCenter, categories, ecoMgr);
+    }
+
+    /// <summary>Item / casing numbers for procurement (legacy Db.Production.ItemNos). Paged, filterable, sortable.</summary>
+    /// <remarks>Do not add Hot Chocolate <c>[UseProjection]</c> here: it re-projects <c>CasingItem</c> using property names as SQL columns,
+    /// so <c>MinRate</c>/<c>MaxRate</c> become invalid on Group Details; the provider must keep the Nav mapping (<c>Value</c>, <c>Extra Value</c>).</remarks>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 200)]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CasingItem> GetPurchaseItemNos(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.ItemNos(scope, param);
+    }
+
+    /// <summary>My Procurement Orders. Fully compatible with GraphQL projection, filters, sorting, and paging.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.PurchaseHeader> GetProcurementOrders(
+        string? respCenters,
+        string? userCode,
+        string? userDepartment,
+        string? userSpecialToken,
+        int? statusFilter,
+        [Service] IDataverseDataService dataService,
+        [Service] IProcurementService procurementService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return procurementService.ProcurementOrders(scope, respCenters, userCode, userDepartment, userSpecialToken, statusFilter);
+    }
+
+    /// <summary>My Procurement Order Lines. Fully compatible with GraphQL projection, filters, sorting, and paging.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.PurchaseLine> GetProcurementOrderLines(
+        string? respCenters,
+        string? userCode,
+        string? userDepartment,
+        string? userSpecialToken,
+        int? statusFilter,
+        [Service] IDataverseDataService dataService,
+        [Service] IProcurementService procurementService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return procurementService.ProcurementOrderLines(scope, respCenters, userCode, userDepartment, userSpecialToken, statusFilter);
+    }
+
+    /// <summary>My calendar events in date range. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getMyCalendarEvents")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>> GetMyCalendarEvents(
+        DateTime fromUtc,
+        DateTime toUtc,
+        EventTagType? tagType = null,
+        string? tagKey = null,
+        int? skip = null,
+        int? take = null,
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>();
+        return await calendarService.GetMyEventsAsync(userId, fromUtc, toUtc, tagType, tagKey, true, skip, take, cancellationToken);
+    }
+
+    /// <summary>Get a single calendar event by id. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getCalendarEventById")]
+    public async Task<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto?> GetCalendarEventById(
+        Guid eventId,
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return null;
+        return await calendarService.GetEventByIdAsync(eventId, userId, cancellationToken);
+    }
+
+    /// <summary>Event types for calendar (Meeting, Call, Visit, etc.). Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getEventTypes")]
+    public async Task<IReadOnlyList<EventTypeDto>> GetEventTypes(
+        [Service] ICalendarService calendarService = null!,
+        CancellationToken cancellationToken = default)
+    {
+        return await calendarService.GetEventTypesAsync(cancellationToken);
+    }
+
+    /// <summary>Upcoming reminders for the current user. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getUpcomingReminders")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>> GetUpcomingReminders(
+        DateTime? untilUtc,
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>();
+        var until = untilUtc ?? DateTime.UtcNow.AddHours(24);
+        return await calendarService.GetUpcomingRemindersAsync(userId, until, cancellationToken);
+    }
+
+    /// <summary>Calendars I have shared with others. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getSharedCalendars")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.CalendarShareDto>> GetSharedCalendars(
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.Calendar.Dto.CalendarShareDto>();
+        return await calendarService.GetSharedCalendarsAsync(userId, cancellationToken);
+    }
+
+    /// <summary>My notification preference for reminders. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getNotificationPreference")]
+    public async Task<Tyresoles.Data.Features.Calendar.NotificationPreferenceDto?> GetNotificationPreference(
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return null;
+        return await calendarService.GetNotificationPreferenceAsync(userId, cancellationToken);
+    }
+
+    /// <summary>Free/busy slots for given user IDs in date range. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getFreeBusy")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.FreeBusyDto>> GetFreeBusy(
+        IReadOnlyList<string> userIds,
+        DateTime fromUtc,
+        DateTime toUtc,
+        [Service] ICalendarService calendarService = null!,
+        CancellationToken cancellationToken = default)
+    {
+        return await calendarService.GetFreeBusyAsync(userIds, fromUtc, toUtc, cancellationToken);
+    }
+
+    /// <summary>Audit log for calendar events. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getCalendarAuditLog")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.CalendarAuditLogEntryDto>> GetCalendarAuditLog(
+        Guid? eventId,
+        string? userId,
+        int limit = 50,
+        [Service] ICalendarService calendarService = null!,
+        CancellationToken cancellationToken = default)
+    {
+        return await calendarService.GetCalendarAuditLogAsync(eventId, userId, limit, cancellationToken);
+    }
+
+    /// <summary>Events that conflict with the given time range for the current user. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getCalendarConflicts")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>> GetCalendarConflicts(
+        DateTime startUtc,
+        DateTime endUtc,
+        Guid? excludeEventId,
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.Calendar.Dto.CalendarEventDto>();
+        return await calendarService.GetConflictsAsync(userId, startUtc, endUtc, excludeEventId, cancellationToken);
+    }
+
+    /// <summary>Export calendar as ICS (iCalendar) for the given range. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("exportCalendarIcs")]
+    public async Task<string> ExportCalendarIcs(
+        DateTime fromUtc,
+        DateTime toUtc,
+        [Service] ICalendarService calendarService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId)) return "";
+        return await calendarService.ExportIcsAsync(userId, fromUtc, toUtc, cancellationToken);
+    }
+
+    /// <summary>Get recent notifications for the current user. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getNotifications")]
+    public async Task<IReadOnlyList<Notification>> GetNotifications(
+        int limit = 50,
+        [Service] INotificationService notificationService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        [Service] ILogger<Query> logger = null!,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+            if (string.IsNullOrEmpty(userId)) return Array.Empty<Notification>();
+            return await notificationService.GetMyNotificationsAsync(userId, limit, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in GetNotifications query");
+            throw;
+        }
+    }
+
+    /// <summary>Get count of unread notifications for the current user. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("getUnreadNotificationCount")]
+    public async Task<int> GetUnreadNotificationCount(
+        [Service] INotificationService notificationService = null!,
+        [Service] IHttpContextAccessor httpContextAccessor = null!,
+        [Service] ILogger<Query> logger = null!,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+            if (string.IsNullOrEmpty(userId)) return 0;
+            return await notificationService.GetUnreadCountAsync(userId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in GetUnreadNotificationCount query");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Fetch documents (Invoices, Credit Notes, Claims) based on parameters.
+    /// Partially integrated with comprehensive user context filtering.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("getMyDocuments")]
+    public async Task<DocumentDto[]> GetMyDocuments(
+        SalesReportParams parameters,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesReportService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Query> logger,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        try
+        {
+            return await salesService.GetMyDocuments(scope, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error in getMyDocuments query");
+            throw;
+        }
+    }
+
+
+    /// <summary>Get group details by category and optional comma-separated codes. Requires authentication.</summary>
+    [Authorize]
+    public async Task<IReadOnlyList<GroupDetails>> GetGroupDetails(
+        string category,
+        string? codes,
+        [Service] ICommonDataService commonService,
+        CancellationToken cancellationToken = default)
+    {
+        return await commonService.GetGroupDetailsAsync(category, codes, cancellationToken);
+    }
+
+    /// <summary>Get user details including RDP password and NAV config name by username. Requires authentication.</summary>
+    [Authorize]
+    public async Task<UserDetail?> GetUser(
+        string username,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        return await userService.GetUserAsync(username, cancellationToken);
+    }
+
+    /// <summary>Get casing items. Ported from Db.Production.ItemNos.</summary>
+    [Authorize]
+    public async Task<List<CasingItem>> GetProductionItemNos(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetItemNosAsync(scope, param, cancellationToken);
+    }
+
+
+    /// <summary>Get makes. Ported from Db.Production.Makes.</summary>
+    [Authorize]
+    public async Task<List<CodeName>> GetProductionMakes(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetMakesAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get sub-makes. Ported from Db.Production.MakeSubMake.</summary>
+    [Authorize]
+    public async Task<List<CodeName>> GetProductionMakeSubMake(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetMakeSubMakeAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get vendors code names. Ported from Db.Production.VendorsCodeNames.</summary>
+    [Authorize]
+    public async Task<List<CodeName>> GetProductionVendorsCodeNames(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetVendorsCodeNamesAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get inspector code names. Ported from Db.Production.InspectorCodeNames.</summary>
+    [Authorize]
+    public async Task<List<CodeName>> GetProductionInspectorCodeNames(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetInspectorCodeNamesAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get procurement inspection options. Ported from Db.Production.ProcurementInspection.</summary>
+    public List<CodeName> GetProductionProcurementInspection(Tyresoles.Data.Features.Production.Models.FetchParams param, [Service] IProductionService productionService)
+    {
+        return productionService.GetProcurementInspection(param);
+    }
+
+    /// <summary>Get procurement markets. Ported from Db.Production.ProcurementMarkets.</summary>
+    [Authorize]
+    public async Task<List<CodeName>> GetProductionProcurementMarkets(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementMarketsAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get vendors with balance. Ported from Db.Production.Vendors.</summary>
+    [Authorize]
+    public async Task<List<VendorModel>> GetProductionVendors(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetVendorsAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get ecomile last numbering. Ported from Db.Production.EcomileLastNewNumber.</summary>
+    [Authorize]
+    public async Task<string> GetProductionEcomileLastNewNumber(
+        string respCenter,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetEcomileLastNewNumberAsync(scope, respCenter, cancellationToken);
+    }
+
+    /// <summary>Get procurement orders info. Ported from Db.Production.ProcurementOrdersInfo.</summary>
+    [Authorize]
+    public async Task<List<OrderInfo>> GetProductionProcurementOrdersInfo(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementOrdersInfoAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>
+    /// Get procurement order lines for dispatch workflows. Ported from Live <c>Db.Production.ProcurementOrderLinesDispatch(FetchParams)</c>.
+    /// GraphQL: <c>productionProcurementOrderLinesDispatch(param: FetchParamsInput!)</c>.
+    /// </summary>
+    [Authorize]
+    public async Task<List<OrderLineDispatch>> GetProductionProcurementOrderLinesDispatch(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementOrderLinesDispatchAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get procurement order lines for numbering. Ported from Db.Production.ProcurementOrderLinesNewNumbering.</summary>
+    [Authorize]
+    public async Task<List<OrderLineDispatch>> GetProductionProcurementOrderLinesNewNumbering(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementOrderLinesNewNumberingAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get procurement order lines. Ported from <c>Tyresoles.One.Data.Navision.Db.Production.ProcurementOrderLines</c> (<c>Db.Production.cs</c>).</summary>
+    [Authorize]
+    public async Task<List<OrderLine>> GetProductionProcurementOrderLines(
+        OrderInfo param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementOrderLinesAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get dispatch orders. Ported from Db.Production.ProcurementDispatchOrders.</summary>
+    [Authorize]
+    public async Task<List<DispatchOrder>> GetProductionProcurementDispatchOrders(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementDispatchOrdersAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get proc markets. Ported from Db.Production.ProcMarkets.</summary>
+    [Authorize]
+    public async Task<List<string>> GetProductionProcMarkets(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcMarketsAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get ecomile procurement tiles. Ported from Db.Production.GetEcomileProcurementTiles.</summary>
+    [Authorize]
+    public async Task<List<Tile>> GetProductionEcomileProcurementTiles(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetEcomileProcurementTilesAsync(scope, param, cancellationToken);
+    }
+
+    /// <summary>Get shipment order for merger. Ported from Db.Production.ShipmentOrderForMerger.</summary>
+    [Authorize]
+    public async Task<List<ShipmentInfo>> GetProductionShipmentOrderForMerger(
+        ProductionFetchParams param,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetShipmentOrderForMergerAsync(scope, param, cancellationToken);
+    }
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    [GraphQLName("procurementNewNumberingPaged")]
+    public IQueryable<ProcurementNewNumberingDto> GetProcurementNewNumberingPaged(
+        DateTime? fromDate,
+        DateTime? toDate,
+        string? respCenters,
+        string? view,
+        string? type,
+        string[]? nos,
+        [Service] IDataverseDataService dataService,
+        [Service] IProcurementService procurementService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        ClaimsPrincipal claimsPrincipal)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+
+        var userCode = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userSpecialToken = claimsPrincipal.FindFirst("SpecialToken")?.Value;
+
+        return procurementService.ProcurementOrderLinesNewNumbering(
+            scope, fromDate, toDate, respCenters, view, type, nos, userCode, userSpecialToken);
+    }
+}
+

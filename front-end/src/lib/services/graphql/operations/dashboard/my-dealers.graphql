@@ -1,0 +1,28 @@
+query GetDealers(
+  $entityType: String
+  $entityCode: String
+  $department: String
+  $respCenter: String
+  $take: Int
+  $where: SalespersonPurchaserFilterInput
+) {
+  dealers: myDealers(
+    entityType: $entityType
+    entityCode: $entityCode
+    department: $department
+    respCenter: $respCenter
+    first: $take
+    after: null
+    where: $where
+  ) {
+    items: nodes {
+      code
+      name
+      phoneNo: mobileNo
+      depot
+      eMail
+      dealershipName
+    }
+    totalCount
+  }
+}

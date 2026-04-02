@@ -1,0 +1,29 @@
+query GetMyAreas(
+  $entityType: String
+  $entityCode: String
+  $department: String
+  $respCenter: String
+  $first: Int
+  $after: String
+  $where: AreaFilterInput
+) {
+  myAreas(
+    entityType: $entityType
+    entityCode: $entityCode
+    department: $department
+    respCenter: $respCenter
+    first: $first
+    after: $after
+    where: $where
+  ) {
+    nodes {
+      code
+      name
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}

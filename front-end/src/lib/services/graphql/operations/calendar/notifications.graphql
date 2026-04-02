@@ -1,0 +1,37 @@
+query GetNotifications($limit: Int) {
+  notifications: getNotifications(limit: $limit) {
+    id
+    userId
+    title
+    message
+    type
+    link
+    isRead
+    createdAt
+  }
+}
+
+query GetUnreadNotificationCount {
+  unreadCount: getUnreadNotificationCount
+}
+
+mutation MarkNotificationAsRead($notificationId: UUID!) {
+  markNotificationAsRead(notificationId: $notificationId)
+}
+
+mutation MarkAllNotificationsAsRead {
+  markAllNotificationsAsRead
+}
+
+subscription OnNotification($userId: String!) {
+  onNotification(userId: $userId) {
+    id
+    userId
+    title
+    message
+    type
+    link
+    isRead
+    createdAt
+  }
+}

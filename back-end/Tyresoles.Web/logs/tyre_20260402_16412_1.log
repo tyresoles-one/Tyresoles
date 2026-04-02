@@ -1,0 +1,280 @@
+INF [EventDefinition`6.Log] Executed DbCommand (189ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+SELECT 1
+INF [EventDefinition`6.Log] Executed DbCommand (230ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+
+IF EXISTS
+    (SELECT *
+     FROM [sys].[objects] o
+     WHERE [o].[type] = 'U'
+     AND [o].[is_ms_shipped] = 0
+     AND [o].[object_id] NOT IN (SELECT [ep].[major_id]
+        FROM [sys].[extended_properties] AS [ep]
+        WHERE [ep].[minor_id] = 0
+            AND [ep].[class] = 1
+            AND [ep].[name] = N'microsoft_database_tools_support'
+    )
+)
+SELECT 1 ELSE SELECT 0
+INF [EventDefinition`6.Log] Executed DbCommand (104ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+
+            IF OBJECT_ID('dbo.Notifications', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[Notifications] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Title] nvarchar(500) NOT NULL,
+                    [Message] nvarchar(4000) NOT NULL,
+                    [Type] int NOT NULL,
+                    [Link] nvarchar(1000) NULL,
+                    [IsRead] bit NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_Notifications] PRIMARY KEY ([Id])
+                );
+                CREATE INDEX [IX_Notifications_IsRead] ON dbo.[Notifications] ([IsRead]);
+                CREATE INDEX [IX_Notifications_UserId_CreatedAt] ON dbo.[Notifications] ([UserId], [CreatedAt]);
+            END
+
+            IF OBJECT_ID('dbo.NotificationPreferences', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[NotificationPreferences] (
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Channel] int NOT NULL,
+                    [DefaultMinutesBefore] int NOT NULL,
+                    [EmailEnabled] bit NOT NULL,
+                    [PushEnabled] bit NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_NotificationPreferences] PRIMARY KEY ([UserId], [Channel])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CalendarAuditLogs', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CalendarAuditLogs] (
+                    [Id] bigint NOT NULL IDENTITY,
+                    [EventId] uniqueidentifier NOT NULL,
+                    [Action] int NOT NULL,
+                    [UserId] nvarchar(128) NOT NULL,
+                    [Payload] nvarchar(4000) NULL,
+                    [CreatedAtUtc] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CalendarAuditLogs] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CalendarTasks', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CalendarTasks] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [EventId] uniqueidentifier NOT NULL,
+                    [ParentTaskId] uniqueidentifier NULL,
+                    [Title] nvarchar(500) NOT NULL,
+                    [IsCompleted] bit NOT NULL,
+                    [SortOrder] int NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CalendarTasks] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CalendarTasks_CalendarEvents_EventId] FOREIGN KEY ([EventId]) REFERENCES dbo.[CalendarEvents] ([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_CalendarTasks_CalendarTasks_ParentTaskId] FOREIGN KEY ([ParentTaskId]) REFERENCES dbo.[CalendarTasks] ([Id]) ON DELETE NO ACTION
+                );
+                CREATE INDEX [IX_CalendarTasks_EventId] ON dbo.[CalendarTasks] ([EventId]);
+                CREATE INDEX [IX_CalendarTasks_ParentTaskId] ON dbo.[CalendarTasks] ([ParentTaskId]);
+            END
+INF [EventDefinition`6.Log] Executed DbCommand (81ms) [Parameters=[], CommandType='Text', CommandTimeout='300']
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [dbo].[EventTypes] AS [e]) THEN CAST(1 AS bit)
+    ELSE CAST(0 AS bit)
+END
+INF [ReminderBackgroundService.ExecuteAsync] Reminder Background Service is starting.
+INF [GenericWebHostService.StartAsync] Now listening on: https://localhost:5002
+INF [GenericWebHostService.StartAsync] Now listening on: http://localhost:5001
+INF [ConsoleLifetime.OnApplicationStarted] Application started. Press Ctrl+C to shut down.
+INF [ConsoleLifetime.OnApplicationStarted] Hosting environment: Production
+INF [ExecutionContext.RunInternal] Content root path: D:\Work Desk\Tyresoles\back-end\Tyresoles.Web
+SQL INF [<>c__DisplayClass0_0.<<Main>$>b__8] Query logging active. Run a GraphQL mutation (e.g. login) to see SQL entries.
+INF [EventDefinition`6.Log] Executed DbCommand (120ms) [Parameters=[@now='?' (DbType = DateTime2), @now1='?' (DbType = DateTime2)], CommandType='Text', CommandTimeout='300']
+SELECT [r].[Id], [r].[Channel], [r].[EventId], [r].[IsSent], [r].[RemindAtUtc], [r].[SentAt], [r].[SnoozeUntilUtc], [c].[Id], [c].[CalendarId], [c].[CreatedAt], [c].[CreatedByUserId], [c].[Description], [c].[EndUtc], [c].[EventTypeId], [c].[ExceptionOccurrenceStartUtc], [c].[IsAllDay], [c].[IsDeleted], [c].[Location], [c].[MeetingLink], [c].[OwnerUserId], [c].[ParentEventId], [c].[RecurrenceRuleId], [c].[ShowAs], [c].[StartUtc], [c].[Status], [c].[TimeZoneId], [c].[Title], [c].[UpdatedAt], [c].[UpdatedByUserId], [c].[Visibility]
+FROM [dbo].[Reminders] AS [r]
+INNER JOIN [dbo].[CalendarEvents] AS [c] ON [r].[EventId] = [c].[Id]
+WHERE [r].[IsSent] = CAST(0 AS bit) AND [r].[RemindAtUtc] <= @now AND ([r].[SnoozeUntilUtc] IS NULL OR [r].[SnoozeUntilUtc] <= @now1)
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE ([EWaybill Enabled] = 1) AND [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Customer] t0 WHERE [No_] IN ('BCUS000006650', 'BCUS000003779', 'BCUS000007395', 'BCUS000006546', 'BCUS000002611')
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$D_C Line (Posted)] t0 WHERE [Invoice No_] IN (SELECT [No_] AS [No] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$D_C Header (Posted)] t0 WHERE ([Skip E Way Bill] = 0)
+SQL INF [ProteanDataService.GetPendingEWaybillsAsync] [Query] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Line] t0 WHERE [Document No_] IN (SELECT [No_] AS [No] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE (([E-WBill Status] = 1) OR ([E-WBill Status] = 3)))
+SQL INF [ProteanDataService.FetchStatesByCodesAsync] [QueryAsync] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[State] WHERE [Code] IN ('KA')
+SQL INF [ProteanDataService.FetchStatesByCodesAsync] [QueryAsync] Tenant=NavLive Executable Query:
+SELECT * FROM [dbo].[State] WHERE [Code] IN ('KA', 'MP', 'MH')
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03261892","docDate":"31/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"29ALUPP4821H1ZI","toTrdName":"M/s MALLIKARJUN AGENCIES","toAddr1":"MUDHOL","toAddr2":"MUDHOL","toPlace":"Mudhol","toPincode":"587316","toStateCode":"29","actToStateCode":"29","transactionType":"2","totalValue":113000.00,"cgstValue":10170.00,"sgstValue":10170.00,"igstValue":0,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":133340.00,"transMode":"1","transDistance":0,"transporterName":"S B MATAPATHI","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"KA23A6163","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":10,"qtyUnit":"NOS","taxableAmount":113000.00,"sgstRate":9.00,"cgstRate":9.00,"igstRate":0,"cessRate":0,"cessNonadvol":0}]}}
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03261568","docDate":"27/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"29APOPD9633B1ZS","toTrdName":"ESRV ENTERPRISES","toAddr1":"Ground Floor, 3-126/6, Jyothi Complex,","toAddr2":"Gangolli Road, Gujjadi Post, Kodapady, Udupi,","toPlace":"Kundapura","toPincode":"576247","toStateCode":"29","actToStateCode":"29","transactionType":"1","totalValue":34618.00,"cgstValue":3115.62,"sgstValue":3115.62,"igstValue":0,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":40849.00,"transMode":"1","transDistance":0,"transporterName":"MALIKJAN","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"KA27A8837","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":6,"qtyUnit":"NOS","taxableAmount":34618.00,"sgstRate":9.00,"cgstRate":9.00,"igstRate":0,"cessRate":0,"cessNonadvol":0}]}}
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03262047","docDate":"31/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"URP","toTrdName":"SANIDHI TYRES (N B ECOMILES) ","toAddr1":"#167,Ward No.01,Mallapur(P.L)","toAddr2":"Po.Dadnatti,Dis.Mudhol,Bagalkot-","toPlace":"Badami","toPincode":"587122","toStateCode":"29","actToStateCode":"29","transactionType":"1","totalValue":17800.00,"cgstValue":1602.00,"sgstValue":1602.00,"igstValue":0,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":21004.00,"transMode":"1","transDistance":0,"transporterName":"S B MATAPATHI","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"KA23A6163","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":2,"qtyUnit":"NOS","taxableAmount":17800.00,"sgstRate":9.00,"cgstRate":9.00,"igstRate":0,"cessRate":0,"cessNonadvol":0}]}}
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03261521","docDate":"27/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"27ACEFA1317J1ZN","toTrdName":"AYM TOP BUS LLP","toAddr1":"2, A/224, OSHIWARA INDUSTRIAL PREMISES CHS LTD","toAddr2":"GOREGAON LINK ROAD OFF NEW LINK ROAD, GOREGAON W","toPlace":"Goregaon West","toPincode":"400104","toStateCode":"27","actToStateCode":"27","transactionType":"1","totalValue":6186.44,"cgstValue":0,"sgstValue":0,"igstValue":1113.56,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":7300.00,"transMode":"1","transDistance":0,"transporterName":"SHANKAR GUJANAL","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"KA492488","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":998729,"quantity":2,"qtyUnit":"NOS","taxableAmount":6186.44,"sgstRate":0,"cgstRate":0,"igstRate":0.00,"cessRate":0,"cessNonadvol":0},{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":0,"qtyUnit":"","taxableAmount":0,"sgstRate":0,"cgstRate":0,"igstRate":0,"cessRate":0,"cessNonadvol":0}]}}
+INF [EWaybillService.GenerateAsync] request {"UserName":"API_tyresolesindia","Password":"Tyres@123","Gstin":"29AAACT2744B1ZM","Action":"Generate","Request":{"supplyType":"O","subSupplyType":"1","subSupplyDesc":"","docType":"INV","docNo":"BSINVP03261588","docDate":"27/03/2026","fromGstin":"29AAACT2744B1ZM","fromTrdName":"TYRESOLES (INDIA) PRIVATE LIMITED","fromAddr1":"Plot No. 35 \u0026 36","fromAddr2":"Kakati Industrial Area, Kakati","fromPlace":"Belgaum","actFromStateCode":"29","fromPincode":"591113","fromStateCode":"29","toGstin":"23AAACT2744B1ZY","toTrdName":"Tyresoles India Private Limited","toAddr1":"84 RICHHAI INDU ,ESTATE OPP PARLE BISCUIT","toAddr2":"FACT RICHHAI JABALPUR ","toPlace":"Jabalpur","toPincode":"482011","toStateCode":"23","actToStateCode":"23","transactionType":"1","totalValue":442530.00,"cgstValue":0,"sgstValue":0,"igstValue":79655.40,"cessValue":0,"cessNonAdvolValue":0,"otherValue":0,"totInvValue":522185.00,"transMode":"1","transDistance":0,"transporterName":"RAEES KHAN","transporterId":"","transDocNo":"","transDocDate":"","vehicleNo":"MP09HH4135","vehicleType":"R","itemList":[{"productName":"Tyre Retreading","productDesc":"Retreading","hsnCode":40121200,"quantity":50,"qtyUnit":"NOS","taxableAmount":442530.00,"sgstRate":0,"cgstRate":0,"igstRate":18.00,"cessRate":0,"cessNonadvol":0}]}}
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 540.5947ms - 200
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 540.4614ms - 200
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 551.3119ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 569.4563ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 569.6073ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 569.7447ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1hocwPwjl51HZkoyPIC62ayBw","sek":"kApQ6QlPOir0GaMp0AWZ5ut5eATFp/KWpeyzVuRzRbPWaBRTBBKmfitgU3H9Susl"}
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1hocwPwjl51HZkoyPIC62ayBw","sek":"ovj49z3VGtoysEhhO8Lvc99frVMv/JaNCCsWvY7VeVvLQaBmuupQUmYOPxdYuN3j"}
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1hocwPwjl51HZkoyPIC62ayBw","sek":"A/xp5dBMQ3wqFu05647mqgdN4FRIW4FDmAFl3M+vOL9T2jLBQkVbPi7DhPpEGUvP"}
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 21:48:01 +00:00
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 21:48:01 +00:00
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 21:48:01 +00:00
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03261588
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03261568
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03261521
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 600.3476ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 616.0207ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1hocwPwjl51HZkoyPIC62ayBw","sek":"xTmMzmnnuQSoZUR/B4XEVrLfLX+5e12JKnOd1qR2C+CX9CAZVdYQVrwVKux5pZrQ"}
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 21:48:01 +00:00
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03261892
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 610.0926ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 626.183ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/auth): {"status":"1","authtoken":"1hocwPwjl51HZkoyPIC62ayBw","sek":"KgixYdxrawfNuEt0ZLRJhLMbzbk87sMtQu1bgOBDjMN8+GZgCHXI6s4rLSKX9SUV"}
+INF [ProteanSessionService.FetchEWaybillSessionAsync] EWaybill session refreshed for 29AAACT2744B1ZM, expires 04/02/2026 21:48:01 +00:00
+INF [EWaybillService.GenerateAsync] GenerateEWaybill BSINVP03262047
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestStart] Sending HTTP request POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 197.6288ms - 200
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 164.7048ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 198.1167ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 165.0751ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiNjA0LCJ9","info":""}
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiNjA0LCJ9","info":""}
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03262047: EWaybill error for BSINVP03262047 — 604: E-way bill(s) are already generated for the same document number
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03262047 — 604: E-way bill(s) are already generated for the same document number
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at System.Runtime.CompilerServices.ConfiguredTaskAwaitable`1.ConfiguredTaskAwaiter.GetResult()
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03261568: EWaybill error for BSINVP03261568 — 604: E-way bill(s) are already generated for the same document number
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03261568 — 604: E-way bill(s) are already generated for the same document number
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at Tyresoles.Data.Features.Sales.ProteanService.<>c__DisplayClass12_0.<<RunEWBProcessAsync>b__0>d.MoveNext() in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 528
+SQL INF [ProteanDataService.GetCredentialsForInvoiceAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03262047'))
+SQL INF [ProteanDataService.GetCredentialsForInvoiceAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03261568'))
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 299.3749ms - 200
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 274.8522ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 300.0873ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 275.6397ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiNjA0LCJ9","info":""}
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiNjA0LCJ9","info":""}
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03261892: EWaybill error for BSINVP03261892 — 604: E-way bill(s) are already generated for the same document number
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03261892 — 604: E-way bill(s) are already generated for the same document number
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at Tyresoles.Data.Features.Sales.ProteanService.<>c__DisplayClass12_0.<<RunEWBProcessAsync>b__0>d.MoveNext() in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 528
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03261588: EWaybill error for BSINVP03261588 — 604: E-way bill(s) are already generated for the same document number
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03261588 — 604: E-way bill(s) are already generated for the same document number
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at Tyresoles.Data.Features.Sales.ProteanService.<>c__DisplayClass12_0.<<RunEWBProcessAsync>b__0>d.MoveNext() in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 528
+SQL INF [ProteanDataService.GetCredentialsForInvoiceAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03261588'))
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 308.4275ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 309.1198ms - 200
+INF [ProteanHttpClientBase.PostInternalAsync] Protean Raw Response (POST https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/): {"status":"0","error":"eyJlcnJvckNvZGVzIjoiNjA0LCJ9","info":""}
+SQL INF [ProteanDataService.GetCredentialsForInvoiceAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03261892'))
+WRN [EWaybillService.DecryptEwbResponse] Protean e-waybill rejected BSINVP03261521: EWaybill error for BSINVP03261521 — 604: E-way bill(s) are already generated for the same document number
+Tyresoles.Protean.EWaybillGenerateException: EWaybill error for BSINVP03261521 — 604: E-way bill(s) are already generated for the same document number
+   at Tyresoles.Protean.Services.EWaybillService.DecryptEwbResponse[TResult](EwbResponse resp, String sekBase64, String label) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 192
+   at Tyresoles.Protean.Services.EWaybillService.GenerateAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 49
+   at Tyresoles.Data.Features.Sales.ProteanService.<>c__DisplayClass12_0.<<RunEWBProcessAsync>b__0>d.MoveNext() in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 528
+SQL INF [ProteanDataService.GetCredentialsForInvoiceAsync] [Query] Tenant=NavLive Executable Query:
+SELECT TOP (1) * FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Responsibility Center] t0 WHERE [Code] IN (SELECT [Responsibility Center] AS [ResponsibilityCenter] FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Sales Invoice Header] t0 WHERE ([No_] = 'BSINVP03261521'))
+INF [EWaybillService.GetByDocumentAsync] GetEWaybillByDoc BSINVP03262047
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestStart] Sending HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 169.9076ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 170.5359ms - 200
+INF [ProteanHttpClientBase.GetInternalAsync] Protean Raw Response (GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?docType=INV&docNo=BSINVP03262047): {"status":"1","data":"weIcm1VZTNW8ZNRDqmbSGuB+OwfvHGaMo7ntVQfSGYTgun+ZyH9awpow6ODXNLwZqYZCIhMyxqbIr7BDr9CQsBXVqLG0wi00+NzTpn0pt2GAFIZGko7V+e5q8OU03SmJS3fFVUoHJPwbKq4Tyz4HKXlY93Gcfw1iqtdBXDpnNys=","rek":"vyAAyp+2Jp1MzTw2Te+DbhSvrp3snqYZ34+m1YSsLK5SfLCVXBhs5ib0sbFQvj78","hmac":"wqSIM21CiYjvZ8L9S8kKsAteowwKnbiVjeFvktrz6LA="}
+ERR [ProteanService.GetEwbByDocNoAsync] GetEwbByDocNoAsync failed for BSINVP03262047
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at Tyresoles.Protean.Services.EWaybillService.GetByDocumentAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 141
+   at Tyresoles.Data.Features.Sales.ProteanService.GetEwbByDocNoAsync(ITenantScope scope, String docType, String docNo, IEWaybillService eWaybillService, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 677
+INF [EWaybillService.GetByDocumentAsync] GetEWaybillByDoc BSINVP03261588
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestStart] Sending HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 115.6946ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 116.1058ms - 200
+INF [ProteanHttpClientBase.GetInternalAsync] Protean Raw Response (GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?docType=INV&docNo=BSINVP03261588): {"status":"1","data":"hyYCayQN20Aqr7ZKQ45cE/NUYTtHsw26AVageusMa4OEiwgBoJs7xoKFqRPeoyQAHvLdlifMxlBYM93RRFdjbdiNYV8TNfgs8kvTBdSjPomhTr0akg/N1IfadC7rVs9wre2RC4VmCRj7CndFTF3dKRmbC7oZ5Gt4VeMxL0GsQOE=","rek":"pn8WYT6z0DWaz03lwOlKUEo/wcet8Yesy6TgWPwcH25SfLCVXBhs5ib0sbFQvj78","hmac":"pvdVS1rhYIJXbp5XAdOoShmU3aTNdZcsRsvp+JAPyfU="}
+ERR [ProteanService.GetEwbByDocNoAsync] GetEwbByDocNoAsync failed for BSINVP03261588
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at Tyresoles.Protean.Services.EWaybillService.GetByDocumentAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 141
+   at Tyresoles.Data.Features.Sales.ProteanService.GetEwbByDocNoAsync(ITenantScope scope, String docType, String docNo, IEWaybillService eWaybillService, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 677
+INF [EWaybillService.GetByDocumentAsync] GetEWaybillByDoc BSINVP03261568
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestStart] Sending HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 114.4166ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 115.248ms - 200
+INF [ProteanHttpClientBase.GetInternalAsync] Protean Raw Response (GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?docType=INV&docNo=BSINVP03261568): {"status":"1","data":"CY9MPam6MlVwXmkJtImT9DfqXt+HQmFsbMAxlPpAl8rdTYn44/02OFjcJUX+YBOHy9oOPK2/2l3rQRL937odpvJP78fagVUL2XN4MS4ERia1Id65j9af7ogwdu09mDGBZvDqT2nHHej16f3yO/ESfflphgQvauS2ZYsygA5kffo=","rek":"qSl+5cWeA4MNbwaqKSIXiMi6fXizf6zhdTVYTYXmJMdSfLCVXBhs5ib0sbFQvj78","hmac":"ATFfNa9KCU5T7Cwi7Bs8yP0QFK1iNv7xxDJce2O0rHE="}
+ERR [ProteanService.GetEwbByDocNoAsync] GetEwbByDocNoAsync failed for BSINVP03261568
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at Tyresoles.Protean.Services.EWaybillService.GetByDocumentAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 141
+   at Tyresoles.Data.Features.Sales.ProteanService.GetEwbByDocNoAsync(ITenantScope scope, String docType, String docNo, IEWaybillService eWaybillService, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 677
+INF [EWaybillService.GetByDocumentAsync] GetEWaybillByDoc BSINVP03261521
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestStart] Sending HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 100.641ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 103.0419ms - 200
+INF [ProteanHttpClientBase.GetInternalAsync] Protean Raw Response (GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?docType=INV&docNo=BSINVP03261521): {"status":"1","data":"mJK912+04YmCX8yOhLm/QgIJhBlKKRJLeN3CzHh0WEGqDKO0HEoyb62qafAbCbCrGPsFE+SVgQbfGS6X0r/Kb3ZUQs+5gKT2PNxjRD2aOuI5QQZf7IUUTREURtp5iZbBIbcs7OdRADd4tk1X45dMVfA18YfiqCphbVl2vizhuCU=","rek":"5OP2zwXkOL4YFCPageQM7EcOdMtjl5uhPrP0Cwc2GYFSfLCVXBhs5ib0sbFQvj78","hmac":"pIZVvVTJzdU8CNfyFY6f02KFgOTTUJ1wVdyQE+jLoEs="}
+ERR [ProteanService.GetEwbByDocNoAsync] GetEwbByDocNoAsync failed for BSINVP03261521
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at Tyresoles.Protean.Services.EWaybillService.GetByDocumentAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 141
+   at Tyresoles.Data.Features.Sales.ProteanService.GetEwbByDocNoAsync(ITenantScope scope, String docType, String docNo, IEWaybillService eWaybillService, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 677
+INF [EWaybillService.GetByDocumentAsync] GetEWaybillByDoc BSINVP03261892
+INF [LogHelper.LogRequestPipelineStart] Start processing HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestStart] Sending HTTP request GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?*
+INF [LogHelper.LogRequestEnd] Received HTTP response headers after 146.9627ms - 200
+INF [LogHelper.LogRequestPipelineEnd] End processing HTTP request after 148.5014ms - 200
+INF [ProteanHttpClientBase.GetInternalAsync] Protean Raw Response (GET https://api.proteangsp.co.in/gus/ewb/v1.03/ewayapi/GetEwayBillGeneratedByConsigner?docType=INV&docNo=BSINVP03261892): {"status":"1","data":"UqnVS4xTBa07teF387YhgyjMMnqj9NDhYu9lc11lmsoLOQ5EfzhP/MbsoMludw7PlZJ9KRRdB6C8Kli25PMJQgL011IoXqjyOCmJicxHKBld9I+mU0POTiR/wdaNC4esG0AMqw2fYiFjBoJBQw3qm67heYb8KRoRc9aVWmwT+gM=","rek":"9/4SaV5nuHeJJMI4o4eGNCA6uo09siOvVNS9+BPzZUpSfLCVXBhs5ib0sbFQvj78","hmac":"9QksdIjKHBZoqeFT5OabWgHIyN82QkbFAkmqdkrMo0Y="}
+ERR [ProteanService.GetEwbByDocNoAsync] GetEwbByDocNoAsync failed for BSINVP03261892
+System.FormatException: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.
+   at System.Convert.FromBase64CharPtr(Char* inputPtr, Int32 inputLength)
+   at System.Convert.FromBase64String(String s)
+   at Tyresoles.Protean.Services.EWaybillService.GetByDocumentAsync(EWaybillRequest request, CancellationToken ct) in d:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\Services\EWaybillService.cs:line 141
+   at Tyresoles.Data.Features.Sales.ProteanService.GetEwbByDocNoAsync(ITenantScope scope, String docType, String docNo, IEWaybillService eWaybillService, CancellationToken ct) in D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\Features\Sales\ProteanDataService.cs:line 677
+INF [EventDefinition`6.Log] Executed DbCommand (121ms) [Parameters=[@now='?' (DbType = DateTime2), @now1='?' (DbType = DateTime2)], CommandType='Text', CommandTimeout='300']
+SELECT [r].[Id], [r].[Channel], [r].[EventId], [r].[IsSent], [r].[RemindAtUtc], [r].[SentAt], [r].[SnoozeUntilUtc], [c].[Id], [c].[CalendarId], [c].[CreatedAt], [c].[CreatedByUserId], [c].[Description], [c].[EndUtc], [c].[EventTypeId], [c].[ExceptionOccurrenceStartUtc], [c].[IsAllDay], [c].[IsDeleted], [c].[Location], [c].[MeetingLink], [c].[OwnerUserId], [c].[ParentEventId], [c].[RecurrenceRuleId], [c].[ShowAs], [c].[StartUtc], [c].[Status], [c].[TimeZoneId], [c].[Title], [c].[UpdatedAt], [c].[UpdatedByUserId], [c].[Visibility]
+FROM [dbo].[Reminders] AS [r]
+INNER JOIN [dbo].[CalendarEvents] AS [c] ON [r].[EventId] = [c].[Id]
+WHERE [r].[IsSent] = CAST(0 AS bit) AND [r].[RemindAtUtc] <= @now AND ([r].[SnoozeUntilUtc] IS NULL OR [r].[SnoozeUntilUtc] <= @now1)

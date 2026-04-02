@@ -1,0 +1,26 @@
+query GetSessions($userId: String) {
+  sessions(userId: $userId) {
+    sessionId
+    userId
+    userType
+    entityType
+    entityCode
+    department
+    createdAtUtc
+    expiresAtUtc
+  }
+}
+
+mutation KillSession($sessionId: String!) {
+  killSession(sessionId: $sessionId) {
+    success
+    message
+  }
+}
+
+mutation KillSessionsByUser($userId: String!) {
+  killSessionsByUser(userId: $userId) {
+    success
+    killedCount
+  }
+}

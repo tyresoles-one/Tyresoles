@@ -1,0 +1,143 @@
+using System.Text;
+using System.Linq.Expressions;
+using System.Reflection;
+using Tyresoles.Sql.Abstractions;
+
+namespace Tyresoles.Sql.Core.Query;
+
+internal class SqlBuilder
+{
+    private readonly string _table;
+    private readonly string? _company;
+    private readonly StringBuilder _sb = new();
+    private readonly ParameterContext _context = new();
+    
+    private List<string> _wheres = new();
+    private List<string> _joins = new();
+    private string _select = "*";
+    private string _orderBy = "";
+    private int? _skip;
+    private int? _take;
+    
+    public SqlBuilder(string table, string? company)
+    {
+       _table = table; 
+       _company = company;
+    }
+
+    public void AddWhere(Expression expr)
+    {
+        var visitor = new SqlExpressionVisitor(_context); // Note: Need to initialize correctly
+        // Wait, visitor needs to handle the parameter remapping if we aliased tables?
+        // For single table query, [Column] is fine.
+        visitor.Visit(expr);
+        _wheres.Add(visitor.GetSql());
+    }
+
+    public void AddJoin(JoinExpression join)
+    {
+        var rightTable = ResolveTableName(join.RightType);
+        var leftCol = GetColumnName(join.LeftKey);
+        var rightCol = GetColumnName(join.RightKey);
+        
+        _joins.Add($"INNER JOIN [{rightTable}] ON [{_table}].[{leftCol}] = [{rightTable}].[{rightCol}]");
+    }
+
+    public void SetSelector(LambdaExpression selector)
+    {
+        // Simple column extraction if new { x.A, x.B }
+        if (selector.Body is NewExpression ne)
+        {
+            var cols = ne.Arguments.Select(GetColumnNameFromArg).Where(x => x != null);
+            _select = string.Join(", ", cols);
+            // Need to handle aliasing?
+        }
+        else if (selector.Body is MemberExpression me)
+        {
+            _select = $"[{me.Member.Name}]";
+        }
+        else if (selector.Body is ParameterExpression)
+        {
+            _select = "*";
+        }
+    }
+    
+    public void SetOrderBy(LambdaExpression orderBy)
+    {
+        var col = GetColumnName(orderBy);
+        _orderBy = $"[{col}]"; 
+    }
+    
+    public void SetSkip(int skip) => _skip = skip;
+    public void SetTake(int take) => _take = take;
+
+    private string ResolveTableName(Type t) 
+    {
+        var attr = t.GetCustomAttribute<NavTableAttribute>();
+        var name = attr?.Name ?? t.Name; 
+        
+        bool isShared = attr?.IsShared ?? false;
+        
+        if (!isShared && !string.IsNullOrEmpty(_company))
+        {
+            return $"{_company}${name}";
+        }
+        return name;
+    }
+    
+    private string ResolveTableName(string tableName)
+    {
+        // For the root table (passed as string), we assume it's NOT shared if _company is set.
+        // Because TenantScope passes NULL company for shared tables.
+        
+        if (!string.IsNullOrEmpty(_company))
+        {
+             return $"{_company}${tableName}";
+        }
+        return tableName;
+    }
+    
+    private string GetColumnName(LambdaExpression expr)
+    {
+        return GetColumnNameFromArg(expr.Body) ?? "*";
+    }
+
+    private string? GetColumnNameFromArg(Expression expr)
+    {
+        if (expr is MemberExpression m) return m.Member.Name;
+        if (expr is UnaryExpression u && u.Operand is MemberExpression um) return um.Member.Name;
+        return null;
+    }
+
+    public QueryDescriptor Build()
+    {
+         _sb.Append("SELECT ");
+         if (_take.HasValue && !_skip.HasValue) 
+             _sb.Append($"TOP ({_take}) ");
+         
+         _sb.Append(_select);
+         // Re-implementing FROM clause
+         var rootTable = ResolveTableName(_table); 
+         _sb.Append($" FROM [{rootTable}]");
+
+         // Prefix strategy applied, company filter removed.
+         
+         foreach(var j in _joins) _sb.Append(" " + j);
+         
+         if (_wheres.Count > 0)
+         {
+             _sb.Append(" WHERE ");
+             _sb.Append(string.Join(" AND ", _wheres));
+         }
+
+         if (!string.IsNullOrEmpty(_orderBy))
+             _sb.Append($" ORDER BY {_orderBy}");
+             
+         if (_skip.HasValue)
+         {
+             _sb.Append($" OFFSET {_skip} ROWS FETCH NEXT {_take ?? int.MaxValue} ROWS ONLY");
+         }
+
+         return new QueryDescriptor { Sql = _sb.ToString(), Parameters = _context.Parameters };
+    }
+}

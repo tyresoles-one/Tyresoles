@@ -1,0 +1,23 @@
+query GetMyTransactions(
+  $entityType: String
+  $entityCode: String
+  $respCenter: String
+) {
+  myTransactions(
+    entityType: $entityType
+    entityCode: $entityCode
+    respCenter: $respCenter
+    first: 3
+    order: { date: DESC }
+  ) {
+    nodes {
+      date
+      type
+      documentNo
+      amount
+      customerNo
+      customerName
+      balance
+    }
+  }
+}

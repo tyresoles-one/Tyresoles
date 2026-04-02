@@ -1,0 +1,6 @@
+D:\Work Desk\Tyresoles\back-end\TestQuery\Program.cs(15,52): error CS0122: 'ParameterContext' is inaccessible due to its protection level [D:\Work Desk\Tyresoles\back-end\TestQuery\TestQuery.csproj]
+D:\Work Desk\Tyresoles\back-end\TestQuery\Program.cs(16,56): error CS0122: 'SqlExpressionVisitor' is inaccessible due to its protection level [D:\Work Desk\Tyresoles\back-end\TestQuery\TestQuery.csproj]
+D:\Work Desk\Tyresoles\back-end\TestQuery\Program.cs(18,39): error CS0122: 'SqlExpressionVisitor.GetSql()' is inaccessible due to its protection level [D:\Work Desk\Tyresoles\back-end\TestQuery\TestQuery.csproj]
+D:\Work Desk\Tyresoles\back-end\TestQuery\Program.cs(19,36): error CS0122: 'ParameterContext.Parameters' is inaccessible due to its protection level [D:\Work Desk\Tyresoles\back-end\TestQuery\TestQuery.csproj]
+
+The build failed. Fix the build errors and run again.

@@ -1,0 +1,148 @@
+using System.Collections.Immutable;
+using System.Linq.Expressions;
+using Tyresoles.Sql.Abstractions;
+
+namespace Tyresoles.Sql.Core.Query;
+
+internal record JoinExpression(LambdaExpression LeftKey, LambdaExpression RightKey, LambdaExpression Selector, Type LeftType, Type RightType);
+
+public class Query<T> : IQuery<T> where T : class
+{
+    private readonly TenantScope _scope;
+    private readonly string _tableName;
+    private readonly string? _company;
+    private readonly ImmutableList<Expression> _wheres;
+    private readonly ImmutableList<JoinExpression> _joins;
+    private readonly LambdaExpression? _selector;
+    private readonly LambdaExpression? _orderBy;
+    private readonly int? _skip;
+    private readonly int? _take;
+
+    public Query(TenantScope scope, string tableName, string? company)
+        : this(scope, tableName, company, ImmutableList<Expression>.Empty, ImmutableList<JoinExpression>.Empty, null, null, null, null)
+    {
+    }
+
+    internal Query(
+        TenantScope scope, 
+        string tableName, 
+        string? company,
+        ImmutableList<Expression> wheres,
+        ImmutableList<JoinExpression> joins,
+        LambdaExpression? selector,
+        LambdaExpression? orderBy,
+        int? skip,
+        int? take)
+    {
+        _scope = scope;
+        _tableName = tableName;
+        _company = company;
+        _wheres = wheres;
+        _joins = joins;
+        _selector = selector;
+        _orderBy = orderBy;
+        _skip = skip;
+        _take = take;
+    }
+
+    public IQuery<T> Where(Expression<Func<T, bool>> predicate)
+    {
+        return new Query<T>(_scope, _tableName, _company, _wheres.Add(predicate), _joins, _selector, _orderBy, _skip, _take);
+    }
+
+    public IQuery<TResult> Select<TResult>(Expression<Func<T, TResult>> selector)
+    {
+        return new Query<TResult>(_scope, _tableName, _company, _wheres, _joins, selector, _orderBy, _skip, _take);
+    }
+
+    public IQuery<TResult> InnerJoin<U, TResult>(Expression<Func<T, object>> tKey, Expression<Func<U, object>> uKey, Expression<Func<JoinQuery<T, U>, TResult>> selector)
+    {
+        // Simplified join handling: appending join metadata
+        var joinExp = new JoinExpression(tKey, uKey, selector, typeof(T), typeof(U));
+        // Result is types as TResult.
+        return new Query<TResult>(_scope, _tableName, _company, _wheres, _joins.Add(joinExp), selector, _orderBy, _skip, _take);
+    }
+
+    public IQuery<T> OrderBy<TKey>(Expression<Func<T, TKey>> key)
+    {
+        return new Query<T>(_scope, _tableName, _company, _wheres, _joins, _selector, key, _skip, _take);
+    }
+
+    public IPagedQuery<T> Page(string? cursor, int pageSize)
+    {
+        int skip = 0;
+        if (!string.IsNullOrEmpty(cursor) && int.TryParse(cursor, out int c)) skip = c;
+        
+        return new PagedQuery<T>(new Query<T>(_scope, _tableName, _company, _wheres, _joins, _selector, _orderBy, skip, pageSize));
+    }
+
+    public IQuery<IGroupResult<TKey, T>> GroupBy<TKey>(Expression<Func<T, TKey>> key)
+    {
+        throw new NotImplementedException("GroupBy not fully implemented in lite version");
+    }
+
+    public Task<T[]> ToArrayAsync(CancellationToken ct = default)
+    {
+        return _scope.ToArrayAsync(this, ct);
+    }
+
+    public QueryDescriptor Build()
+    {
+        var builder = new SqlBuilder(_tableName, _company);
+        foreach(var w in _wheres) builder.AddWhere(w);
+        foreach(var j in _joins) builder.AddJoin(j);
+        if (_selector != null) builder.SetSelector(_selector);
+        if (_orderBy != null) builder.SetOrderBy(_orderBy);
+        if (_skip.HasValue) builder.SetSkip(_skip.Value);
+        if (_take.HasValue) builder.SetTake(_take.Value);
+        
+        return builder.Build();
+    }
+
+    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    {
+        // Simple shim
+        return new AsyncDataEnumerator<T>(ToArrayAsync(cancellationToken));
+    }
+}
+
+internal class AsyncDataEnumerator<T> : IAsyncEnumerator<T>
+{
+    private readonly Task<T[]> _task;
+    private IEnumerator<T>? _enumerator;
+
+    public AsyncDataEnumerator(Task<T[]> task) => _task = task;
+
+    public T Current => _enumerator!.Current;
+
+    public async ValueTask<bool> MoveNextAsync()
+    {
+        if (_enumerator == null)
+            _enumerator = (await _task).AsEnumerable().GetEnumerator();
+        return _enumerator.MoveNext();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _enumerator?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal class PagedQuery<T> : IPagedQuery<T>
+{
+    private readonly Query<T> _query;
+    public PagedQuery(Query<T> query) => _query = query;
+
+    public async Task<PagedResult<T>> ExecuteAsync(CancellationToken ct = default)
+    {
+        var items = await _query.ToArrayAsync(ct);
+        // Determine cursor logic (simplistic skip+take) - Real logic needs keyset pagination
+        return new PagedResult<T>
+        {
+            Items = items,
+            HasNextPage = items.Length > 0, // Simplified
+            NextCursor = "Next" // Simplified
+        };
+    }
+}

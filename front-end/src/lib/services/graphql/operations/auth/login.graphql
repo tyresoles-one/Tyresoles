@@ -1,0 +1,45 @@
+mutation Login($username: String!, $password: String!, $platform: String) {
+  login(username: $username, password: $password, platform: $platform) {
+    success
+    message
+    token
+    requirePasswordChange
+    requirePasswordChangeReason
+    user {
+      userId
+      userSecurityId
+      fullName
+      userType
+      title
+      entityType
+      entityCode
+      department
+      respCenter
+      workDate
+      avatar
+    }
+    locations {
+      code
+      name
+      sale
+      purchase
+      production
+      payroll
+    }
+    menus {
+      label
+      icon
+      subMenus {
+        label
+        icon
+        items {
+          label
+          icon
+          action
+          order
+          options
+        }
+      }
+    }
+  }
+}

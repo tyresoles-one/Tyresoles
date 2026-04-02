@@ -1,0 +1,129 @@
+query GetEcoprocTiles($statusPosted: Int!, $userCode: String, $userDepartment: String, $userSpecialToken: String, $respCenters: String) {
+  open: procurementOrders(statusFilter: 0, userCode: $userCode, userDepartment: $userDepartment, userSpecialToken: $userSpecialToken, respCenters: $respCenters) {
+    totalCount
+  }
+  posted: procurementOrders(statusFilter: $statusPosted, userCode: $userCode, userDepartment: $userDepartment, userSpecialToken: $userSpecialToken, respCenters: $respCenters) {
+    totalCount
+  }
+  vendors: myVendors(categories: ["CASING PROCUREMENT"], respCenter: $respCenters) {
+    totalCount
+  }
+}
+
+query GetProcurementOrders($first: Int, $after: String, $order: [PurchaseHeaderSortInput!], $where: PurchaseHeaderFilterInput, $userCode: String, $userDepartment: String, $userSpecialToken: String, $respCenters: String, $statusFilter: Int) {
+  procurementOrders(first: $first, after: $after, order: $order, where: $where, userCode: $userCode, userDepartment: $userDepartment, userSpecialToken: $userSpecialToken, respCenters: $respCenters, statusFilter: $statusFilter) {
+    totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      no
+      postingDate
+      orderDate
+      buyFromVendorName
+      buyFromVendorNo
+      responsibilityCenter
+      orderStatus
+      ecomileProcMgr
+    }
+  }
+}
+
+query GetProcurementOrderLines($first: Int, $after: String, $order: [PurchaseLineSortInput!], $where: PurchaseLineFilterInput, $userCode: String, $userDepartment: String, $userSpecialToken: String, $respCenters: String, $statusFilter: Int) {
+  procurementOrderLines(first: $first, after: $after, order: $order, where: $where, userCode: $userCode, userDepartment: $userDepartment, userSpecialToken: $userSpecialToken, respCenters: $respCenters, statusFilter: $statusFilter) {
+    totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      documentNo
+      lineNo
+      no
+      make
+      serialNo
+      dispatchOrderNo
+      dispatchDate
+      dispatchDestination
+      dispatchVehicleNo
+      dispatchMobileNo
+      dispatchTransporter
+      model
+      inspection
+      newSerialNo
+      rejectionReason
+      orderDate
+      casingCondition
+      orderStatus
+    }
+  }
+}
+
+query GetEcomileLastNewNumber($respCenter: String!) {
+  productionEcomileLastNewNumber(respCenter: $respCenter)
+}
+
+query GetProcurementNewNumberingPaged(
+  $first: Int
+  $after: String
+  $fromDate: DateTime
+  $toDate: DateTime
+  $respCenters: String
+  $view: String
+  $type: String
+  $nos: [String!]
+  $where: ProcurementNewNumberingDtoFilterInput
+  $order: [ProcurementNewNumberingDtoSortInput!]
+) {
+  procurementNewNumberingPaged(
+    first: $first
+    after: $after
+    fromDate: $fromDate
+    toDate: $toDate
+    respCenters: $respCenters
+    view: $view
+    type: $type
+    nos: $nos
+    where: $where
+    order: $order
+  ) {
+    totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      orderNo
+      lineNo
+      no
+      make
+      serialNo
+      dispatchOrderNo
+      dispatchDate
+      dispatchDestination
+      dispatchVehicleNo
+      dispatchMobileNo
+      dispatchTransporter
+      button
+      model
+      newSerialNo
+      factInspection
+      rejectionReason
+      supplier
+      location
+      date
+      inspector
+      factInspector
+      factInspectorFinal
+      sortNo
+      inspection
+      orderStatus
+      remark
+    }
+  }
+}
+
+mutation UpdateProductionProcOrdLineDispatchSingle($line: OrderLineDispatchInput!) {
+  updateProductionProcOrdLineDispatchSingle(line: $line)
+}

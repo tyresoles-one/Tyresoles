@@ -1,0 +1,10 @@
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\bin\Release\netstandard2.0\Tyresoles.Sql.Generators.deps.json
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\bin\Release\netstandard2.0\Tyresoles.Sql.Generators.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\bin\Release\netstandard2.0\Tyresoles.Sql.Generators.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.csproj.AssemblyReference.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.GeneratedMSBuildEditorConfig.editorconfig
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.AssemblyInfoInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.AssemblyInfo.cs
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.csproj.CoreCompileInputs.cache
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.pdb

@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Tyresoles.Sql</name>
+    </assembly>
+    <members>
+        <member name="T:Tyresoles.Sql.Abstractions.IDialect">
+            <summary>
+            Provides database-specific syntax translation.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.IDialect.QuoteIdentifier(System.String)">
+            <summary>
+            Quotes an identifier, e.g., columnname -> [columnname] for SQL Server or "columnname" for PG.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.IDialect.BuildPagination(System.Nullable{System.Int32},System.Nullable{System.Int32},System.String)">
+            <summary>
+            Generates the pagination syntax.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.IDialect.BuildTableName(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Generates proper table name reference for NAV Company handling and schema scopes.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.IDialect.FormatParameterName(System.String)">
+            <summary>
+            Formats the parameter name. e.g. @p0
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.ITenantScope.StreamRawAsync``1(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>Execute raw SQL and return results as an async stream.</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Abstractions.ITenantScope.RawQueryToArrayAsync``1(System.String,System.Object,System.Threading.CancellationToken)">
+            <summary>Execute raw SQL and return all results as an array.</summary>
+        </member>
+        <member name="P:Tyresoles.Sql.Core.Configuration.TenantConfiguration.CommandTimeout">
+            <summary>Command timeout in seconds. Default 30. Use 0 for no timeout.</summary>
+        </member>
+        <member name="P:Tyresoles.Sql.Core.Configuration.TenantConfiguration.EnableRetry">
+            <summary>Enable retry for transient failures. Default false.</summary>
+        </member>
+        <member name="P:Tyresoles.Sql.Core.Configuration.TenantConfiguration.RetryCount">
+            <summary>Number of retry attempts when EnableRetry is true. Default 3.</summary>
+        </member>
+        <member name="P:Tyresoles.Sql.Core.Configuration.TenantConfiguration.RetryDelayMilliseconds">
+            <summary>Delay in milliseconds between retries. Default 500.</summary>
+        </member>
+        <member name="T:Tyresoles.Sql.Core.SqlLogCategories">
+            <summary>Category used for query logging. Set LogLevel to Debug (or Information) to log SQL and parameters.</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Core.Materialization.Materializer.NormalizeColumnName(System.String)">
+            <summary>Strip table alias from reader column name so "t5.[Role ID]" or "t5.Role ID" matches "Role ID".</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Core.Materialization.Materializer.TryGetGeneratedMapper``1">
+            <summary>
+            Tries to use the source-generated *Mapper.Parse(reader) for [NavTable] types. One-time reflection per T, then cached.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Sql.Core.Metadata.EntityMetadata`1">
+            <summary>
+            Pre-caches reflection metadata per entity type to ensure zero-alloc and AOT-safe executions.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Sql.Core.Metadata.EntityMetadataResolvers">
+            <summary>
+            Non-generic resolver for dynamic types.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Core.Query.MultipleQuery.MergeQueries(System.Text.StringBuilder,Tyresoles.Sql.Core.Query.ParameterContext)">
+            <summary>Builds each query with a shared ParameterContext and per-query prefix so parameter names are unique without string replacement.</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Core.Query.SqlBuilder.IsReadOnlySqlColumn(System.String)">
+            <summary>SQL Server timestamp/rowversion columns are read-only and must be excluded from UPDATE SET.</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Core.Query.ParameterContext.PushPrefix(System.String)">
+            <summary>Use a prefix for parameter names (e.g. "q0" -> @q0_p0, @q0_p1). Use with PushPrefix/PopPrefix for multi-query batches.</summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Dialects.NavDialect.NavBulkExtensions.ModifyRangeAsync``1(Tyresoles.Sql.Abstractions.ITenantScope,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)">
+            <summary>
+            Bulk updates instances via a native single RPC network jump using raw ADO.NET internals for massive speed.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.Dialects.NavDialect.NavCompanyExtensions.NavCompany(Tyresoles.Sql.Abstractions.IDataverse,System.String,System.String)">
+            <summary>
+            Reroutes table compilation strictly to a specified NAV Company syntax (e.g., [CRONUS$Customer]).
+            </summary>
+        </member>
+        <!-- Badly formed XML comment ignored for member "M:Tyresoles.Sql.Dialects.NavDialect.NavFilterParserExtensions.Filter``1(Tyresoles.Sql.Abstractions.IQuery{``0},System.String)" -->
+        <member name="M:Tyresoles.Sql.Dialects.NavDialect.NavMetadataExtensions.GetNavTablesAsync(Tyresoles.Sql.Abstractions.ITenantScope,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves a list of NAV tables currently recognized within the bound tenant SQL schema.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.GraphQL.NavQueryExtensions.AsQueryable``1(Tyresoles.Sql.Abstractions.IQuery{``0},Tyresoles.Sql.Abstractions.ITenantScope)">
+            <summary>
+            Converts IQuery to IQueryable so that GraphQL (HotChocolate) filtering, sorting, and paging
+            are translated to SQL and executed in a single round-trip.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Sql.GraphQL.TyresolesQueryable`1">
+            <summary>
+            IQueryable implementation that wraps Tyresoles.Sql IQuery and translates LINQ to SQL at execution.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.GraphQL.TyresolesQueryable`1.Execute">
+            <summary>
+            Builds and executes the query, returning the result array (synchronous; blocks on async).
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Sql.GraphQL.TyresolesQueryProvider">
+            <summary>
+            IQueryProvider that translates LINQ expression trees into Tyresoles.Sql IQuery and executes them.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.SqlServer.Extensions.AddTyresolesSql(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers Tyresoles.Sql services with SQL Server. Call Configure&lt;DataverseOptions&gt; or bind from config first.
+            If the host registers an ILoggerFactory (e.g. AddTyresolesLogger), query logging will be available at Debug level.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.SqlServer.Extensions.AddTyresolesSql(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Registers Tyresoles.Sql with configuration bound from the "Tyresoles" or "tenants" section.
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Tyresoles.Reporting -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\bin\Debug\net10.0\Tyresoles.Reporting.dll
+  Tyresoles.Sql.Generators -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\bin\Debug\netstandard2.0\Tyresoles.Sql.Generators.dll
+  Tyresoles.Sql -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\bin\Debug\net10.0\Tyresoles.Sql.dll
+  Tyresoles.Protean -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\bin\Debug\net10.0\Tyresoles.Protean.dll
+  Tyresoles.Data -> D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\bin\Debug\net10.0\Tyresoles.Data.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.34

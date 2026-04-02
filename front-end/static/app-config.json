@@ -1,0 +1,10 @@
+{
+  "backendBaseUrl": "https://localhost:5002",
+  "updateUrl": "http://app.tyresoles.net/updates/update.json",
+  "version": "1.0",
+  "mode": "Server",
+  "rdpUrl": "10.10.10.8:8224",
+  "navExePath": "C:\\Program Files (x86)\\Microsoft Dynamics NAV\\71\\RoleTailored Client\\Microsoft.Dynamics.Nav.Client.exe",
+  "rdpPassword": "Tyre@$tr0ng2026",
+  "webErpUrl": "http://20.207.200.140:8080/DynamicsNAV71/WebClient/"
+}
