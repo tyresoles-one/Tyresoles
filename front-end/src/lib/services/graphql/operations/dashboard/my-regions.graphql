@@ -2,7 +2,7 @@ query GetMyRegions(
   $entityType: String
   $entityCode: String
   $department: String
-  $respCenter: String
+  $respCenters: [String!]
   $first: Int
   $after: String
   $where: TerritoryFilterInput
@@ -11,7 +11,7 @@ query GetMyRegions(
     entityType: $entityType
     entityCode: $entityCode
     department: $department
-    respCenter: $respCenter
+    respCenters: $respCenters
     first: $first
     after: $after
     where: $where

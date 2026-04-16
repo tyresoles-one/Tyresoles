@@ -23,6 +23,7 @@ function slug(s: string): string {
  * Converts login response menus (GraphQL Menu[]) to venUI MenuItem[].
  * Menu → { label, icon, subMenus }; SubMenu → { label, icon, items }; MenuItem (GQL) → { label, icon, action, options }.
  * When a submenu has no label (e.g. "Masters"), that level is skipped and its items become direct children of the parent menu.
+ * Labeled submenus always keep one nested level, even with a single item.
  */
 export function buildMenusFromLoginMenus(
   menus: Menu[] | null | undefined,
@@ -57,22 +58,12 @@ export function buildMenusFromLoginMenus(
       }
 
       const subId = slug(sub.label) || `sub-${children.length}`;
-      if (subChildren.length === 1 && !subChildren[0].children?.length) {
-        children.push({
-          id: subChildren[0].id,
-          label: subChildren[0].label,
-          icon: subChildren[0].icon,
-          href: subChildren[0].href,
-          options: subChildren[0].options,
-        });
-      } else {
-        children.push({
-          id: subId,
-          label: sub.label ?? "",
-          icon: sub.icon ?? undefined,
-          children: subChildren,
-        });
-      }
+      children.push({
+        id: subId,
+        label: sub.label ?? "",
+        icon: sub.icon ?? undefined,
+        children: subChildren,
+      });
     }
 
     return {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	// Reusable composables
@@ -12,7 +13,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Icon } from '$lib/components/venUI/icon';
 	import { TableCell, TableHead } from '$lib/components/ui/table';
-	import MasterList from '$lib/components/venUI/masterList/MasterList.svelte';
+	import { DataGrid, type DataGridColumn, type FilterRule } from '$lib/components/venUI/datagrid';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Command from '$lib/components/ui/command';
 	import * as Popover from '$lib/components/ui/popover';
@@ -47,13 +48,23 @@
 	};
 
 	let viewMode = $state<ViewMode>('grid');
+	let filterRules = $state<FilterRule[]>([]);
 
-	/** Maps MasterList search to Hot Chocolate `where` on `myDealers` (server-side filter). */
-	function dealersSearchToWhere(term: string): { where: SalespersonPurchaserFilterInput | null } {
+	function buildFilterRulesWhere(rules: FilterRule[]): Record<string, any>[] | undefined {
+		if (rules.length === 0) return undefined;
+		return rules.map((rule) => {
+			return { [rule.columnId]: { [rule.operator]: rule.value } };
+		});
+	}
+
+	/** Maps MasterList search AND filters to Hot Chocolate `where` on `myDealers` (server-side filter). */
+	function dealersSearchToWhere(term: string, rulesForWhere: FilterRule[] = filterRules): Record<string, unknown> {
 		const q = term.trim();
-		if (!q) return { where: null };
-		return {
-			where: {
+		const filterConds = buildFilterRulesWhere(rulesForWhere);
+		const andConds: Record<string, any>[] = [];
+
+		if (q) {
+			andConds.push({
 				or: [
 					{ code: { contains: q } },
 					{ name: { contains: q } },
@@ -62,27 +73,46 @@
 					{ eMail: { contains: q } },
 					{ depot: { contains: q } }
 				]
-			}
-		};
+			});
+		}
+
+		if (filterConds && filterConds.length > 0) {
+			andConds.push(...filterConds);
+		}
+
+		if (andConds.length === 0) {
+			return { where: null };
+		} else if (andConds.length === 1) {
+			return { where: andConds[0] };
+		} else {
+			return { where: { and: andConds } };
+		}
 	}
 
 	const list = usePaginatedList<Dealer>({
 		query: GetDealersDocument,
 		dataPath: 'dealers',
 		pageSize: 50,
-		mapSearchToVariables: dealersSearchToWhere
+		mapSearchToVariables: (term) => dealersSearchToWhere(term, filterRules),
+		serverVariableAllowlist: ['entityType', 'entityCode', 'department', 'respCenters', 'where', 'order'],
+		paginationMode: 'cursor',
+		pageInfoPath: 'dealers.pageInfo'
 	});
 
 	const user = $derived(authStore.get().user);
 
-	$effect(() => {
-		const u = $authStore.user;
-		list.pagination.setVariables({
-			entityType: u?.entityType ?? null,
-			entityCode: u?.entityCode ?? null,
-			department: u?.department ?? null,
-			respCenter: u?.respCenter ?? null
+	// Entity scope from auth (subscribe avoids $effect re-runs on pagination updates → duplicate full reloads).
+	onMount(() => {
+		const unsub = authStore.subscribe((auth) => {
+			const u = auth.user;
+			list.pagination.setVariables({
+				entityType: u?.entityType ?? null,
+				entityCode: u?.entityCode ?? null,
+				department: u?.department ?? null,
+				respCenters: u?.respCenter ? [u.respCenter] : null
+			});
 		});
+		return unsub;
 	});
 	/** Non–sales employees only (LoginUser uses `department`, not entityDepartment). */
 	const canAddDealer = $derived(
@@ -101,6 +131,13 @@
 	let selectedCustomerNo = $state('');
 	let selectedCustomerName = $state('');
 	let createDealerLoading = $state(false);
+
+	function handleFilterRulesChange(rules: FilterRule[]) {
+		filterRules = rules;
+		const vars = dealersSearchToWhere(list.searchQuery.value, rules);
+		list.pagination.setVariables(vars);
+		list.onRefresh();
+	}
 
 	const CreateDealerDocument = buildMutation`
 		mutation CreateDealer($customerNo: String!) {
@@ -254,129 +291,53 @@
 		const id = d.code?.trim();
 		return id ? `/dealers/${encodeURIComponent(id)}` : '/dealers';
 	}
+
+	function onDealerRowClick(dealer: Dealer) {
+		goto(dealerDetailPath(dealer));
+	}
+
+const columns: DataGridColumn<Dealer>[] = [
+{ accessorKey: 'code', header: 'Code' },
+{ accessorKey: 'name', header: 'Full Name' },
+{ accessorKey: 'depot', header: 'Location' },
+{ accessorKey: 'dealershipName', header: 'Dealership Name' },
+{ accessorKey: 'eMail', header: 'Email' },
+{ accessorKey: 'phoneNo', header: 'Phone' }
+];
 </script>
 
-<div class="min-h-screen bg-background pb-20">
-	<MasterList
-		title="Dealers"
-		description="View and manage dealers"
-		items={list.items}
-		totalCount={list.totalCount}
-		bind:searchQuery={list.searchQuery.value}
-		bind:viewMode
-		loading={list.loading}
-		loadingMore={list.loadingMore}
-		error={list.error}
-		hasMore={list.hasMore}
-		onLoadMore={list.onLoadMore}
-		onRefresh={list.onRefresh}
-	>
-		{#snippet filters()}
-			<!-- Inline filter bar (avoids SSR snippet scope issue with FilterChip/FilterSeparator) -->
-			<div class="hidden sm:flex items-center gap-1.5 p-1 bg-muted/30 rounded-lg border border-border/20">
-				<span class="px-2.5 py-1 text-xs font-medium text-muted-foreground">All dealers</span>
-			</div>
-			<div class="w-px h-6 bg-border/80 mx-1 hidden sm:block"></div>
-		{/snippet}
 
-		{#snippet actions()}
-			{#if canAddDealer}
-				<Button
-					size="sm"
-					class="gap-2 shrink-0 bg-primary/90 hover:bg-primary shadow-sm hover:shadow-md transition-all"
-					onclick={() => (addDialogOpen = true)}
-				>
-					<Icon name="plus" class="size-3.5" />
-					<span class="hidden sm:inline">Add Dealer</span>
-					<span class="sm:hidden">Add</span>
-				</Button>
-			{/if}
-		{/snippet}
-
-		{#snippet gridItem(dealer: Dealer)}
-			<EntityCard
-				icon="store"
-				title={dealer.name || '—'}
-				subtitle={dealer.code ?? ''}
-				metadata={[
-					...(dealer.depot?.trim()
-						? [{ icon: 'map-pin' as const, label: 'Location', value: dealer.depot }]
-						: []),
-					...(dealer.phoneNo?.trim() ? [{ icon: 'phone' as const, label: 'Phone', value: dealer.phoneNo }] : []),
-					...(dealer.dealershipName?.trim()
-						? [{ icon: 'user' as const, label: 'Dealership', value: dealer.dealershipName }]
-						: []),
-					...(dealer.eMail?.trim()
-						? [{ icon: 'mail' as const, label: 'Email', value: dealer.eMail }]
-						: [])
-				]}
-				onclick={() => goto(dealerDetailPath(dealer))}
-			/>
-		{/snippet}
-
-		{#snippet tableHeader()}
-			<TableHead class="w-[80px] text-center">Code</TableHead>
-			<TableHead class="cursor-pointer hover:text-primary transition-colors">Name</TableHead>
-			<TableHead class="hidden md:table-cell">Location</TableHead>
-			<TableHead class="hidden lg:table-cell">Contact</TableHead>
-			<TableHead class="text-right">Actions</TableHead>
-		{/snippet}
-
-		{#snippet tableRow(dealer: Dealer)}
-			<TableCell class="text-center p-2">
-				<div
-					class="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary/5 text-primary ring-2 ring-transparent"
-				>
-					<Icon name="store" class="size-5" />
-				</div>
-				<code class="mt-1 block text-[10px] font-mono text-muted-foreground truncate max-w-[70px] mx-auto">{dealer.code || '—'}</code>
-			</TableCell>
-			<TableCell>
-				<div class="font-medium text-foreground">{dealer.name || 'N/A'}</div>
-				<div class="text-xs text-muted-foreground md:hidden font-mono">{dealer.code}</div>
-			</TableCell>
-			<TableCell class="hidden md:table-cell">
-				<span class="text-sm text-muted-foreground">{dealer.depot?.trim() || '—'}</span>
-			</TableCell>
-			<TableCell class="hidden lg:table-cell">
-				<div class="flex flex-col gap-1 text-xs">
-					{#if dealer.dealershipName?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="user" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{dealer.dealershipName}</span>
-						</div>
-					{/if}
-					{#if dealer.eMail?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="mail" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{dealer.eMail}</span>
-						</div>
-					{/if}
-					{#if dealer.phoneNo?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="phone" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{dealer.phoneNo}</span>
-						</div>
-					{/if}
-					{#if !dealer.dealershipName?.trim() && !dealer.phoneNo?.trim() && !dealer.eMail?.trim()}
-						<span class="text-muted-foreground/60">—</span>
-					{/if}
-				</div>
-			</TableCell>
-			<TableCell class="text-right">
-				<TableActions
-					title={dealer.name ?? ''}
-					actions={[
-						{
-							label: 'View Details',
-							icon: 'eye',
-							onClick: () => goto(dealerDetailPath(dealer))
-						}
-					]}
-				/>
-			</TableCell>
-		{/snippet}
-	</MasterList>
+<div class="min-h-screen bg-background pb-20 pt-8">
+<DataGrid
+title="Dealers"
+description="View and manage dealers"
+items={list.items}
+{columns}
+pagination={list.pagination}
+loading={list.loading}
+loadingMore={list.loadingMore}
+bind:searchQuery={list.searchQuery.value}
+mobileCardTitleKey="name"
+mobileCardSubtitleKey="code"
+onRowClick={onDealerRowClick}
+showFilters={true}
+{filterRules}
+onFilterRulesChange={handleFilterRulesChange}
+>
+{#snippet actions()}
+{#if canAddDealer}
+<Button
+size="sm"
+class="gap-2 shrink-0 bg-primary/90 hover:bg-primary shadow-sm hover:shadow-md transition-all"
+onclick={() => (addDialogOpen = true)}
+>
+<Icon name="plus" class="size-3.5" />
+<span class="hidden sm:inline">Add Dealer</span>
+<span class="sm:hidden">Add</span>
+</Button>
+{/if}
+{/snippet}
+</DataGrid>
 </div>
 
 <Dialog.Root bind:open={addDialogOpen}>

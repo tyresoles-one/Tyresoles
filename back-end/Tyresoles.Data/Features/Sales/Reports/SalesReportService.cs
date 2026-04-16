@@ -2307,8 +2307,10 @@ LEFT JOIN (
                     break;
             }
 
-            if (string.Equals(p.Type, "Hide Dealer Name", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(p.Type, "Hide Dealer Name", StringComparison.OrdinalIgnoreCase))
                 record.bHideDealer = true;
+
+            
 
             list.Add(record);
         }
@@ -2501,38 +2503,44 @@ LEFT JOIN (
         var locations = await GetLocationRespCentersAsync(scope, new[] { 0 }, new[] { 0 }, ct).ConfigureAwait(false);
         
         var list = new List<ProductMixEcomileRow>();
-        int ordNo = 1;
-
-        foreach (var location in locations.OrderBy(l => l.RespCenterName))
-        {
-            var locItems = await GetProductMixEcomileDataAsync(scope, p, new[] { location.LocationCode! }, fromDt, toDt, ct).ConfigureAwait(false);
-            foreach (var item in locItems)
-            {
-                item.Location = $"{ordNo:D2} {location.RespCenterName}";
-                item.PeriodText = $"Period from: {fromDt:dd-MMM-yyyy} to: {toDt:dd-MMM-yyyy}";
-                item.ReportName = "Product Mix (Ecomile)";
-                item.CompanyName = "Tyresoles (India) Pvt. Ltd.";
-            }
-            if (locItems.Count > 0)
-            {
-                list.AddRange(locItems);
-                ordNo++;
-            }
-        }
-
-        // Consolidated
         if (locations.Count > 0)
         {
+            int ordNo = 1;
+            foreach (var location in locations)
+            {
+                ordNo++;
+                var locItems = await GetProductMixEcomileDataAsync(scope, p, new[] { location.LocationCode! }, fromDt, toDt, ct).ConfigureAwait(false);
+                if (locItems.Count > 0)
+                {
+                    var filtered = locItems.Where(c => c.Qty != 0).ToList();
+                    foreach (var item in filtered)
+                    {
+                        item.ReportName = "Product Mix (Ecomile)";
+                        item.PeriodText = $"For Period ({fromDt.ToString("dd-MMM-yy")} .. {toDt.ToString("dd-MMM-yy")})";
+                        item.Location = $"{ordNo}{location.RespCenterName}";
+                        item.UnitPrice = item.Qty != 0 ? Math.Round(item.SalesAmount / item.Qty) : 0;
+                        item.CompanyName = "Tyresoles (India) Pvt. Ltd.";
+                    }
+                    list.AddRange(filtered);
+                }
+            }
+
+            // Consolidated
             var allLocCodes = locations.Select(l => l.LocationCode!).ToArray();
             var consolidatedItems = await GetProductMixEcomileDataAsync(scope, p, allLocCodes, fromDt, toDt, ct).ConfigureAwait(false);
-            foreach (var item in consolidatedItems)
+            if (consolidatedItems.Count > 0)
             {
-                item.Location = "00 CONSOLIDATED";
-                item.PeriodText = $"Period from: {fromDt:dd-MMM-yyyy} to: {toDt:dd-MMM-yyyy}";
-                item.ReportName = "Product Mix (Ecomile)";
-                item.CompanyName = "Tyresoles (India) Pvt. Ltd.";
+                var filteredConsolidated = consolidatedItems.Where(c => c.Qty != 0).ToList();
+                foreach (var item in filteredConsolidated)
+                {
+                    item.ReportName = "Product Mix (Ecomile)";
+                    item.PeriodText = $"For Period ({fromDt.ToString("dd-MMM-yy")} .. {toDt.ToString("dd-MMM-yy")})";
+                    item.Location = "0CONSOLIDATED";
+                    item.UnitPrice = item.Qty != 0 ? Math.Round(item.SalesAmount / item.Qty) : 0;
+                    item.CompanyName = "Tyresoles (India) Pvt. Ltd.";
+                }
+                list.AddRange(filteredConsolidated);
             }
-            list.AddRange(consolidatedItems);
         }
 
         return ("ProductMixEcomile", list.Count > 0 ? ToDataTable(list) : null);
@@ -2557,8 +2565,7 @@ LEFT JOIN (
             Items.No_ as ItemNo, 
             Items.[Alternative Item No_] as ItemGroup,
             ISNULL(Ledger.Qty, 0) as Qty,
-            ISNULL(ValueLedger.Amount, 0) as SalesAmount,
-            CASE WHEN ISNULL(Ledger.Qty, 0) <> 0 THEN ISNULL(ValueLedger.Amount, 0) / Ledger.Qty ELSE 0 END AS UnitPrice
+            ISNULL(ValueLedger.Amount, 0) as SalesAmount
         FROM {itemT} as Items
         LEFT JOIN (
             SELECT ILE.[Item No_], -SUM(ILE.[Quantity]) as Qty
@@ -2567,20 +2574,19 @@ LEFT JOIN (
             WHERE ILE.[Entry Type] = 1 
               AND ILE.[Posting Date] >= @fromDt AND ILE.[Posting Date] <= @toDt
               AND ILE.[Location Code] IN @locCodes
-              AND Cust.[Gen_ Bus_ Posting Group] IN ('SALES', 'EXEMPT', 'EXPORT')
+              AND Cust.[Gen_ Bus_ Posting Group] IN ('SALES')
             GROUP BY ILE.[Item No_]
         ) AS Ledger ON Ledger.[Item No_] = Items.No_
         LEFT JOIN (
-            SELECT VE.[Item No_], -SUM(VE.[Sales Amount (Actual)]) as Amount
+            SELECT VE.[Item No_], SUM(VE.[Sales Amount (Actual)]) as Amount
             FROM {veT} AS VE
             JOIN {custT} AS Cust ON Cust.[No_] = VE.[Source No_]
             WHERE VE.[Posting Date] >= @fromDt AND VE.[Posting Date] <= @toDt
               AND VE.[Location Code] IN @locCodes
-              AND Cust.[Gen_ Bus_ Posting Group] IN ('SALES', 'EXEMPT', 'EXPORT')
+              AND Cust.[Gen_ Bus_ Posting Group] IN ('SALES')
             GROUP BY VE.[Item No_]
         ) AS ValueLedger ON ValueLedger.[Item No_] = Items.No_
         WHERE Items.[Item Category Code] = 'ECOMILE' 
-          AND (ISNULL(Ledger.Qty, 0) <> 0 OR ISNULL(ValueLedger.Amount, 0) <> 0)
         ORDER BY Items.[Alternative Item No_]";
 
         var result = await scope.RawQueryToArrayAsync<ProductMixEcomileRow>(sql, param, ct).ConfigureAwait(false);
@@ -3054,7 +3060,7 @@ LEFT JOIN (
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
             ProductGroup = "TRADE-RUBB",
-            Items = new List<string> { "RUBBER-PCP" },
+            Items = new List<string> { "RUBBER-PCP", "RUBBER-RADIAL-PRM" },
             Name = "Rubber PCP"
         });
         products.Add(new ItemCategoryProductGroup
@@ -3063,7 +3069,7 @@ LEFT JOIN (
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
             ProductGroup = "TRADE-RUBB",
-            Items = new List<string> { "RUBBER-HOT" },
+            Items = new List<string> { "RUBBER-HOT", "RUBBER-RADIAL" },
             Name = "Rubber HOT"
         });
         products.Add(new ItemCategoryProductGroup

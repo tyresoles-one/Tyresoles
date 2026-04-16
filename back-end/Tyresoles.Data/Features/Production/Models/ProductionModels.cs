@@ -56,6 +56,7 @@ public class VendorModel
     public bool SelfInvoice { get; set; }
     public string PanNo { get; set; } = "";
     public string AdhaarNo { get; set; } = "";
+    public string GSTRegistrationNo { get; set; } = "";
     public decimal Balance { get; set; }
     public string StateCode { get; set; } = "";
 }
@@ -147,4 +148,27 @@ public class ShipmentInfo
     public string Transport { get; set; } = "";
     public string VehicleNo { get; set; } = "";
     public string Date { get; set; } = "";
+}
+
+public class ClaimRatio
+{
+    public string CompanyName { get; set; } = "";
+    public string ReportName { get; set; } = "";
+    public string Locations { get; set; } = "";
+    public string Period { get; set; } = "";
+    public string View { get; set; } = "";
+    public string Particular { get; set; } = "";
+    public string Group { get; set; } = "";
+    public string ParticularLbl { get; set; } = "";
+    public bool bValue { get; set; } = false;
+    public int Sold { get; set; } = 0;
+    public int Claims { get; set; } = 0;
+    public int Pass { get; set; } = 0;
+    public int Reject { get; set; } = 0;
+    public int Unsettled { get; set; } = 0;
+    public decimal ClaimPercent { get; set; } = 0;
+    public decimal PassPercent { get; set; } = 0;
+    public decimal SaleValue { get; set;  } = 0;
+    public decimal CreditNoteValue { get; set; } = 0;
+    public decimal CreditNotePercent {  get; set; } = 0;
 }

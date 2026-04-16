@@ -41,7 +41,8 @@ public sealed class ProductionReportService : IProductionReportService
         "Casing Purchase Analysis",
         "Ecomile Inv. Sales Stat.",
         "Claim Analysis",
-        "Casing Average Cost"
+        "Casing Average Cost",
+        "Claim Ratios",
     };
 
     // Aligns with legacy ProductionReportData and RDLC requirements.
@@ -61,6 +62,7 @@ public sealed class ProductionReportService : IProductionReportService
         new() { Id = 12, Name = "Ecomile Inv. Sales Stat.", ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "dateRange" },
         new() { Id = 13, Name = "Claim Analysis", ShowType = true, ShowView = true, TypeOptions = new List<string> { "Claim Receipt", "Claim Sanctioned" }, ViewOptions = new List<string> { "Customers", "Dealers", "Fault Reasons", "Tread Patterns", "Casing Makes", "Prod. Agings" }, ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "dateRange" },
         new() { Id = 14, Name = "Casing Average Cost", ShowNos = true, ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "nos" },
+        new(){ Id = 15, Name="Claim Ratios", ShowView=true, ViewOptions= new List<string>{"Product wise","Pattern wise","Make wise","Submake wise","Dealer wise","Salesperson wise","Defect wise","Proc. Market wise" }, DatePreset="thisMonth, lastMonth",OutputFormats = "pdf,excel", RequiredFields = "dateRange,view,respCenters" }
     };
 
     public ProductionReportService(IReportRenderer reportRenderer)
@@ -187,6 +189,7 @@ public sealed class ProductionReportService : IProductionReportService
             "Ecomile Inv. Sales Stat." => ("EcomileInvSalesStatistics", await GetEcomileInvSalesStatisticsAsync(scope, p, ct).ConfigureAwait(false), null),
             "Claim Analysis" => ("ClaimAnalysis", await GetClaimAnalysisAsync(scope, p, ct).ConfigureAwait(false), null),
             "Casing Average Cost" => ("PostedDispatchAverageCost", await GetPostedDispatchAverageCostAsync(scope, p, ct).ConfigureAwait(false), null),
+            "Claim Ratios" => ("ClaimRatios", await GetClaimRatiosAsync(scope, p, ct).ConfigureAwait(false), null),
             _ => ("", null, null)
         };
     }
@@ -386,6 +389,295 @@ WHERE E.[On Exchange] = 1 {respCentersIn}";
         return ToDataTable(new[] { row });
     }
 
+    private async Task<object?> GetClaimRatiosAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    {
+        var ileT = scope.GetQualifiedTableName("Item Ledger Entry", false);
+        var custT = scope.GetQualifiedTableName("Customer", false);
+        var locT = scope.GetQualifiedTableName("Location", false);
+        var postedT = scope.GetQualifiedTableName("Claim & Failure Posted", false);
+        var itemT = scope.GetQualifiedTableName("Item", false);
+        var settleT = scope.GetQualifiedTableName("Claim & Failure Settlement", false);
+        var glT = scope.GetQualifiedTableName("G_L Entry", false);
+        var crHeaderT = scope.GetQualifiedTableName("Sales Cr_Memo Header", false);
+        var crLineT = scope.GetQualifiedTableName("Sales Cr_Memo Line", false);
+
+        var dr = ResolveCasingPurchaseSqlAndDisplayRange(p);
+
+        var locations = p.RespCenters?.Count > 0 ? string.Join(", ", p.RespCenters) : "";    
+        var respCentersIn = p.RespCenters?.Count > 0 
+            ? $" AND Loc.[Responsibility Center] IN ({string.Join(",", p.RespCenters.Select((_, i) => $"@rc{i}"))})" 
+            : " AND Loc.[Responsibility Center] IN ('AHM', 'BEL', 'JBP')";
+
+        var postedRespCentersIn = p.RespCenters?.Count > 0
+            ? $" AND Posted.[Responsibility Center] IN ({string.Join(",", p.RespCenters.Select((_, i) => $"@rc{i}"))})"
+            : " AND Posted.[Responsibility Center] IN ('AHM', 'BEL', 'JBP')";
+
+        var glRespCentersIn = p.RespCenters?.Count > 0
+            ? $" AND GLEntry.[Responsibility Center] IN ({string.Join(",", p.RespCenters.Select((_, i) => $"@rc{i}"))})"
+            : " AND GLEntry.[Responsibility Center] IN ('AHM', 'BEL', 'JBP')";
+
+        var headerRespCentersIn = p.RespCenters?.Count > 0
+            ? $" AND Header.[Responsibility Center] IN ({string.Join(",", p.RespCenters.Select((_, i) => $"@rc{i}"))})"
+            : " AND Header.[Responsibility Center] IN ('AHM', 'BEL', 'JBP')";
+
+        var particularILE = "ILE.[Product Group Code] as Particular";
+        var particularILEGroup = "ILE.[Product Group Code]";
+        var particularLbl = "Product";
+        var particularClaims = "Item.[Product Group Code] as Particular";
+        var particularClaims2 = "Particular";
+        var particularClaimsGroup = "Particular";
+        var joinILE = "";
+        var joinClaims = "";
+        bool bValue = false;
+
+        switch (p.View)
+        {
+            case "Product wise":
+                {
+                    particularILE = "ILE.[Product Group Code] as Particular";
+                    particularILEGroup = "ILE.[Product Group Code]";
+                    particularLbl = "Product";
+                    particularClaims = "Item.[Product Group Code] as Particular,";
+                    particularClaims2 = "Particular,";
+                    particularClaimsGroup = "Particular";
+                    bValue = true;
+                    break;
+                }
+            case "Pattern wise":
+                {
+                    particularILE = "IV.Pattern as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "IV.Pattern, ILE.[Product Group Code]";
+                    joinILE = "LEFT join [Tyresoles (India) Pvt_ Ltd_$Item Variant] as IV on IV.[Item No_] = ILE.[Item No_] and IV.Code = ILE.[Variant Code]";
+                    particularLbl = "Pattern";
+                    particularClaims = "Item.[Product Group Code] as [Group], InvLines.Pattern as Particular,";
+                    particularClaims2 = "Particular, [Group],";
+                    joinClaims = "LEFT JOIN [Tyresoles (India) Pvt_ Ltd_$Sales Invoice Line] as InvLines on InvLines.[Document No_] = Posted.[Invoice No_] and InvLines.[Line No_] = Posted.[Line No_] ";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Make wise":
+                {
+                    particularILE = "ILE.Make as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "ILE.Make, ILE.[Product Group Code]";                    
+                    particularLbl = "Make";
+                    particularClaims = "Item.[Product Group Code] as [Group], Posted.Make as Particular,";
+                    particularClaims2 = "Particular, [Group],";                    
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Submake wise":
+                {
+                    particularILE = "ILE.[Sub Make] as Particular, Item.[Alternative Item No_]+' '+ILE.Make as [Group]";
+                    particularILEGroup = "ILE.[Sub Make], Item.[Alternative Item No_]+' '+ILE.Make";
+                    particularLbl = "Sub Make";
+                    joinILE = "Left Join [Tyresoles (India) Pvt_ Ltd_$Item] as Item on Item.No_ = ILE.[Item No_] ";
+                    particularClaims = "Item.[Alternative Item No_]+' '+Posted.[Make] as [Group], Posted.[Sub Make] as Particular,";
+                    particularClaims2 = "Particular, [Group],";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Dealer wise":
+                {
+                    particularILE = "Dealer.[Dealership Name] as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "Dealer.[Dealership Name], ILE.[Product Group Code]";
+                    particularLbl = "Dealer";
+                    joinILE = "LEFT JOIN [Tyresoles (India) Pvt_ Ltd_$Salesperson_Purchaser] as Dealer on Dealer.Code = Cust.[Dealer Code]";
+                    particularClaims = "Item.[Product Group Code] as [Group], Dealer.[Dealership Name] as Particular,";
+                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n  Left join [Tyresoles (India) Pvt_ Ltd_$Salesperson_Purchaser] as Dealer on Dealer.Code = Customer.[Dealer Code]";
+                    particularClaims2 = "Particular, [Group],";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Salesperson wise":
+                {
+                    particularILE = "ISNULL(Salesperson.Name,'') as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "Salesperson.Name, ILE.[Product Group Code]";
+                    particularLbl = "Salesperson";
+                    joinILE = "LEFT JOIN (select * from [Tyresoles (India) Pvt_ Ltd_$Team Salesperson] where [Type] = 0) as Salesperson on Salesperson.[Team Code] = Cust.[Area Code]";
+                    particularClaims = "Item.[Product Group Code] as [Group], ISNULL(Salesperson.Name,'') as Particular,";
+                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n  LEFT JOIN (select * from [Tyresoles (India) Pvt_ Ltd_$Team Salesperson] where [Type] = 0) as Salesperson on Salesperson.[Team Code] = Customer.[Area Code]";
+                    particularClaims2 = "Particular, [Group],";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Proc. Market wise":
+                {
+                    particularILE = "ISNULL(Vendor.[Group Details],'') as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "Vendor.[Group Details], ILE.[Product Group Code]";
+                    particularLbl = "Proc. Market";
+                    joinILE = "left join [Tyresoles (India) Pvt_ Ltd_$Ecomile Items_] as EcoItem on EcoItem.[New Serial No_] = ILE.[Serial No] --and EcoItem.[Responsibility Center] =  ILE.[Responsibility Center]\r\nleft join [Tyresoles (India) Pvt_ Ltd_$Vendor] as Vendor on Vendor.No_ = EcoItem.[Buy-from Vendor No_]";
+                    particularClaims = "Item.[Product Group Code] as [Group], ISNULL(Salesperson.Name,'') as Particular,";
+                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n  LEFT JOIN (select * from [Tyresoles (India) Pvt_ Ltd_$Team Salesperson] where [Type] = 0) as Salesperson on Salesperson.[Team Code] = Customer.[Area Code]";
+                    particularClaims2 = "Particular, [Group],";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+        }
+
+        var sql = $@"
+SELECT 
+    CAST(SUM(-ILE.[Quantity]) AS INT) as Sold,
+    {particularILE}
+FROM {ileT} AS ILE
+LEFT JOIN {custT} AS Cust ON Cust.[No_] = ILE.[Source No_]
+{joinILE}
+INNER JOIN {locT} AS Loc ON Loc.[Code] = ILE.[Location Code] {respCentersIn}
+WHERE ILE.[Posting Date] >= @from AND ILE.[Posting Date] <= @to
+    AND ILE.[Entry Type] = 1 
+    AND Loc.[Type] IN (0, 1, 3) 
+    AND ILE.[Item Category Code] = 'ECOMILE' 
+    AND Cust.[Gen_ Bus_ Posting Group] = 'SALES'
+GROUP BY {particularILEGroup}";
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["from"] = dr.FromSql,
+            ["to"] = dr.ToSql
+        };
+
+        if (p.RespCenters?.Count > 0)
+        {
+            for (int i = 0; i < p.RespCenters.Count; i++) parameters[$"rc{i}"] = p.RespCenters[i];
+        }
+
+        var results = await scope.RawQueryToArrayAsync<ClaimRatio>(sql, parameters, ct).ConfigureAwait(false);
+        if (results == null)
+            results = Array.Empty<ClaimRatio>();
+
+        var claimsSql = $@"
+WITH LatestSettlement AS (
+  SELECT 
+    {particularClaims}
+    Settlement.Decision,
+    ROW_NUMBER() OVER (
+      PARTITION BY Posted.[No_]
+      ORDER BY ISNULL(Settlement.Date, '1900-01-01') DESC, Settlement.[Document No_]
+    ) AS rn
+  FROM {postedT} AS Posted
+  LEFT JOIN {itemT} AS Item
+    ON Item.No_ = Posted.[Item No_]
+  LEFT JOIN {settleT} AS Settlement
+    ON Settlement.[Document No_] = Posted.No_
+ {joinClaims}
+  WHERE Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
+    AND Item.[Item Category Code] = 'ECOMILE'
+    AND Posted.Type = 0
+    {postedRespCentersIn}
+)
+SELECT 
+    {particularClaims2}
+    COUNT(*) as Claims,
+    SUM(CASE WHEN Decision IN (3,5) THEN 1 ELSE 0 END) as Reject,
+    SUM(CASE WHEN Decision IN (1,2,4,6,7) THEN 1 ELSE 0 END) as Pass,
+    SUM(CASE WHEN Decision is null then 1 else 0 end) as Unsettled
+FROM LatestSettlement
+WHERE rn = 1 AND Particular IS NOT NULL
+GROUP BY {particularClaimsGroup}";
+
+        var claimStats = await scope.RawQueryToArrayAsync<ClaimRatio>(claimsSql, parameters, ct).ConfigureAwait(false);
+
+        var saleValueSql = $@"
+SELECT
+    CAST(SUM(-GLEntry.[Amount]) AS DECIMAL(18, 2)) AS SaleValue
+FROM {glT} AS GLEntry
+INNER JOIN {custT} AS Customer ON Customer.[No_] = GLEntry.[Source No_]
+WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
+    AND GLEntry.[Posting Date] >= @from AND GLEntry.[Posting Date] <= @to
+    {glRespCentersIn}
+    AND Customer.[Gen_ Bus_ Posting Group] = 'SALES'";
+
+        var creditNoteSql = $@"
+SELECT    
+    CAST(SUM(Lines.[Amount To Customer]) AS DECIMAL(18, 2)) AS CreditNoteValue
+FROM {crHeaderT} AS Header
+INNER JOIN {crLineT} AS Lines ON Lines.[Document No_] = Header.[No_]
+INNER JOIN {postedT} AS Posted ON Posted.[No_] = Header.[External Document No_]
+LEFT JOIN {itemT} AS Item ON Item.[No_] = Posted.[Item No_]
+WHERE Header.[Posting Date] >= @from AND Header.[Posting Date] <= @to
+    {headerRespCentersIn}
+    AND Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
+    AND Item.[Item Category Code] = 'ECOMILE'
+    AND Posted.Type = 0
+    {postedRespCentersIn}";
+
+        var saleValueRows = await scope.RawQueryToArrayAsync<ClaimRatio>(saleValueSql, parameters, ct).ConfigureAwait(false);
+        var creditNoteRows = await scope.RawQueryToArrayAsync<ClaimRatio>(creditNoteSql, parameters, ct).ConfigureAwait(false);
+
+        var glSaleValueTotal = saleValueRows is { Length: > 0 } ? saleValueRows[0].SaleValue : 0m;
+        var crValueTotal = creditNoteRows is { Length: > 0 } ? creditNoteRows[0].CreditNoteValue : 0m;
+
+        static bool ProductMatch(string? a, string? b) =>
+            string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+
+        var reportName = string.IsNullOrWhiteSpace(p.ReportName) ? "Claim Ratios" : p.ReportName;
+        foreach (var r in results)
+        {
+            r.ReportName = reportName;
+            r.Period = dr.DateRangeLabel;
+            r.Locations = locations;
+            r.SaleValue = glSaleValueTotal;
+            r.CreditNoteValue = crValueTotal;
+            r.ParticularLbl = particularLbl;
+            r.View = p.View ?? "";
+            r.bValue = bValue;
+
+            r.CreditNotePercent = r.SaleValue > 0
+                ? Math.Round(r.CreditNoteValue * 100m / r.SaleValue, 2)
+                : 0;
+
+            if (claimStats != null)
+            {
+                var stat = claimStats.FirstOrDefault(c => ProductMatch(c.Particular, r.Particular) && ProductMatch(c.Group, r.Group));
+                if (stat != null)
+                {
+                    r.Claims = stat.Claims;
+                    r.Pass = stat.Pass;
+                    r.Reject = stat.Reject;
+                    r.Unsettled = stat.Unsettled;
+                    r.ClaimPercent = r.Sold > 0 ? Math.Round((decimal)stat.Claims * 100m / r.Sold, 2) : 0;
+                    r.PassPercent = stat.Claims > 0 ? Math.Round((decimal)stat.Pass * 100m / stat.Claims, 2) : 0;
+                }
+            }
+        }
+
+        var list = results.ToList();
+        if (claimStats != null)
+        {
+            foreach (var stat in claimStats)
+            {
+                var matchedBySale = results.Any(r =>
+                    ProductMatch(r.Particular, stat.Particular) && ProductMatch(r.Group, stat.Group));
+                if (matchedBySale)
+                    continue;
+
+                list.Add(new ClaimRatio
+                {
+                    ReportName = reportName,
+                    Period = dr.DateRangeLabel,
+                    Locations = locations,
+                    SaleValue = glSaleValueTotal,
+                    CreditNoteValue = crValueTotal,
+                    ParticularLbl = particularLbl,
+                    View = p.View ?? "",
+                    bValue = bValue,
+                    Particular = stat.Particular ?? "",
+                    Group = stat.Group ?? "",
+                    Sold = 0,
+                    Claims = stat.Claims,
+                    Pass = stat.Pass,
+                    Reject = stat.Reject,
+                    Unsettled = stat.Unsettled,
+                    ClaimPercent = 0,
+                    PassPercent = stat.Claims > 0 ? Math.Round((decimal)stat.Pass * 100m / stat.Claims, 2) : 0,
+                    CreditNotePercent = glSaleValueTotal > 0
+                        ? Math.Round(crValueTotal * 100m / glSaleValueTotal, 2)
+                        : 0,
+                });
+            }
+        }
+
+        return list;
+    }
     private async Task<object?> GetClaimFailureAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
     {
         var settleT = scope.GetQualifiedTableName("Claim & Failure Settlement", false);
@@ -805,7 +1097,7 @@ GROUP BY Lines.[No_], Lines.[Dispatch Date], Vendors.[Group Details], Lines.[Dis
                 var row = new ClaimAnalysisRow
                 {
                     ReportName = "Claim Analysis",
-                    Period = $"{p.From} .. {p.To}",
+                    Period = $"{fromDate.ToString("dd-MMM-yy")} .. {toDate.ToString("dd-MMM-yy")}",
                     Location = locationText,
                     View = p.View ?? "", ParticularLabel = p.View ?? "",
                     Particular = topic, Type = p.Type ?? "",

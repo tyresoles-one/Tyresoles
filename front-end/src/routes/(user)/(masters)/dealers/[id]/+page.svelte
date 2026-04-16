@@ -12,6 +12,9 @@
 	import { Icon } from '$lib/components/venUI/icon';
 	import { Select } from '$lib/components/venUI/select';
 	import { DatePicker } from '$lib/components/venUI/date-picker';
+	import FormField from '$lib/components/venUI/form/FormField.svelte';
+	import FormSectionHeader from '$lib/components/venUI/form/FormSectionHeader.svelte';
+	import AsyncButton from '$lib/components/venUI/button/AsyncButton.svelte';
 	import { gql } from 'graphql-request';
 	const GetDealerByCodeDocument: any = gql`
 		query GetDealerByCode($code: String!) {
@@ -444,24 +447,19 @@
 					<span class="hidden sm:inline">Documents</span>
 					<span class="sm:hidden">Docs</span>
 				</Button>
-				<StatusBadge status={dealer.status ?? 0} class="shrink-0 hidden sm:inline-flex text-xs" />
+				
 				<Button variant="outline" size="sm" onclick={cancelEdit} disabled={dealerDetail.loading || updateDealerMutation.saving}>
 					Cancel
 				</Button>
-				<Button
+				<AsyncButton
 					size="sm"
 					onclick={saveDealer}
-					disabled={dealerDetail.loading || updateDealerMutation.saving}
-					class="min-w-[80px]"
+					loading={updateDealerMutation.saving}
+					icon="save"
+					loadingText="Saving..."
 				>
-					{#if updateDealerMutation.saving}
-						<Icon name="loader-2" class="size-4 animate-spin mr-2" />
-						Saving...
-					{:else}
-						<Icon name="save" class="size-4 mr-2" />
-						Save
-					{/if}
-				</Button>
+					Save
+				</AsyncButton>
 			{/if}
 		{/snippet}
 	</PageHeading>
@@ -510,29 +508,17 @@
 		{:else}
 			<!-- Single Unified Card -->
 			<Card class="border-border/50 shadow-lg bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-sm">	
-				<CardContent class="pt-6 pb-6 space-y-6">
+				<CardContent class="pt-2 pb-6 space-y-6">
 					<form
 						class="contents"
 						onsubmit={(e) => e.preventDefault()}
 						use:focusManager={{ autoFocus: true }}
 					>
 					<!-- Basic Information Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-								<Icon name="user" class="size-3.5" />
-								Basic Details
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
+					<div class="space-y-1">
+						<FormSectionHeader icon="user" title="Basic Details" />
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-							<div class="space-y-1.5">
-								<label for="dealer-code" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="hash" class="size-3" />
-									Code
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							<FormField id="dealer-code" label="Code" icon="hash" required error={fieldErrors.code}>
 								<Input
 									id="dealer-code"
 									value={dealer.code ?? ''}
@@ -544,16 +530,8 @@
 										fieldErrors.code && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.code}
-									<p id="dealer-code-error" class="text-xs text-destructive" role="alert">{fieldErrors.code}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-name" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="user" class="size-3" />
-									Name
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField id="dealer-name" label="Name" icon="user" required error={fieldErrors.name}>
 								<Input
 									id="dealer-name"
 									bind:value={form.name}
@@ -566,16 +544,8 @@
 										fieldErrors.name && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.name}
-									<p id="dealer-name-error" class="text-xs text-destructive" role="alert">{fieldErrors.name}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-dealership" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="building" class="size-3" />
-									Dealership Name
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField id="dealer-dealership" label="Dealership Name" icon="building" required error={fieldErrors.dealershipName}>
 								<Input
 									id="dealer-dealership"
 									bind:value={form.dealershipName}
@@ -588,16 +558,8 @@
 										fieldErrors.dealershipName && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.dealershipName}
-									<p id="dealer-dealership-error" class="text-xs text-destructive" role="alert">{fieldErrors.dealershipName}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-phone" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="phone" class="size-3" />
-									Mobile Number
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField id="dealer-phone" label="Mobile Number" icon="phone" required error={fieldErrors.mobileNo}>
 								<Input
 									id="dealer-phone"
 									bind:value={form.mobileNo}
@@ -610,15 +572,8 @@
 										fieldErrors.mobileNo && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.mobileNo}
-									<p id="dealer-phone-error" class="text-xs text-destructive" role="alert">{fieldErrors.mobileNo}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-email" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="mail" class="size-3" />
-									Email Address
-								</label>
+							</FormField>
+							<FormField id="dealer-email" label="Email Address" icon="mail">
 								<Input
 									id="dealer-email"
 									type="email"
@@ -626,12 +581,8 @@
 									placeholder="Enter email"
 									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
 								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-status" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="activity" class="size-3" />
-									Status
-								</label>
+							</FormField>
+							<FormField id="dealer-status" label="Status" icon="activity">
 								<select
 									id="dealer-status"
 									bind:value={form.status}
@@ -640,27 +591,15 @@
 									<option value={0}>Active</option>
 									<option value={1}>Inactive</option>
 								</select>
-							</div>
+							</FormField>
 						</div>
 					</div>
 
 					<!-- Business Details Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2 p-4">
-								<Icon name="briefcase" class="size-3.5" />
-								Business Information
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
+					<div class="space-y-3 mt-4">
+						<FormSectionHeader icon="briefcase" title="Business Information" />
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="layers" class="size-3" />
-									Business Model
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							<FormField label="Business Model" icon="layers" required error={fieldErrors.businessModel}>
 								<Select
 									options={businessModelOptions}
 									bind:value={form.businessModel}
@@ -675,16 +614,8 @@
 									)}
 									onSelect={() => setTimeout(triggerNextFocus, 50)}
 								/>
-								{#if fieldErrors.businessModel}
-									<p class="text-xs text-destructive" role="alert">{fieldErrors.businessModel}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="package" class="size-3" />
-									Product
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField label="Product" icon="package" required error={fieldErrors.product}>
 								<Select
 									options={productOptions}
 									bind:value={form.product}
@@ -699,10 +630,7 @@
 									)}
 									onSelect={() => setTimeout(triggerNextFocus, 50)}
 								/>
-								{#if fieldErrors.product}
-									<p class="text-xs text-destructive" role="alert">{fieldErrors.product}</p>
-								{/if}
-							</div>
+							</FormField>
 							<div class="space-y-1.5">
 								<label for="investment" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
 									<Icon name="indian-rupee" class="size-3" />
@@ -742,22 +670,10 @@
 					</div>
 
 					<!-- Important Dates Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-border/40 via-border/60 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2 p-4">
-								<Icon name="calendar" class="size-3.5" />
-								Important Dates
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-border/40 via-border/60 to-transparent"></div>
-						</div>
+					<div class="space-y-3 mt-4">
+						<FormSectionHeader icon="calendar" title="Important Dates" />
 						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="calendar-plus" class="size-3" />
-									Dealership Start
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							<FormField label="Dealership Start" icon="calendar-plus" required error={fieldErrors.dealershipStartDate}>
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
@@ -766,16 +682,8 @@
 									aria-invalid={fieldErrors.dealershipStartDate ? true : undefined}
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}
 								/>
-								{#if fieldErrors.dealershipStartDate}
-									<p class="text-xs text-destructive" role="alert">{fieldErrors.dealershipStartDate}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="calendar-x" class="size-3" />
-									Dealership Expiry
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField label="Dealership Expiry" icon="calendar-x" required error={fieldErrors.dealershipExpDate}>
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
@@ -784,16 +692,8 @@
 									aria-invalid={fieldErrors.dealershipExpDate ? true : undefined}
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}
 								/>
-								{#if fieldErrors.dealershipExpDate}
-									<p class="text-xs text-destructive" role="alert">{fieldErrors.dealershipExpDate}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="cake" class="size-3" />
-									Date of Birth
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
+							</FormField>
+							<FormField label="Date of Birth" icon="cake" required error={fieldErrors.dateOfBirth}>
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
@@ -802,15 +702,8 @@
 									aria-invalid={fieldErrors.dateOfBirth ? true : undefined}
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}
 								/>
-								{#if fieldErrors.dateOfBirth}
-									<p class="text-xs text-destructive" role="alert">{fieldErrors.dateOfBirth}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="heart" class="size-3" />
-									Anniversary Date
-								</label>
+							</FormField>
+							<FormField label="Anniversary Date" icon="heart">
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
@@ -818,28 +711,17 @@
 									placeholder="Select date..."
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}
 								/>
-							</div>
+							</FormField>
 						</div>
 					</div>
 
 					<!-- Tax & Bank Details Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2 p-4">
-								<Icon name="credit-card" class="size-3.5" />
-								Tax & Banking
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
+					<div class="space-y-3 mt-4">
+						<FormSectionHeader icon="credit-card" title="Tax & Banking" />
 
 						<!-- Tax IDs -->
 						<div class="grid gap-3 sm:grid-cols-3">
-							<div class="space-y-1.5">
-								<label for="dealer-gst" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="file-text" class="size-3" />
-									GST Number
-								</label>
+							<FormField id="dealer-gst" label="GST Number" icon="file-text">
 								<Input
 									id="dealer-gst"
 									bind:value={form.gstNo}
@@ -860,14 +742,9 @@
 										{gstLegalName}
 									</p>
 								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-pan" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="id-card" class="size-3" />
-									PAN Number
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
-								<Input
+</FormField>
+							<FormField id="dealer-pan" label="PAN Number" icon="id-card" required error={fieldErrors.panNo}>
+	<Input
 									id="dealer-pan"
 									bind:value={form.panNo}
 									placeholder="PAN No"
@@ -879,17 +756,9 @@
 										fieldErrors.panNo && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.panNo}
-									<p id="dealer-pan-error" class="text-xs text-destructive" role="alert">{fieldErrors.panNo}</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-aadhar" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="fingerprint-pattern" class="size-3" />
-									Aadhar Number
-									<span class="text-destructive" aria-hidden="true">*</span>
-								</label>
-								<Input
+</FormField>
+							<FormField id="dealer-aadhar" label="Aadhar Number" icon="fingerprint-pattern" required error={fieldErrors.aadharNo}>
+	<Input
 									id="dealer-aadhar"
 									bind:value={form.aadharNo}
 									placeholder="Aadhar No"
@@ -901,22 +770,14 @@
 										fieldErrors.aadharNo && 'border-destructive'
 									)}
 								/>
-								{#if fieldErrors.aadharNo}
-									<p id="dealer-aadhar-error" class="text-xs text-destructive" role="alert">{fieldErrors.aadharNo}</p>
-								{/if}
-							</div>
+</FormField>
 						</div>
 
 						<!-- Bank Details -->
 						<div class="pt-3 mt-2 border-t border-border/30">
 							<div class="grid gap-3 sm:grid-cols-2">
-								<div class="space-y-1.5">
-									<label for="bank-ifsc" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="key" class="size-3" />
-										IFSC Code
-										<span class="text-destructive" aria-hidden="true">*</span>
-									</label>
-									<Input
+								<FormField id="bank-ifsc" label="IFSC Code" icon="key" required error={fieldErrors.bankIfsc}>
+	<Input
 										id="bank-ifsc"
 										bind:value={form.bankIfsc}
 										placeholder="IFSC code"
@@ -936,17 +797,9 @@
 									{:else if ifscLookupError}
 										<p class="text-xs text-destructive" aria-live="polite">{ifscLookupError}</p>
 									{/if}
-									{#if fieldErrors.bankIfsc}
-										<p id="bank-ifsc-error" class="text-xs text-destructive" role="alert">{fieldErrors.bankIfsc}</p>
-									{/if}
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-name" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="landmark" class="size-3" />
-										Bank Name
-										<span class="text-destructive" aria-hidden="true">*</span>
-									</label>
-									<Input
+</FormField>
+								<FormField id="bank-name" label="Bank Name" icon="landmark" required error={fieldErrors.bankName}>
+	<Input
 										id="bank-name"
 										bind:value={form.bankName}
 										placeholder="Enter bank name"
@@ -958,17 +811,9 @@
 											fieldErrors.bankName && 'border-destructive'
 										)}
 									/>
-									{#if fieldErrors.bankName}
-										<p id="bank-name-error" class="text-xs text-destructive" role="alert">{fieldErrors.bankName}</p>
-									{/if}
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-branch" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="map-pin" class="size-3" />
-										Bank Branch
-										<span class="text-destructive" aria-hidden="true">*</span>
-									</label>
-									<Input
+</FormField>
+								<FormField id="bank-branch" label="Bank Branch" icon="map-pin" required error={fieldErrors.bankBranch}>
+	<Input
 										id="bank-branch"
 										bind:value={form.bankBranch}
 										placeholder="Enter branch"
@@ -980,17 +825,9 @@
 											fieldErrors.bankBranch && 'border-destructive'
 										)}
 									/>
-									{#if fieldErrors.bankBranch}
-										<p id="bank-branch-error" class="text-xs text-destructive" role="alert">{fieldErrors.bankBranch}</p>
-									{/if}
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-ac" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="hash" class="size-3" />
-										Account Number
-										<span class="text-destructive" aria-hidden="true">*</span>
-									</label>
-									<Input
+</FormField>
+								<FormField id="bank-ac" label="Account Number" icon="hash" required error={fieldErrors.bankACNo}>
+	<Input
 										id="bank-ac"
 										bind:value={form.bankACNo}
 										placeholder="Account number"
@@ -1002,10 +839,7 @@
 											fieldErrors.bankACNo && 'border-destructive'
 										)}
 									/>
-									{#if fieldErrors.bankACNo}
-										<p id="bank-ac-error" class="text-xs text-destructive" role="alert">{fieldErrors.bankACNo}</p>
-									{/if}
-								</div>
+</FormField>
 								
 							</div>
 						</div>

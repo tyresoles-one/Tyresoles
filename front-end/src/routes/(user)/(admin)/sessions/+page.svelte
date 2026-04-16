@@ -5,6 +5,7 @@
   import PageHeading from "$lib/components/venUI/page-heading/PageHeading.svelte";
   import { Icon } from "$lib/components/venUI/icon";
   import { Toast } from "$lib/components/venUI/toast";
+  import { Dialog } from "$lib/components/venUI/dialog";
   import { formatDistanceToNow } from "date-fns";
   import { cn } from "$lib/utils";
 
@@ -82,15 +83,25 @@
   }
 
   async function killSession(id: string) {
-    if (!confirm("Are you sure you want to end this session?")) return;
-    
+    const confirmed = await Dialog.confirm(
+      "End this session?",
+      "They will be signed out immediately on their next request (or right away if the app is open).",
+      {
+        confirmLabel: "End session",
+        cancelLabel: "Cancel",
+        variant: "destructive",
+        icon: "power",
+      },
+    );
+    if (!confirmed) return;
+
     actionLoading = id;
     try {
       const res = await graphqlMutation<{ killSession: { success: boolean, message: string } }>(KILL_SESSION, {
         variables: { sessionId: id }
       });
       if (res.success && res.data?.killSession.success) {
-        Toast.success("Session ended successfully");
+        Toast.success("Session ended", "That user is signed out immediately.");
         sessions = sessions.filter(s => s.sessionId !== id);
         if (selectedId === id) selectedId = null;
       } else {
@@ -104,7 +115,17 @@
   }
 
   async function killAllForUser(userId: string) {
-    if (!confirm(`Are you sure you want to end ALL sessions for user ${userId}?`)) return;
+    const confirmed = await Dialog.confirm(
+      `End all sessions for ${userId}?`,
+      "Every active session for this user ends immediately on their next request.",
+      {
+        confirmLabel: "End all sessions",
+        cancelLabel: "Cancel",
+        variant: "destructive",
+        icon: "users-round",
+      },
+    );
+    if (!confirmed) return;
 
     actionLoading = `user-${userId}`;
     try {
@@ -112,7 +133,10 @@
         variables: { userId }
       });
       if (res.success && res.data?.killSessionsByUser.success) {
-        Toast.success(`Ended ${res.data.killSessionsByUser.killedCount} sessions for ${userId}`);
+        Toast.success(
+          "Sessions ended",
+          `${res.data.killSessionsByUser.killedCount} session(s) cleared — those clients are signed out.`,
+        );
         sessions = sessions.filter(s => s.userId !== userId);
       } else {
         Toast.error("Failed to end user sessions");
@@ -126,24 +150,41 @@
 
   // ── Helpers ────────────────────────────────────────────────
   let filteredSessions = $derived(
-    sessions.filter(s => 
-      s.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.entityCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.department.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    sessions
+      .filter(s => isLiveSession(s.expiresAtUtc))
+      .filter(
+        s =>
+          s.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          s.entityCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          s.department.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
   );
+
+  /** GraphQL often returns ISO strings that already end with `Z`; appending `Z` again yields Invalid Date. */
+  function parseUtcDate(iso: string): Date {
+    const s = (iso ?? "").trim();
+    if (!s) return new Date(NaN);
+    if (/Z$/i.test(s)) return new Date(s);
+    if (/[+-]\d{2}:?\d{2}$/.test(s)) return new Date(s);
+    return new Date(`${s}Z`);
+  }
 
   function formatDate(iso: string) {
     try {
-      return formatDistanceToNow(new Date(iso + 'Z'), { addSuffix: true });
+      return formatDistanceToNow(parseUtcDate(iso), { addSuffix: true });
     } catch {
       return iso;
     }
   }
 
   function getStatusColor(expiresAt: string) {
-    const isExpired = new Date(expiresAt + 'Z') <= new Date();
+    const isExpired = parseUtcDate(expiresAt) <= new Date();
     return isExpired ? "text-rose-500" : "text-emerald-500";
+  }
+
+  /** Server should only return active rows; keep this so the UI never lists expired tokens as "live". */
+  function isLiveSession(expiresAtUtc: string): boolean {
+    return parseUtcDate(expiresAtUtc) > new Date();
   }
 
   onMount(() => {
@@ -164,9 +205,9 @@
   <div class="session-toolbar">
     <div class="session-summary-chip">
       {#if loading}
-        <span class="session-chip-label">Fetching active sessions…</span>
+        <span class="session-chip-label">Fetching live sessions…</span>
       {:else}
-        <span class="session-chip-label">{filteredSessions.length} active sessions</span>
+        <span class="session-chip-label">{filteredSessions.length} live sessions</span>
       {/if}
     </div>
 
@@ -209,7 +250,7 @@
       {:else if filteredSessions.length === 0}
         <div class="flex flex-col items-center justify-center py-20 text-center opacity-40">
           <Icon name="monitor-off" class="h-16 w-16 mb-4" />
-          <p class="text-lg font-medium">No active sessions found</p>
+          <p class="text-lg font-medium">No live sessions found</p>
           <p class="text-xs">Adjust your filters or refresh the list</p>
         </div>
       {:else}
@@ -270,7 +311,7 @@
                         <div class="session-detail-item">
                             <span class="session-detail-label">Expires</span>
                             <span class="session-detail-value {getStatusColor(s.expiresAtUtc)}">
-                                {new Date(s.expiresAtUtc + 'Z').toLocaleString()}
+                                {parseUtcDate(s.expiresAtUtc).toLocaleString()}
                             </span>
                         </div>
                         <div class="session-detail-item flex items-end justify-end">
@@ -488,8 +529,8 @@
     width: 2rem;
     height: 2rem;
     border-radius: 0.5rem;
-    background: var(--rose-500)/10;
-    color: var(--rose-500);
+    background: color-mix(in oklch, var(--destructive) 14%, transparent);
+    color: var(--destructive);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -497,8 +538,8 @@
   }
 
   .session-kill-btn:hover:not(:disabled) {
-    background: var(--rose-500);
-    color: white;
+    background: var(--destructive);
+    color: var(--primary-foreground);
   }
 
   .session-kill-btn:disabled {
@@ -546,9 +587,9 @@
     display: flex;
     align-items: center;
     padding: 0.5rem 0.875rem;
-    background: var(--rose-500)/5;
-    color: var(--rose-500);
-    border: 1px solid var(--rose-500)/20;
+    background: color-mix(in oklch, var(--destructive) 8%, transparent);
+    color: var(--destructive);
+    border: 1px solid color-mix(in oklch, var(--destructive) 25%, transparent);
     border-radius: 0.5rem;
     font-size: 0.65rem;
     font-weight: 700;
@@ -556,9 +597,9 @@
   }
 
   .kill-user-btn:hover:not(:disabled) {
-    background: var(--rose-500);
-    color: white;
-    border-color: var(--rose-500);
+    background: var(--destructive);
+    color: var(--primary-foreground);
+    border-color: var(--destructive);
   }
 
   :global(.spinning) { animation: spin 1s linear infinite; }

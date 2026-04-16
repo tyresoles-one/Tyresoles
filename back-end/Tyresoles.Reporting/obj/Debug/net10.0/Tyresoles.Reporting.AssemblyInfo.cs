@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Tyresoles.Reporting")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d9b48db97ecf6c55916a8e5dd9b505a87502abe6")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tyresoles.Reporting")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tyresoles.Reporting")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

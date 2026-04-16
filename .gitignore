@@ -1,0 +1,47 @@
+# IDE / Editor
+.vs/
+.vscode/
+.cursor/
+.qodo/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET
+bin/
+obj/
+nupkg/
+*.nupkg
+
+# Node / Frontend
+node_modules/
+.svelte-kit/
+
+# Build artifacts
+build/
+dist/
+*.zip
+
+# Logs
+*.log
+debug-*.log
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temporary / scratch files
+*.tmp
+out.txt
+out_build.txt
+out_web_build.txt
+build_errors.txt
+final_build_errors.txt
+build_output.txt
+check_result.txt
+check_ecoproc.txt
+codegen_output.txt
+patterns.txt
+sales_files.txt

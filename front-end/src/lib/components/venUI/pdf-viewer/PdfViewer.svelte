@@ -41,6 +41,45 @@
     
 	let resizeObserver: ResizeObserver | null = null;
 	let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+	/** When true, window/container resize must not override zoom (user zoomed or pinched). */
+	let userAdjustedZoom = $state(false);
+
+	// Pinch-to-zoom (mobile) — touchmove must be non-passive so we can preventDefault while pinching
+	let pinchStartDistance = 0;
+	let pinchStartScale = 1;
+
+	function pinchScrollArea(node: HTMLDivElement) {
+		const onStart = (e: TouchEvent) => {
+			if (e.touches.length === 2) {
+				pinchStartDistance = pinchDistance(e.touches);
+				pinchStartScale = scale;
+			}
+		};
+		const onMove = (e: TouchEvent) => {
+			if (e.touches.length !== 2 || pinchStartDistance <= 0) return;
+			e.preventDefault();
+			const d = pinchDistance(e.touches);
+			if (d <= 0) return;
+			userAdjustedZoom = true;
+			const next = pinchStartScale * (d / pinchStartDistance);
+			scale = Math.min(3.0, Math.max(0.5, next));
+		};
+		const onEnd = () => {
+			pinchStartDistance = 0;
+		};
+		node.addEventListener('touchstart', onStart, { passive: true });
+		node.addEventListener('touchmove', onMove, { passive: false });
+		node.addEventListener('touchend', onEnd);
+		node.addEventListener('touchcancel', onEnd);
+		return {
+			destroy() {
+				node.removeEventListener('touchstart', onStart);
+				node.removeEventListener('touchmove', onMove);
+				node.removeEventListener('touchend', onEnd);
+				node.removeEventListener('touchcancel', onEnd);
+			}
+		};
+	}
 
     onMount(async () => {
         try {
@@ -109,10 +148,10 @@
     // Setup resize observer
 	$effect(() => {
 		if (containerRef && !resizeObserver) {
-			resizeObserver = new ResizeObserver((entries) => {
+			resizeObserver = new ResizeObserver(() => {
 				if (resizeTimeout) clearTimeout(resizeTimeout);
 				resizeTimeout = setTimeout(() => {
-					if (pdfDoc) {
+					if (pdfDoc && !userAdjustedZoom) {
                         fitToWidth();
                     }
 				}, 200);
@@ -147,6 +186,7 @@
             pdfDoc = null;
             numPages = 0;
             pageNum = 1;
+            userAdjustedZoom = false;
 
             if (typeof src === 'string') {
                  currentTask = pdfjs.getDocument(src);
@@ -271,14 +311,17 @@
 	}
 
 	function zoomIn() {
+		userAdjustedZoom = true;
 		scale = Math.min(scale + 0.25, 3.0);
 	}
 
 	function zoomOut() {
+		userAdjustedZoom = true;
 		scale = Math.max(scale - 0.25, 0.5);
 	}
 
 	function rotate() {
+		userAdjustedZoom = true;
 		rotation = (rotation + 90) % 360;
 	}
 
@@ -286,6 +329,8 @@
 		if (!containerRef || !pdfDoc) return;
         // Don't run if container has no width yet
         if (containerRef.clientWidth === 0) return;
+
+		userAdjustedZoom = false;
 
 		// A rough estimate, getting first page to calculate aspect ratio
 		pdfDoc.getPage(1).then((page: any) => {
@@ -299,6 +344,13 @@
                 }
 			}
 		});
+	}
+
+	function pinchDistance(touches: TouchList) {
+		if (touches.length < 2) return 0;
+		const dx = touches[0].clientX - touches[1].clientX;
+		const dy = touches[0].clientY - touches[1].clientY;
+		return Math.hypot(dx, dy);
 	}
 
     async function downloadPdf() {
@@ -352,7 +404,7 @@
 <svelte:window onkeydown={handleKeyDown} />
 
 <div
-  class={cn("flex flex-col gap-4 w-full h-full relative", className)}
+  class={cn("flex min-h-0 flex-col gap-4 w-full h-full relative", className)}
   bind:this={containerRef}
 >
   <!-- Toolbar -->
@@ -464,13 +516,15 @@
     </div>
   </div>
 
-  <!-- Content -->
+  <!-- Content: block scroll (not flex justify-center) so overflow can reach both edges; inner w-fit + mx-auto centers when smaller than viewport -->
   <div
-    class="flex-1 w-full overflow-auto flex justify-center p-4 bg-muted/20 rounded-lg border min-h-[400px]"
+    use:pinchScrollArea
+    class="flex-1 w-full min-w-0 min-h-0 overflow-auto p-4 bg-muted/20 rounded-lg border"
+    style="touch-action: pan-x pan-y;"
   >
     {#if loading}
       <div
-        class="flex flex-col items-center justify-center space-y-4 w-full h-full"
+        class="flex flex-col items-center justify-center space-y-4 w-full min-h-[360px]"
       >
         <Icon name="loader-circle" class="size-8 animate-spin text-primary" />
         <div class="space-y-2 w-full max-w-md">
@@ -478,7 +532,7 @@
         </div>
       </div>
     {:else if error}
-      <div class="flex items-center justify-center w-full h-full">
+      <div class="flex items-center justify-center w-full min-h-[360px]">
         <Alert variant="destructive" class="max-w-md">
           <Icon name="CircleAlert" class="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
@@ -486,7 +540,9 @@
         </Alert>
       </div>
     {:else}
-      <canvas bind:this={canvasRef} class="shadow-lg max-w-full"></canvas>
+      <div class="mx-auto w-fit">
+        <canvas bind:this={canvasRef} class="shadow-lg block max-w-none"></canvas>
+      </div>
     {/if}
   </div>
 </div>

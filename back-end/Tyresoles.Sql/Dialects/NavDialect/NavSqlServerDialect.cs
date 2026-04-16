@@ -27,7 +27,7 @@ public class NavSqlServerDialect : IDialect
     {
         // 1. Prefix with schema if provided
         var schema = string.IsNullOrEmpty(schemaPrefix) ? "dbo" : schemaPrefix;
-        
+
         // 2. NAV Company Handling logic
         if (!isShared && !string.IsNullOrEmpty(company))
         {

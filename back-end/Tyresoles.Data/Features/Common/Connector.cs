@@ -309,6 +309,21 @@ public class Connector
         return result.return_value ? 1 : 0;
     });
 
+    /// <summary>NAV WebServe <c>UpdateVehicle</c> with raw status (matches <see cref="Dataverse.NavLive.Vehicles.Status"/>).</summary>
+    public Task<int> UpdateVehicleNavAsync(
+        string no,
+        string name,
+        string mobileNo,
+        string gstin,
+        int lineNo,
+        string respCenter,
+        int status) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.UpdateVehicleAsync(no, name, mobileNo, gstin, lineNo, respCenter, status);
+            return result.return_value ? 1 : 0;
+        });
+
     public Task<int> AddUpdateDocumentImageAsync(DocumentImage record) => ExecuteWithRetryAsync(async client =>
     {
         var result = await client.AddUpdateImageAsync(record.DocumentNo, record.Type, record.LineNo, record.Image);
@@ -326,6 +341,30 @@ public class Connector
         var result = await client.PortalForDealerAsync(dealerCode);
         return result.return_value ? 1 : 0;
     });
+
+    /// <summary>NAV WebServe <c>ReqCustEdit</c> — customer edit request (dealer / area).</summary>
+    public Task<bool> ReqCustEditAsync(string customerNo, string dealerCode, string areaCode) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqCustEditAsync(customerNo, dealerCode, areaCode);
+            return result.return_value;
+        });
+
+    /// <summary>NAV WebServe <c>ReqUserSetup</c> — user setup request for a responsibility center and date range.</summary>
+    public Task<bool> ReqUserSetupAsync(string userid, string respCenter, DateTime fromDate, DateTime toDate) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqUserSetupAsync(userid, respCenter, fromDate, toDate);
+            return result.return_value;
+        });
+
+    /// <summary>NAV WebServe <c>ReqGLEntry</c> — G/L entry request.</summary>
+    public Task<bool> ReqGLEntryAsync(int entryNo, string glAccountNo, string respCenter, decimal amount, DateTime postingDate) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqGLEntryAsync(entryNo, glAccountNo, respCenter, amount, postingDate);
+            return result.return_value;
+        });
 
     public async Task<string> CreateSupportRequestAsync(SupportRequest request)
     {

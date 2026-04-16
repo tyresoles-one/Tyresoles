@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Report xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:cl="http://schemas.microsoft.com/sqlserver/reporting/2010/01/componentdefinition" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition">
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <AutoRefresh>0</AutoRefresh>
   <DataSources>
     <DataSource Name="DataSource">
@@ -125,7 +125,7 @@
             <TablixBody>
               <TablixColumns>
                 <TablixColumn>
-                  <Width>7.94444in</Width>
+                  <Width>7.31944in</Width>
                 </TablixColumn>
               </TablixColumns>
               <TablixRows>
@@ -187,7 +187,7 @@
                               <Top>0.00001cm</Top>
                               <Left>2.8575cm</Left>
                               <Height>0.25in</Height>
-                              <Width>4.70833in</Width>
+                              <Width>4.13194in</Width>
                               <ZIndex>1</ZIndex>
                               <RepeatWith>Tablix3</RepeatWith>
                               <Style>
@@ -219,7 +219,7 @@
                               </Paragraphs>
                               <rd:DefaultName>Textbox7</rd:DefaultName>
                               <Top>0.00001cm</Top>
-                              <Left>14.81666cm</Left>
+                              <Left>13.22916cm</Left>
                               <Height>0.25in</Height>
                               <Width>2.11111in</Width>
                               <ZIndex>2</ZIndex>
@@ -238,22 +238,22 @@
                               <TablixBody>
                                 <TablixColumns>
                                   <TablixColumn>
-                                    <Width>0.42824in</Width>
+                                    <Width>0.32407in</Width>
                                   </TablixColumn>
                                   <TablixColumn>
-                                    <Width>1.06018in</Width>
+                                    <Width>0.99768in</Width>
                                   </TablixColumn>
                                   <TablixColumn>
-                                    <Width>0.90046in</Width>
+                                    <Width>0.86574in</Width>
                                   </TablixColumn>
                                   <TablixColumn>
-                                    <Width>1.83796in</Width>
+                                    <Width>1.71296in</Width>
                                   </TablixColumn>
                                   <TablixColumn>
-                                    <Width>2.6574in</Width>
+                                    <Width>2.54629in</Width>
                                   </TablixColumn>
                                   <TablixColumn>
-                                    <Width>1.06018in</Width>
+                                    <Width>0.8727in</Width>
                                   </TablixColumn>
                                 </TablixColumns>
                                 <TablixRows>
@@ -294,6 +294,7 @@
                                               <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                           </Textbox>
+                                          <rd:Selected>true</rd:Selected>
                                         </CellContents>
                                       </TablixCell>
                                       <TablixCell>
@@ -1036,7 +1037,10 @@
                               </TablixColumnHierarchy>
                               <TablixRowHierarchy>
                                 <TablixMembers>
-                                  <TablixMember />
+                                  <TablixMember>
+                                    <KeepWithGroup>After</KeepWithGroup>
+                                    <RepeatOnNewPage>true</RepeatOnNewPage>
+                                  </TablixMember>
                                   <TablixMember>
                                     <Group Name="Inspector">
                                       <GroupExpressions>
@@ -1065,7 +1069,7 @@
                               <DataSetName>DataSet_Result</DataSetName>
                               <Top>0.63417in</Top>
                               <Height>1.09722in</Height>
-                              <Width>7.94442in</Width>
+                              <Width>7.31944in</Width>
                               <ZIndex>3</ZIndex>
                               <Style>
                                 <Border>
@@ -1126,7 +1130,7 @@
                               <Top>0.635cm</Top>
                               <Left>2.8575cm</Left>
                               <Height>0.25in</Height>
-                              <Width>6.81942in</Width>
+                              <Width>6.19444in</Width>
                               <ZIndex>5</ZIndex>
                               <RepeatWith>Tablix3</RepeatWith>
                               <Style>
@@ -1176,7 +1180,7 @@
             <Top>0.06944in</Top>
             <Left>0.07055cm</Left>
             <Height>1.73139in</Height>
-            <Width>7.94444in</Width>
+            <Width>7.31944in</Width>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1383,7 +1387,7 @@
           </Border>
         </Style>
       </Body>
-      <Width>202.49442mm</Width>
+      <Width>186.6193mm</Width>
       <Page>
         <PageHeader>
           <Height>12.7mm</Height>
@@ -1443,7 +1447,7 @@
               <rd:DefaultName>Textbox33</rd:DefaultName>
               <Left>8.69597cm</Left>
               <Height>0.5in</Height>
-              <Width>4.54861in</Width>
+              <Width>3.92361in</Width>
               <ZIndex>1</ZIndex>
               <Style>
                 <Border>

@@ -14,10 +14,13 @@
 		getValueKey,
 		getProductionArrayFieldKey,
 		isProductionArrayMaster,
+		isGroupCategoriesMaster,
+		isSearchUsersMaster,
 		PAGE_SIZE,
 		type MasterType,
 		type MasterOption,
 		type ProductionArrayQueryResult,
+		type GroupCategoriesQueryResult,
 	} from './masters-api';
 	import * as Field from '$lib/components/ui/field';
 	import type { FetchParamsInput } from '$lib/services/graphql/generated/graphql';
@@ -38,7 +41,7 @@
 		respCenterType?: string;
 		/** When true, picking an item sets the value and closes the dropdown (single-select mode). */
 		singleSelect?: boolean;
-		/** Override the respCenter variable sent to the GraphQL query. Can be string or array (array used for vehicles). */
+		/** Override responsibility centers: for myCustomers / legacy queries uses first entry as `respCenter`; for myDealers / myAreas / myRegions passes full list as `respCenters`. */
 		respCenterOverride?: string | string[] | null;
 		/** For `masterType="vendors"`, limit to these vendor categories (e.g. casing procurement). Default: all (`[]`). */
 		vendorCategories?: string[];
@@ -46,10 +49,18 @@
 		purchaseItemParam?: FetchParamsInput | null;
 		/** Required for `production*` master types — maps to Query.cs `ProductionFetchParams param`. */
 		productionFetchParam?: FetchParamsInput | null;
+		/** For `masterType="departments"` — Query.GetGroupCategories `type` (e.g. 1 = departments). */
+		groupCategoriesType?: number;
+		/** For `masterType="departments"` — comma-separated resp. center codes (same as payroll form `respCenters`). */
+		groupCategoryRespCenters?: string | null;
+		/** For `masterType="payrollEmployees"` — NAV Employee `Department` filter (`ReportFetchParam.department`). */
+		payrollDepartment?: string | null;
+		/** After single-select (e.g. postCodes): NAV row fields in `meta` for related form fields. */
+		onPicked?: (detail: { value: string; meta?: Record<string, unknown> }) => void;
 	};
 
 	let {
-		form,
+		form = $bindable(),
 		fieldName,
 		masterType,
 		label,
@@ -62,6 +73,10 @@
 		vendorCategories,
 		purchaseItemParam = null,
 		productionFetchParam = null,
+		groupCategoriesType = 1,
+		groupCategoryRespCenters = undefined,
+		payrollDepartment = undefined,
+		onPicked = undefined,
 	}: Props = $props();
 
 	const user = $derived(authStore.get().user);
@@ -71,6 +86,23 @@
 		department: user?.department ?? null,
 		respCenter: user?.respCenter ?? null,
 	});
+
+	/** GraphQL `respCenters` on myDealers / myAreas / myRegions — union filter; omits when null. */
+	function resolveRespCentersForMasters(
+		override: string | string[] | undefined,
+		fallback: string | null | undefined
+	): string[] | null {
+		if (override !== undefined && override !== null) {
+			if (Array.isArray(override)) {
+				const c = override.map((s) => String(s).trim()).filter(Boolean);
+				return c.length ? [...new Set(c)] : null;
+			}
+			const s = String(override).trim();
+			return s ? [s] : null;
+		}
+		const f = fallback != null ? String(fallback).trim() : '';
+		return f ? [f] : null;
+	}
 
 	let open = $state(false);
 	/** Combobox trigger — used to dispatch `ven-form:next-focus` after selection / Enter. */
@@ -85,6 +117,8 @@
 	let totalCount = $state(0);
 	/** Full list from production array queries; `options` is filtered by search client-side. */
 	let productionCache = $state<MasterOption[]>([]);
+	/** Full list from `groupCategories`; `options` is filtered by search client-side. */
+	let groupCategoriesCache = $state<MasterOption[]>([]);
 
 	const valueStr = $derived(String(form.values[fieldName] ?? ''));
 	const selectedValues = $derived(
@@ -104,6 +138,30 @@
 	});
 
 	function nodeToOption(node: { code?: string | null; no?: string | null; name?: string | null; category?: string | null }): MasterOption {
+		if (masterType === 'states') {
+			const n = node as { code?: string | null; description?: string | null };
+			const value = String(n.code ?? '').trim();
+			const desc = String(n.description ?? '').trim();
+			return { label: desc ? `${value} - ${desc}` : value, value };
+		}
+		if (masterType === 'postCodes') {
+			const n = node as {
+				code?: string | null;
+				city?: string | null;
+				stateCode?: string | null;
+			};
+			const value = String(n.code ?? '').trim();
+			const city = String(n.city ?? '').trim();
+			return {
+				label: city ? `${value} - ${city}` : value,
+				value,
+				meta: {
+					code: value,
+					city: n.city ?? '',
+					stateCode: n.stateCode ?? '',
+				},
+			};
+		}
 		if (masterType === 'purchaseItems') {
 			const n = node as { code?: string | null; name?: string | null; category?: string | null };
 			const value = n.code ?? '';
@@ -132,10 +190,19 @@
 			const value = raw ?? '';
 			return { label: value, value };
 		}
+		if (masterType === 'payrollEmployees') {
+			const n = node as { no?: string | null; firstName?: string | null; lastName?: string | null };
+			const value = n.no ?? '';
+			const name = `${n.firstName ?? ''} ${n.lastName ?? ''}`.trim();
+			return { label: name ? `${value} - ${name}` : value, value };
+		}
 		const valueKey = getValueKey(masterType);
 		const raw = valueKey === 'no' ? (node as { no?: string | null }).no : (node as { code?: string | null }).code;
 		const value = raw ?? '';
-		const name = node.name ?? '';
+		const name =
+			node.name ??
+			(node as { description?: string | null }).description ??
+			'';
 		return { label: name ? `${value} - ${name}` : value, value };
 	}
 
@@ -147,6 +214,42 @@
 						o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
 				)
 			: productionCache;
+	}
+
+	function applyGroupCategoriesFilter() {
+		const q = debouncedSearch.trim().toLowerCase();
+		options = q
+			? groupCategoriesCache.filter(
+					(o) =>
+						o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
+				)
+			: groupCategoriesCache;
+	}
+
+	async function loadGroupCategoriesList() {
+		if (!isGroupCategoriesMaster(masterType)) return;
+		loading = true;
+		try {
+			const query = getMasterQuery(masterType);
+			const rc = groupCategoryRespCenters?.trim();
+			const result = await graphqlQuery<GroupCategoriesQueryResult>(query, {
+				variables: {
+					type: groupCategoriesType,
+					respCenters: rc ? rc : null,
+				},
+				skipLoading: true,
+				skipCache: true,
+			});
+			if (!result.success || !result.data) return;
+			const rows = result.data.groupCategories ?? [];
+			groupCategoriesCache = (rows as { code?: string | null; name?: string | null }[]).map(
+				(n) => nodeToOption(n as { code?: string | null; no?: string | null; name?: string | null })
+			);
+			hasNextPage = false;
+		} finally {
+			loading = false;
+		}
+		applyGroupCategoriesFilter();
 	}
 
 	async function loadProductionList() {
@@ -186,16 +289,85 @@
 		applyProductionFilter();
 	}
 
+	async function fetchSearchUsers() {
+		if (!isSearchUsersMaster(masterType)) return;
+		loading = true;
+		try {
+			const query = getMasterQuery(masterType);
+			const result = await graphqlQuery<{
+				searchUsers: { userId: string; fullName: string; userType: string }[];
+			}>(query, {
+				variables: {
+					search: debouncedSearch.trim() || null,
+					take: 50,
+				},
+				skipLoading: true,
+				skipCache: true,
+			});
+			if (!result.success || !result.data) return;
+			const rows = result.data.searchUsers ?? [];
+			options = rows.map((u) => ({
+				label: u.fullName?.trim() ? `${u.userId} — ${u.fullName.trim()}` : u.userId,
+				value: u.userId,
+			}));
+			hasNextPage = false;
+			endCursor = null;
+			totalCount = options.length;
+		} finally {
+			loading = false;
+		}
+	}
+
 	async function fetchPage(append: boolean) {
-		if (isProductionArrayMaster(masterType)) return;
+		if (isProductionArrayMaster(masterType) || isGroupCategoriesMaster(masterType) || isSearchUsersMaster(masterType)) return;
 		if (masterType === 'purchaseItems' && !purchaseItemParam) return;
 
 		const query = getMasterQuery(masterType);
 		const where = buildWhereFilter(masterType, debouncedSearch);
 		const variables: Record<string, any> =
-			masterType === 'purchaseItems'
+			masterType === 'postCodes' || masterType === 'states'
+				? {
+						first: PAGE_SIZE,
+						after: append ? endCursor : undefined,
+						where: where ?? undefined,
+						order: [{ code: 'ASC' }],
+					}
+				: masterType === 'purchaseItems'
 				? {
 						param: purchaseItemParam,
+						first: PAGE_SIZE,
+						after: append ? endCursor : undefined,
+						where: where ?? undefined,
+					}
+				: masterType === 'payrollEmployees'
+				? {
+						param: {
+							respCenters: respCenterOverride
+								? Array.isArray(respCenterOverride)
+									? respCenterOverride
+									: [String(respCenterOverride)]
+								: entityContext.respCenter
+									? [entityContext.respCenter]
+									: [],
+							/** Schema requires `nos`; empty list = no employee-number filter (see ReportFetchParam.Nos). */
+							nos: [],
+							...(String(payrollDepartment ?? '').trim()
+								? { department: String(payrollDepartment).trim() }
+								: {}),
+						},
+						first: PAGE_SIZE,
+						after: append ? endCursor : undefined,
+						where: where ?? undefined,
+					}
+				: masterType === 'dealers' || masterType === 'areas' || masterType === 'regions'
+				? {
+						entityType: entityContext.entityType,
+						entityCode: entityContext.entityCode,
+						department: entityContext.department,
+						respCenters: resolveRespCentersForMasters(
+							respCenterOverride ?? undefined,
+							entityContext.respCenter
+						),
 						first: PAGE_SIZE,
 						after: append ? endCursor : undefined,
 						where: where ?? undefined,
@@ -206,8 +378,17 @@
 						after: append ? endCursor : undefined,
 						where: where ?? undefined,
 					};
-		// respCenterOverride wins over the entityContext.respCenter/respCenters when provided
-		if (masterType !== 'purchaseItems' && respCenterOverride !== undefined) {
+		// respCenterOverride wins over the entityContext.respCenter for myCustomers, myVehicles, etc.
+		if (
+			masterType !== 'purchaseItems' &&
+			masterType !== 'postCodes' &&
+			masterType !== 'states' &&
+			masterType !== 'payrollEmployees' &&
+			masterType !== 'dealers' &&
+			masterType !== 'areas' &&
+			masterType !== 'regions' &&
+			respCenterOverride !== undefined
+		) {
 			variables.respCenter = Array.isArray(respCenterOverride) ? respCenterOverride[0] : respCenterOverride;
 		}
 		if (masterType === 'respCenters') {
@@ -225,6 +406,8 @@
 		else loading = true;
 		try {
 			const result = await graphqlQuery<{
+				states?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				postCodes?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				myRegions?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				myCustomers?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				myAreas?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
@@ -233,9 +416,21 @@
 				myVehicles?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				myVendors?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				purchaseItemNos?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				payrollEmployees?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				glAccounts?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				unitOfMeasures?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				itemCategories?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				productGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				genProductPostingGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				gstGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				hsnSacs?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				inventoryPostingGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				items?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 			}>(query, { variables, skipLoading: true, skipCache: true });
 			if (!result.success || !result.data) return;
 			const conn =
+				result.data.states ??
+				result.data.postCodes ??
 				result.data.myRegions ??
 				result.data.myCustomers ??
 				result.data.myAreas ??
@@ -243,7 +438,17 @@
 				result.data.myRespCenters ??
 				result.data.myVehicles ??
 				result.data.myVendors ??
-				result.data.purchaseItemNos;
+				result.data.purchaseItemNos ??
+				result.data.payrollEmployees ??
+				result.data.glAccounts ??
+				result.data.unitOfMeasures ??
+				result.data.itemCategories ??
+				result.data.productGroups ??
+				result.data.genProductPostingGroups ??
+				result.data.gstGroups ??
+				result.data.hsnSacs ??
+				result.data.inventoryPostingGroups ??
+				result.data.items;
 			if (!conn?.nodes) return;
 			const newOptions = (conn.nodes as Record<string, unknown>[]).map((n) =>
 				nodeToOption(n as { code?: string | null; no?: string | null; name?: string | null })
@@ -259,12 +464,22 @@
 		}
 	}
 
-	// When popover opens, fetch first page (or refetch when search / purchase scope changes)
+	// NAV users: searchUsers(search, take) — refetch when search changes
 	$effect(() => {
 		if (!open) return;
-		if (isProductionArrayMaster(masterType)) return;
+		if (!isSearchUsersMaster(masterType)) return;
+		debouncedSearch;
+		void fetchSearchUsers();
+	});
+
+	// When popover opens, fetch first page (or refetch when search / purchase scope / respCenterOverride changes)
+	$effect(() => {
+		if (!open) return;
+		if (isProductionArrayMaster(masterType) || isGroupCategoriesMaster(masterType) || isSearchUsersMaster(masterType)) return;
 		debouncedSearch;
 		purchaseItemParam;
+		respCenterOverride;
+		payrollDepartment;
 		fetchPage(false);
 	});
 
@@ -276,11 +491,27 @@
 		void loadProductionList();
 	});
 
+	// Group categories (departments): GetGroupCategories(type, respCenters), filter client-side.
+	$effect(() => {
+		if (!open) return;
+		if (!isGroupCategoriesMaster(masterType)) return;
+		groupCategoriesType;
+		groupCategoryRespCenters;
+		void loadGroupCategoriesList();
+	});
+
 	$effect(() => {
 		if (!isProductionArrayMaster(masterType)) return;
 		debouncedSearch;
 		productionCache;
 		applyProductionFilter();
+	});
+
+	$effect(() => {
+		if (!isGroupCategoriesMaster(masterType)) return;
+		debouncedSearch;
+		groupCategoriesCache;
+		applyGroupCategoriesFilter();
 	});
 
 	// Scroll-to-bottom: load more
@@ -301,6 +532,8 @@
 		if (singleSelect) {
 			// Single-select: replace value and close the popover
 			(form.values as Record<string, string>)[fieldName] = val;
+			const picked = options.find((o) => o.value === val);
+			onPicked?.({ value: val, meta: picked?.meta });
 			form.setTouched(fieldName);
 			open = false;
 			searchQuery = '';

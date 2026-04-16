@@ -1,4 +1,5 @@
 export * from "./models";
+export * from "./fetch-params";
 
 /**
  * List of active tyre factories/responsibility centers for ecomile procurement.

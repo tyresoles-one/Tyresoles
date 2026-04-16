@@ -10,7 +10,18 @@
   import UpdateChecker from "$lib/components/UpdateChecker.svelte";
   import { initAppConfig } from "$lib/config/runtime";
 
+  import { onMount, onDestroy } from "svelte";
+  import { initIdleTimer, cleanupIdleTimer } from "$lib/services/auth/idle-timer";
+
   let { children } = $props();
+
+  onMount(() => {
+    initIdleTimer();
+  });
+
+  onDestroy(() => {
+    cleanupIdleTimer();
+  });
 
   // Load runtime config once before any API/GraphQL calls
   const configPromise = initAppConfig();

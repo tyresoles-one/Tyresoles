@@ -12,3 +12,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\refint\Ty
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.xml
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\ref\Tyresoles.Easebuzz.dll
+d:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Release\net10.0\Tyresoles.Easebuzz.sourcelink.json

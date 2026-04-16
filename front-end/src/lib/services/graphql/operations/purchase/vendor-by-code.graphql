@@ -1,0 +1,27 @@
+query GetVendorByCode($code: String!) {
+  vendorByCode(code: $code) {
+    no
+    name
+    address
+    address2
+    city
+    postCode
+    stateCode
+    phoneNo
+    territoryCode
+    responsibilityCenter
+    groupCategory
+    groupDetails
+    ecomileProcMgr
+    nameOnInvoice
+    bankName
+    bankIFSCCode
+    bankACNo
+    bankBranch
+    selfInvoice
+    panNo
+    adhaarNo
+    gstRegistrationNo
+    balance
+  }
+}

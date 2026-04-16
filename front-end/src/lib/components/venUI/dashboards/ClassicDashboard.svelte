@@ -68,6 +68,8 @@
   let locations = $state<BusinessLocation[]>([]);
   let dbrdData = $state<DashboardData>();
   let popoverRecords = $state<any[]>([]);
+  /** Inner Salesperson/Dealer tab value per business (avoids duplicate product keys). */
+  let salesInnerTabByBiz = $state<Record<string, string>>({});
   let activeController: AbortController | null = null;
   let fetchId = $state(0);
 
@@ -430,7 +432,7 @@
             <Tabs.List
               class="w-full justify-start overflow-x-auto h-11 p-1 bg-background border border-border/50 rounded-lg"
             >
-              {#each VIEWS as view}
+              {#each VIEWS as view (view.value)}
                 <Tabs.Trigger
                   value={view.label}
                   class="cd-inner-tab flex items-center gap-2 whitespace-nowrap data-[state=active]:shadow-md rounded-md px-3 py-1.5 text-sm font-medium transition-all"
@@ -536,7 +538,7 @@
 <!-- ─── PRODUCT SALE VIEW ───────────────────────────── -->
 {#snippet productSaleView(source: DashboardData)}
   <div class="cd-view-content">
-    {#each locations as location (location.business)}
+    {#each locations as location, locIdx (`cd-loc-${locIdx}`)}
       {@const prodSales = source.data.filter(
         (d) =>
           d.business === location.business && d.location === location.default,
@@ -544,7 +546,7 @@
       <section class="cd-biz-section" in:fly={{ y: 20, duration: 300 }}>
         {@render businessHeader(location)}
         <div class="cd-products">
-          {#each prodSales as prodSale, pi (prodSale.product)}
+          {#each prodSales as prodSale, pi (`cd-ps-${pi}`)}
             <div
               class={cn(
                 "cd-product-group",
@@ -558,7 +560,7 @@
                 <span>{prodSale.product}</span>
               </div>
               <div class="cd-sale-cards">
-                {#each prodSale.data as sale (sale.label)}
+                {#each prodSale.data as sale, si (`cd-sale-${si}`)}
                   {@render saleCard(sale, prodSale.product === "Grand Total")}
                 {/each}
               </div>
@@ -591,7 +593,7 @@
     </div>
     {#if source.items?.length}
       <div class="cd-metric-items">
-        {#each source.items as item, i (item.label)}
+        {#each source.items as item, i (`cd-item-${i}`)}
           <div
             class={cn(
               "cd-metric-item",
@@ -618,7 +620,7 @@
 <!-- ─── ACTIVE CUSTOMER VIEW ────────────────────────── -->
 {#snippet activeCustomerView(source: DashboardData)}
   <div class="cd-view-content">
-    {#each locations as location (location.business)}
+    {#each locations as location, locIdx (`cd-loc-${locIdx}`)}
       {@const custData = source.data.filter(
         (d: any) =>
           d.business === location.business && d.location === location.default,
@@ -626,11 +628,11 @@
       <section class="cd-biz-section" in:fly={{ y: 20, duration: 300 }}>
         {@render businessHeader(location)}
         <div class="cd-products">
-          {#each custData as group (group.product)}
+          {#each custData as group, gi (`cd-ac-${gi}`)}
             <div class="cd-product-group">
               <div class="cd-product-label"><span>{group.product}</span></div>
               <div class="cd-sale-cards">
-                {#each group.data as cs (cs.dateRange)}
+                {#each group.data as cs, csi (`cd-cs-${csi}`)}
                   {@render customerCard(cs)}
                 {/each}
               </div>
@@ -673,7 +675,7 @@
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each popoverRecords as rec (rec.code)}
+                {#each popoverRecords as rec, pri (`cd-pop-${pri}`)}
                   <Table.Row>
                     <Table.Cell class="font-medium">{rec.code}</Table.Cell>
                     <Table.Cell>{rec.name}</Table.Cell>
@@ -697,7 +699,7 @@
 
     {#if source.lines?.length}
       <div class="cd-metric-items">
-        {#each source.lines as line (line.description)}
+        {#each source.lines as line, li (`cd-line-${li}`)}
           <div class="cd-metric-item">
             <span class="cd-metric-item-label">{line.description}</span>
             <span
@@ -717,7 +719,7 @@
 <!-- ─── COLLECTION VIEW ─────────────────────────────── -->
 {#snippet collectionView(source: DashboardData)}
   <div class="cd-view-content">
-    {#each locations as location (location.business)}
+    {#each locations as location, locIdx (`cd-loc-${locIdx}`)}
       {@const collections = source.data.filter(
         (d) =>
           d.business === location.business && d.location === location.default,
@@ -725,7 +727,7 @@
       <section class="cd-biz-section" in:fly={{ y: 20, duration: 300 }}>
         {@render businessHeader(location)}
         <div class="cd-sale-cards cd-collection-cards">
-          {#each collections as col (col.period)}
+          {#each collections as col, ci (`cd-col-${ci}`)}
             {@render collectionCard(col)}
           {/each}
         </div>
@@ -857,7 +859,7 @@
 <!-- ─── SALESPERSON / DEALER VIEW ───────────────────── -->
 {#snippet salesPersonView(source: DashboardData)}
   <div class="cd-view-content">
-    {#each locations as location (location.business)}
+    {#each locations as location, locIdx (`cd-loc-${locIdx}`)}
       {@const salesData = source.data.filter(
         (d) =>
           d.business === location.business && d.location === location.default,
@@ -866,14 +868,25 @@
         {@render businessHeader(location)}
         {#if salesData.length}
           <div class="cd-sales-tabs-wrap">
-            <Tabs.Root value={salesData[0]?.product ?? ""} class="w-full">
+            <Tabs.Root
+              value={salesInnerTabByBiz[location.business] ?? "tab-0"}
+              onValueChange={(v) => {
+                salesInnerTabByBiz = {
+                  ...salesInnerTabByBiz,
+                  [location.business]: v,
+                };
+              }}
+              class="w-full"
+            >
               <Tabs.List class="cd-inner-tab-list">
-                {#each salesData as sd (sd.product)}
-                  <Tabs.Trigger value={sd.product}>{sd.product}</Tabs.Trigger>
+                {#each salesData as sd, i (`sp-${i}`)}
+                  <Tabs.Trigger value={`tab-${i}`}
+                    >{sd.product ?? "—"}</Tabs.Trigger
+                  >
                 {/each}
               </Tabs.List>
-              {#each salesData as sd (sd.product)}
-                <Tabs.Content value={sd.product} class="cd-inner-tab-content">
+              {#each salesData as sd, i (`sp-${i}`)}
+                <Tabs.Content value={`tab-${i}`} class="cd-inner-tab-content">
                   {#if !sd.data?.length}
                     <div class="cd-tab-empty">
                       <Icon name="inbox" class="cd-icon-lg" />

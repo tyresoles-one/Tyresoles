@@ -16,3 +16,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Release\net10.0\refint\Tyr
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Release\net10.0\Tyresoles.Protean.xml
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Release\net10.0\Tyresoles.Protean.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Release\net10.0\ref\Tyresoles.Protean.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Release\net10.0\Tyresoles.Protean.sourcelink.json

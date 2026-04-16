@@ -4,6 +4,10 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), '');
+	const win = process.platform === 'win32';
+	/** Vite 7 SSR can hit "transport invoke timed out after 60000ms" if file watchers are flaky (common on Windows). Set VITE_DEV_WATCH_POLLING=1 to use polling. */
+	const watchPolling = env.VITE_DEV_WATCH_POLLING === '1';
+
 	return {
 		plugins: [tailwindcss(), sveltekit()],
 		optimizeDeps: {
@@ -21,7 +25,10 @@ export default defineConfig(({ mode }) => {
 					changeOrigin: true,
 					secure: false // Useful if using self-signed certs for local backend dev
 				}
-			}
+			},
+			...(win && watchPolling
+				? { watch: { usePolling: true, interval: 300 } }
+				: {})
 		}
 	};
 });

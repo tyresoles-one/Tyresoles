@@ -80,7 +80,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">No.</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Color>White</Color>
                                   </Style>
@@ -117,7 +117,7 @@
                                 <TextRun>
                                   <Value>Name</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Color>White</Color>
                                   </Style>
@@ -154,7 +154,7 @@
                                 <TextRun>
                                   <Value>Amount</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Color>White</Color>
                                   </Style>
@@ -191,7 +191,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Amount on Hold</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Color>White</Color>
                                   </Style>
@@ -233,7 +233,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -265,7 +265,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -297,7 +297,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -331,7 +331,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -370,7 +370,7 @@
                                 <TextRun>
                                   <Value>=RowNumber(Nothing)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -404,7 +404,7 @@
                                 <TextRun>
                                   <Value>=Fields!Name.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -436,7 +436,7 @@
                                 <TextRun>
                                   <Value>=iif(Fields!Amount.Value=0,0,Fields!Amount.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
                                 </TextRun>
@@ -471,7 +471,7 @@
                                 <TextRun>
                                   <Value>=iif(Fields!HoldAmount.Value=0,0,Fields!HoldAmount.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
                                 </TextRun>
@@ -511,7 +511,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Grand Total</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -548,7 +548,7 @@
                                 <TextRun>
                                   <Value>=Sum(Fields!Amount.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
@@ -584,7 +584,7 @@
                                 <TextRun>
                                   <Value>=Sum(Fields!HoldAmount.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
@@ -687,7 +687,7 @@
                     <TextRun>
                       <Value>=First(Fields!CompanyName.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                         <FontSize>11pt</FontSize>
                       </Style>
                     </TextRun>
@@ -719,7 +719,7 @@
                     <TextRun>
                       <Value>=First(Fields!Location.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                       </Style>
                     </TextRun>
                   </TextRuns>
@@ -751,7 +751,7 @@
                     <TextRun>
                       <Value>=First(Fields!ReportName.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                         <FontSize>12pt</FontSize>
                       </Style>
                     </TextRun>

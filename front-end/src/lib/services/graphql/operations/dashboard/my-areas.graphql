@@ -2,7 +2,7 @@ query GetMyAreas(
   $entityType: String
   $entityCode: String
   $department: String
-  $respCenter: String
+  $respCenters: [String!]
   $first: Int
   $after: String
   $where: AreaFilterInput
@@ -11,7 +11,7 @@ query GetMyAreas(
     entityType: $entityType
     entityCode: $entityCode
     department: $department
-    respCenter: $respCenter
+    respCenters: $respCenters
     first: $first
     after: $after
     where: $where

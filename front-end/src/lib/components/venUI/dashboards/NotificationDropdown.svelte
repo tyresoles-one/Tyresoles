@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { notificationStore, type Notification } from "$lib/stores/notificationStore";
   import Icon from "../icon/icon.svelte";
   import { cn } from "$lib/utils";
-  import { formatDistanceToNow } from "date-fns";
+  import { formatNotificationAge } from "$lib/utils/notificationTime";
+  import { formatDistanceToNow, parseISO } from "date-fns";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
@@ -11,8 +12,50 @@
 
   let { class: className = "" } = $props();
 
+  /** Dedupe debug logs per notification id + createdAt (session). */
+  let _dbgNavNotifKey = "";
+
   onMount(() => {
     notificationStore.init();
+    const unsub = notificationStore.subscribe((s) => {
+      const n = s.notifications[0];
+      if (!n) return;
+      const key = `${n.id}:${n.createdAt}:${s.serverTimeUtc ?? ""}`;
+      if (key === _dbgNavNotifKey) return;
+      _dbgNavNotifKey = key;
+      const raw = n.createdAt;
+      const d = new Date(raw);
+      const relClient = formatDistanceToNow(d, { addSuffix: true });
+      const relServer = s.serverTimeUtc ? formatNotificationAge(raw, s.serverTimeUtc) : null;
+      const deltaServerMs =
+        s.serverTimeUtc && !Number.isNaN(parseISO(s.serverTimeUtc).getTime())
+          ? parseISO(s.serverTimeUtc).getTime() - d.getTime()
+          : null;
+      // #region agent log
+      fetch("http://127.0.0.1:7618/ingest/5d806cd4-86b2-403a-9e2d-75847ea1b6fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ab180f" },
+        body: JSON.stringify({
+          sessionId: "ab180f",
+          runId: "post-fix",
+          hypothesisId: "verify",
+          location: "NotificationDropdown.svelte:subscribe",
+          message: "notification relative time client vs server ref",
+          data: {
+            titlePrefix: (n.title || "").slice(0, 24),
+            rawCreatedAt: raw,
+            serverTimeUtc: s.serverTimeUtc,
+            deltaMsClientVsCreated: Date.now() - d.getTime(),
+            deltaMsServerRefVsCreated: deltaServerMs,
+            formatDistanceClientClock: relClient,
+            formatDistanceServerRef: relServer,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    });
+    return unsub;
   });
 
   function getIcon(type: string) {
@@ -20,7 +63,7 @@
       case "INFO":
         return "info";
       case "WARNING":
-        return "alert-triangle";
+        return "triangle-alert";
       case "ERROR":
         return "x-circle";
       case "SUCCESS":
@@ -150,7 +193,7 @@
                       {notification.title}
                     </p>
                     <span class="text-[9px] font-medium text-muted-foreground whitespace-nowrap bg-muted/50 px-1.5 py-0.5 rounded-full">
-                      {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                      {formatNotificationAge(notification.createdAt, $notificationStore.serverTimeUtc)}
                     </span>
                   </div>
                   <p class="text-[11px] leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-foreground/80 transition-colors">

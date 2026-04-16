@@ -1,6 +1,5 @@
 <script lang="ts">
 import Icon from "../icon/icon.svelte";
-import NotificationDropdown from "./NotificationDropdown.svelte";
 import { authStore } from "$lib/stores/auth";
 let {title} = $props();
 </script>
@@ -33,8 +32,6 @@ let {title} = $props();
             Operational
           </span>
         </div>
-        <div class="w-px h-6 bg-border hidden sm:block"></div>
-        <NotificationDropdown />
       </div>
     </div>
   </header>

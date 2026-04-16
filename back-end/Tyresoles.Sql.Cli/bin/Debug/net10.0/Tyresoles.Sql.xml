@@ -4,6 +4,18 @@
         <name>Tyresoles.Sql</name>
     </assembly>
     <members>
+        <member name="T:Tyresoles.Sql.Abstractions.JoinSqlAliasAttribute">
+            <summary>
+            When set on a DTO property used in JOIN queries, SQL predicates/order emit <c>t0.[Column]</c> instead of
+            <c>[Column]</c> so names like <c>No_</c> are not ambiguous between root (e.g. Purchase Line) and joined tables.
+            </summary>
+        </member>
+        <member name="T:Tyresoles.Sql.Abstractions.SqlNotMappedAttribute">
+            <summary>
+            CLR-only property: not a NAV column. Excluded from SQL projection (MemberInit) and bulk insert column lists.
+            Use for values supplied via <see cref="M:Tyresoles.Sql.Abstractions.IQuery`1.SelectRaw(System.String,System.Object)"/> or resolvers.
+            </summary>
+        </member>
         <member name="T:Tyresoles.Sql.Abstractions.IDialect">
             <summary>
             Provides database-specific syntax translation.
@@ -98,6 +110,12 @@
         <member name="M:Tyresoles.Sql.Core.Query.SqlBuilder.ExtractColumnWithTargetName(System.Linq.Expressions.Expression,System.String,System.Collections.Generic.List{System.String},System.Collections.Generic.Dictionary{System.Type,System.String})">
             <summary>Emit a select part, aliasing as targetMemberName when it differs from the source column so the materializer binds correctly (e.g. t1.[Name] AS [CustomerName]).</summary>
         </member>
+        <member name="M:Tyresoles.Sql.Core.Query.SqlBuilder.GetQualifiedColumnSqlFromExpr(System.Linq.Expressions.LambdaExpression,Tyresoles.Sql.Abstractions.IDialect)">
+            <summary>
+            Like <see cref="M:Tyresoles.Sql.Core.Query.SqlBuilder.GetColumnNameFromExpr(System.Linq.Expressions.LambdaExpression)"/> but prefixes <c>t0.</c>/<c>t1.</c> when the member has
+            <see cref="T:Tyresoles.Sql.Abstractions.JoinSqlAliasAttribute"/> (required for JOINs where column names collide, e.g. <c>No_</c>).
+            </summary>
+        </member>
         <member name="M:Tyresoles.Sql.Core.Query.SqlBuilder.IsReadOnlySqlColumn(System.String)">
             <summary>SQL Server timestamp/rowversion columns are read-only and must be excluded from UPDATE SET.</summary>
         </member>
@@ -128,6 +146,34 @@
         </member>
         <member name="M:Tyresoles.Sql.Core.TenantScope.GetQualifiedTableName(System.String,System.Boolean)">
             <inheritdoc />
+        </member>
+        <member name="T:Tyresoles.Sql.QueryWhereIfExtensions">
+            <summary>
+            Conditional filters for <see cref="T:Tyresoles.Sql.Abstractions.IQuery`1"/>: avoids allocating a predicate or IN clause when the condition is false.
+            Collection overloads emit the same IN / OPENJSON / ANY strategies as expression-based <c>Contains</c> for large lists.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.QueryWhereIfExtensions.WhereIf``1(Tyresoles.Sql.Abstractions.IQuery{``0},System.Boolean,System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})">
+            <summary>
+            Applies <paramref name="predicate"/> only when <paramref name="condition"/> is true; otherwise returns <paramref name="query"/> unchanged.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.QueryWhereIfExtensions.WhereIf``2(Tyresoles.Sql.Abstractions.IQuery{``0},System.Boolean,System.Linq.Expressions.Expression{System.Func{``0,System.Object}},System.Collections.Generic.IEnumerable{``1})">
+            <summary>
+            When <paramref name="condition"/> is true and <paramref name="values"/> is not null, adds
+            <c>WHERE column IN (...)</c> (or OPENJSON / ANY for large lists, matching the expression visitor).
+            When <paramref name="values"/> is null, no filter is applied. When the sequence is empty, adds <c>1 = 0</c> (same as empty <c>Contains</c>).
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.QueryWhereIfExtensions.WhereIf``2(Tyresoles.Sql.Abstractions.IQuery{``0},System.Boolean,System.Linq.Expressions.Expression{System.Func{``0,System.Object}},``1[])">
+            <summary>
+            Span/array overload: avoids IEnumerable allocation when filtering by a materialized array.
+            </summary>
+        </member>
+        <member name="M:Tyresoles.Sql.QueryWhereIfExtensions.WhereIf``2(Tyresoles.Sql.Abstractions.IQuery{``0},System.Boolean,System.Linq.Expressions.Expression{System.Func{``0,System.Object}},System.ReadOnlySpan{``1})">
+            <summary>
+            Span overload for zero-allocation filtering when values are already contiguous.
+            </summary>
         </member>
         <member name="M:Tyresoles.Sql.Dialects.NavDialect.NavBulkExtensions.ModifyRangeAsync``1(Tyresoles.Sql.Abstractions.ITenantScope,System.Collections.Generic.IEnumerable{``0},System.Threading.CancellationToken)">
             <summary>

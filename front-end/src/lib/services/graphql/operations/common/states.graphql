@@ -1,0 +1,19 @@
+# NAV State master — Query.states / CommonDataService.GetStatesQuery (same table as GetStateAsync).
+query GetStates(
+  $first: Int
+  $after: String
+  $where: StateFilterInput
+  $order: [StateSortInput!]
+) {
+  states(first: $first, after: $after, where: $where, order: $order) {
+    nodes {
+      code
+      description
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}

@@ -17,6 +17,11 @@ public class GraphQLNotificationPublisher : INotificationPublisher
     {
         // Topic name is formatted as "OnNotification_{UserId}" for efficient filtering
         var topicName = $"OnNotification_{notification.UserId}";
-        await _eventSender.SendAsync(topicName, notification, cancellationToken);
+        var payload = new NotificationPushPayload
+        {
+            Notification = notification,
+            ServerTimeUtc = DateTime.UtcNow
+        };
+        await _eventSender.SendAsync(topicName, payload, cancellationToken);
     }
 }

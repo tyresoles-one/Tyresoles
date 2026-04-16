@@ -12,6 +12,7 @@ using Tyresoles.Data.Features.Sales;
 using Tyresoles.Data.Features.Sales.Reports;
 using Tyresoles.Data.Features.Production;
 using Tyresoles.Data.Features.Production.Models;
+using Tyresoles.Data.Features.Purchase;
 
 using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
 using Tyresoles.Web.GraphQL;
@@ -32,16 +33,40 @@ public class Mutation
         string password,
         string? platform = null,
         [Service] IUserService userService = null!,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor = null!,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return await userService.LoginAsync(username, password, platform, cancellationToken);
+            var context = httpContextAccessor.HttpContext;
+            var ipAddress = context?.Connection?.RemoteIpAddress?.ToString();
+            var userAgent = context?.Request?.Headers["User-Agent"].ToString();
+            return await userService.LoginAsync(username, password, platform, ipAddress, userAgent, cancellationToken);
         }
         catch (Exception ex)
         {
             var message = ex.InnerException?.Message ?? ex.Message;
             return new LoginResult { Success = false, Message = message, User = null };
+        }
+    }
+
+    public async Task<LoginResult> RefreshToken(
+        string token,
+        string refreshToken,
+        [Service] IUserService userService = null!,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor = null!,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var context = httpContextAccessor.HttpContext;
+            var ipAddress = context?.Connection?.RemoteIpAddress?.ToString();
+            var userAgent = context?.Request?.Headers["User-Agent"].ToString();
+            return await userService.RefreshTokenAsync(token, refreshToken, ipAddress, userAgent, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return new LoginResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
         }
     }
 
@@ -467,6 +492,38 @@ public class Mutation
         }
     }
 
+    /// <summary>Update transporter / vehicle via NAV WebServe <c>UpdateVehicle</c>.</summary>
+    [Authorize]
+    [GraphQLName("saveVehicle")]
+    public async Task<MutationResult> SaveVehicle(
+        VehicleSaveInput input,
+        [Service] Connector connector,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(input.No))
+                return new MutationResult { Success = false, Message = "Vehicle number is required." };
+
+            var n = await connector.UpdateVehicleNavAsync(
+                input.No.Trim(),
+                input.Name ?? "",
+                input.MobileNo ?? "",
+                input.GstNo ?? "",
+                input.LineNo,
+                input.ResponsibilityCenter ?? "",
+                input.Status).ConfigureAwait(false);
+
+            return n > 0
+                ? new MutationResult { Success = true, Message = "Vehicle saved successfully." }
+                : new MutationResult { Success = false, Message = "Failed to save vehicle." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = NavConnectorErrorFormatting.FormatMessage(ex) };
+        }
+    }
+
     /// <summary>
     /// Creates a casing-procurement vendor in NAV via SOAP. Ported from Live <c>Db.Production.CreateVendor</c>.
     /// GraphQL: <c>createProductionVendor(param: FetchParamsInput!)</c>.
@@ -801,6 +858,201 @@ public class Mutation
         {
             logger.LogError(ex, "DeleteProductionProcurementOrder failed OrderNo={OrderNo}", order.OrderNo);
             throw ToGqlNavException(ex);
+        }
+    }
+
+    // ── Navision Edit Requests ─────────────────────────────────
+
+    /// <summary>Create or update a request type template (admin only).</summary>
+    [Authorize]
+    [GraphQLName("navEditSaveRequestType")]
+    public async Task<MutationResult> NavEditSaveRequestType(
+        Tyresoles.Data.Features.NavisionEdits.NavEditRequestTypeInput input,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            await navEditService.SaveRequestTypeAsync(input, userId, cancellationToken);
+            return new MutationResult { Success = true, Message = "Request type saved successfully." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditSaveRequestType failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Delete (deactivate) a request type template.</summary>
+    [Authorize]
+    [GraphQLName("navEditDeleteRequestType")]
+    public async Task<MutationResult> NavEditDeleteRequestType(
+        int id,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await navEditService.DeleteRequestTypeAsync(id, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Request type deleted." : "Request type not found." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditDeleteRequestType failed id={Id}", id);
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Submit a new edit request.</summary>
+    [Authorize]
+    [GraphQLName("navEditSubmitRequest")]
+    public async Task<MutationResult> NavEditSubmitRequest(
+        Tyresoles.Data.Features.NavisionEdits.NavEditRequestInput input,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var fullName = httpContextAccessor.HttpContext?.User?.FindFirstValue("FullName");
+            await navEditService.SubmitRequestAsync(input, userId, fullName, cancellationToken);
+            return new MutationResult { Success = true, Message = "Request submitted successfully." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditSubmitRequest failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Re-send notifications to IT admin and current-level approvers (requester only).</summary>
+    [Authorize]
+    [GraphQLName("navEditResendNotifications")]
+    public async Task<MutationResult> NavEditResendNotifications(
+        Guid requestId,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var ok = await navEditService.ResendSubmitNotificationsAsync(requestId, userId, cancellationToken);
+            return ok
+                ? new MutationResult { Success = true, Message = "Notifications sent." }
+                : new MutationResult { Success = false, Message = "Could not resend notifications for this request." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditResendNotifications failed requestId={RequestId}", requestId);
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Approve a pending approval level on a request.</summary>
+    [Authorize]
+    [GraphQLName("navEditApproveRequest")]
+    public async Task<MutationResult> NavEditApproveRequest(
+        Guid requestId,
+        int level,
+        string? comment,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var result = await navEditService.ApproveRequestAsync(requestId, level, userId, comment, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Approved successfully." : "Approval failed or not applicable." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditApproveRequest failed requestId={RequestId}", requestId);
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Reject an edit request.</summary>
+    [Authorize]
+    [GraphQLName("navEditRejectRequest")]
+    public async Task<MutationResult> NavEditRejectRequest(
+        Guid requestId,
+        string? comment,
+        bool? isApproval,
+        int? level,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var result = await navEditService.RejectRequestAsync(requestId, userId, comment, isApproval ?? false, level ?? 0, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Rejected." : "Rejection failed." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditRejectRequest failed requestId={RequestId}", requestId);
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Mark a request as processed (admin only).</summary>
+    [Authorize]
+    [GraphQLName("navEditProcessRequest")]
+    public async Task<MutationResult> NavEditProcessRequest(
+        Guid requestId,
+        string? adminRemark,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var result = await navEditService.ProcessRequestAsync(requestId, userId, adminRemark, cancellationToken);
+            return new MutationResult
+            {
+                Success = result,
+                Message = result
+                    ? "Request processed."
+                    : "Cannot process this request. NAV may have returned false — check the request type connector settings and field values."
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "navEditProcessRequest failed requestId={RequestId}", requestId);
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    public async Task<MutationResult> SaveFixedAsset(
+        Tyresoles.Data.Features.Purchase.Models.FixedAsset input,
+        [Service] IFixedAssetService fixedAssetService,
+        [Service] IDataverseDataService dataService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            await fixedAssetService.SaveFixedAssetAsync(scope, input);
+            return new MutationResult { Success = true, Message = "Fixed asset saved successfully." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = NavConnectorErrorFormatting.FormatMessage(ex) };
         }
     }
 }

@@ -8,3 +8,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.csproj.CoreCompileInputs.cache
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.dll
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Release\netstandard2.0\Tyresoles.Sql.Generators.sourcelink.json

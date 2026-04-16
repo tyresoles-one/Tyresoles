@@ -48,3 +48,4 @@ d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Debug\net10.0\Tyresoles.Sql.sourcelink.json

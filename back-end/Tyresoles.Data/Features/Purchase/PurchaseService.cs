@@ -35,6 +35,25 @@ public sealed class PurchaseService : IPurchaseService
         return query.AsQueryable(scope);
     }
 
+
+    public Vendor VendorByCode (
+        ITenantScope scope,
+        string code,
+        CancellationToken cancellationToken = default
+        )
+    {
+        var detailedLedger = scope.GetQualifiedTableName("Detailed Vendor Ledg_ Entry", isShared: false);
+        // Correlated subquery: same balance as GetVendorBalanceAsync (sum of Amount on Detailed Vendor Ledger).
+        var balanceSql =
+            $"(SELECT ISNULL(-SUM(d.[Amount]), 0) FROM {detailedLedger} d WITH (NOLOCK) WHERE d.[Vendor No_] = t0.[No_]) AS [Balance]";
+
+        var query = scope.Query<Vendor>()
+            .Where(l => l.No == code)
+            .SelectRaw(balanceSql);           
+
+        var row = query.FirstOrDefaultAsync(cancellationToken).Result;
+        return row ?? new Vendor();
+    }
     /// <inheritdoc/>
     public async Task<decimal> GetVendorBalanceAsync(
         ITenantScope scope,
@@ -203,4 +222,36 @@ public sealed class PurchaseService : IPurchaseService
             .Select(g => new CodeName { Code = g.Code, Name = g.Code })
             .AsQueryable(scope);
     }
+
+    /// <inheritdoc/>
+    public IQueryable<Models.UnitOfMeasure> GetUnitOfMeasures(ITenantScope scope)
+        => scope.Query<Models.UnitOfMeasure>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.ItemCategory> GetItemCategories(ITenantScope scope)
+        => scope.Query<Models.ItemCategory>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.ProductGroup> GetProductGroups(ITenantScope scope)
+        => scope.Query<Models.ProductGroup>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.GenProductPostingGroup> GetGenProductPostingGroups(ITenantScope scope)
+        => scope.Query<Models.GenProductPostingGroup>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.GSTGroup> GetGSTGroups(ITenantScope scope)
+        => scope.Query<Models.GSTGroup>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.HsnSac> GetHsnSacs(ITenantScope scope)
+        => scope.Query<Models.HsnSac>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.InventoryPostingGroup> GetInventoryPostingGroups(ITenantScope scope)
+        => scope.Query<Models.InventoryPostingGroup>().AsQueryable(scope);
+
+    /// <inheritdoc/>
+    public IQueryable<Models.Item> GetItems(ITenantScope scope)
+        => scope.Query<Models.Item>().AsQueryable(scope);
 }

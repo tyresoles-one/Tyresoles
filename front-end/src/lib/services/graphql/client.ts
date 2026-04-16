@@ -3,13 +3,13 @@ import {
   type RequestDocument,
   type Variables,
 } from "graphql-request";
+import { Kind, type DocumentNode, type OperationDefinitionNode } from "graphql";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { getGraphQLEndpoint } from "$lib/config/system";
 import { handleGraphQLError } from "./config";
 import type { GraphQLError } from "./types";
 import { getAuthToken as getStoreToken, clearAuth } from "$lib/stores/auth";
 import stableStringify from "fast-json-stable-stringify";
-import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { Toast } from "$lib/components/venUI/toast";
 import { setGraphQLConfig } from "./config";
@@ -119,6 +119,56 @@ function generateCacheKey(
   return `gql:${docString}:${varsString}`;
 }
 
+/**
+ * True when the operation declares a non-null `$param` variable (HC0018 if missing).
+ * Uses AST walk — avoids relying on `print()`, which can fail on some bundled documents.
+ */
+function documentRequiresParamNonNull(document: RequestDocument): boolean {
+  if (typeof document === "string") {
+    return /\$param\s*:\s*[^!]+!/.test(document);
+  }
+  try {
+    const defs = (document as DocumentNode).definitions;
+    for (const d of defs) {
+      if (d.kind !== Kind.OPERATION_DEFINITION) continue;
+      const op = d as OperationDefinitionNode;
+      for (const vd of op.variableDefinitions ?? []) {
+        if (
+          vd.variable.name.value === "param" &&
+          vd.type.kind === Kind.NON_NULL_TYPE
+        ) {
+          return true;
+        }
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function getOperationNameFromDocument(
+  document: RequestDocument,
+): string | undefined {
+  if (typeof document === "string") {
+    const m = document.match(/\b(?:query|mutation|subscription)\s+(\w+)/i);
+    return m?.[1];
+  }
+  const defs = (document as DocumentNode).definitions;
+  for (const d of defs) {
+    if (d.kind === Kind.OPERATION_DEFINITION && "name" in d && d.name) {
+      return d.name.value;
+    }
+  }
+  return undefined;
+}
+
+function paramVariableMissingOrNull(variables: unknown): boolean {
+  if (variables == null || typeof variables !== "object") return true;
+  const v = variables as Record<string, unknown>;
+  return !("param" in v) || v.param === undefined || v.param === null;
+}
+
 import { NativeTokenStore } from '$lib/utils/native-token-store';
 
 /**
@@ -139,11 +189,65 @@ async function getAuthToken(): Promise<string> {
   return "";
 }
 
+let refreshTokenPromise: Promise<boolean> | null = null;
+import { getRefreshToken as getStoreRefreshToken, authStore } from "$lib/stores/auth";
+
+async function attemptRefreshTokens(): Promise<boolean> {
+  if (refreshTokenPromise) return refreshTokenPromise;
+  refreshTokenPromise = (async () => {
+    try {
+      const token = await getAuthToken();
+      const refreshToken = getStoreRefreshToken();
+      if (!token || !refreshToken) return false;
+      const endpoint = getGraphQLEndpoint();
+      const response = await window.fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `mutation RefreshToken($token: String!, $refreshToken: String!) { refreshToken(token: $token, refreshToken: $refreshToken) { success token refreshToken } }`,
+          variables: { token, refreshToken }
+        })
+      });
+      const result = await response.json();
+      if (result.data?.refreshToken?.success) {
+        const newTokens = result.data.refreshToken;
+        authStore.set({ 
+          ...authStore.get(), 
+          token: newTokens.token, 
+          refreshToken: newTokens.refreshToken 
+        });
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      refreshTokenPromise = null;
+    }
+  })();
+  return refreshTokenPromise;
+}
+
+function isUnauthorizedError(error: unknown): boolean {
+  if (!error) return false;
+  const str = String(error);
+  if (str.includes("401") || str.includes("UNAUTHENTICATED")) return true;
+  if (typeof error === "object" && "response" in error) {
+    const res = (error as any).response;
+    if (res?.status === 401) return true;
+    const errors = res?.errors || [];
+    return errors.some((e: any) => e.extensions?.code === "UNAUTHENTICATED" || e.message?.toLowerCase().includes("unauthenticated") || e.message?.toLowerCase().includes("unauthorized"));
+  }
+  return false;
+}
+
 export { clearUserSession };
 
-// Register global unauthorized handler
+// Register global unauthorized handler (immediate logout when JWT/session is rejected)
 setGraphQLConfig({
-  onUnauthorized: clearUserSession
+  onUnauthorized: (info) => {
+    void clearUserSession({ reason: info?.revoked ? "revoked" : "expired" });
+  },
 });
 
 /**
@@ -299,6 +403,25 @@ export async function graphqlQuery<
     silent = false,
   } = options;
 
+  const requiresParam = documentRequiresParamNonNull(document);
+  const paramMissing = paramVariableMissingOrNull(variables);
+  const opName = getOperationNameFromDocument(document) ?? "unknown";
+
+  if (requiresParam && paramMissing) {
+    const err = new Error(
+      `Missing required GraphQL variable \`param\` for "${opName}".`,
+    );
+    const { message, errors: graphqlErrors, code } = handleGraphQLError(err, {
+      silent,
+    });
+    return {
+      success: false,
+      error: message,
+      errors: graphqlErrors,
+      code,
+    };
+  }
+
   // Generate cache key if not provided
   const finalCacheKey = cacheKey || generateCacheKey(document, variables);
 
@@ -331,7 +454,22 @@ export async function graphqlQuery<
         variables: variables as TVariables,
       } as any;
 
-      const data = await client.request<TData, TVariables>(requestOptions);
+      let data;
+      try {
+        data = await client.request<TData, TVariables>(requestOptions);
+      } catch (err: any) {
+        if (isUnauthorizedError(err)) {
+          const refreshed = await attemptRefreshTokens();
+          if (refreshed) {
+            const newClient = await createGraphQLClient();
+            data = await newClient.request<TData, TVariables>(requestOptions);
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
 
       // Cache the result if cache key is provided
       if (!skipCache && finalCacheKey) {
@@ -411,6 +549,25 @@ export async function graphqlMutation<
 ): Promise<GraphQLResult<TData>> {
   const { variables, skipLoading = false, silent = false } = options;
 
+  const requiresParamM = documentRequiresParamNonNull(document);
+  const paramMissingM = paramVariableMissingOrNull(variables);
+  const opNameM = getOperationNameFromDocument(document) ?? "unknown";
+
+  if (requiresParamM && paramMissingM) {
+    const err = new Error(
+      `Missing required GraphQL variable \`param\` for "${opNameM}".`,
+    );
+    const { message, errors: graphqlErrors, code } = handleGraphQLError(err, {
+      silent,
+    });
+    return {
+      success: false,
+      error: message,
+      errors: graphqlErrors,
+      code,
+    };
+  }
+
   try {
     const client = await createGraphQLClient();
 
@@ -424,7 +581,22 @@ export async function graphqlMutation<
       variables: variables as TVariables,
     } as any;
 
-    const data = await client.request<TData, TVariables>(requestOptions);
+    let data;
+    try {
+      data = await client.request<TData, TVariables>(requestOptions);
+    } catch (err: any) {
+      if (isUnauthorizedError(err)) {
+        const refreshed = await attemptRefreshTokens();
+        if (refreshed) {
+          const newClient = await createGraphQLClient();
+          data = await newClient.request<TData, TVariables>(requestOptions);
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
+    }
 
     const failureMessage = extractMutationResultFailureMessage(data);
     if (failureMessage !== undefined) {

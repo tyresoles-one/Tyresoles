@@ -1,5 +1,5 @@
 import { createQuery, createMutation } from '@tanstack/svelte-query';
-import { getGraphQLClient } from './client';
+import { graphqlQuery, graphqlMutation } from './client';
 import { handleGraphQLError } from './config';
 import type { RequestDocument } from 'graphql-request';
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
@@ -37,13 +37,16 @@ export function useAppQuery<TData, TVariables extends Record<string, unknown> = 
 		return {
 			queryKey: baseKey,
 			queryFn: async (): Promise<TData> => {
-				const client = await getGraphQLClient();
-				try {
-					return await client.request(document as any, variables as any);
-				} catch (error) {
-					const { message } = handleGraphQLError(error, { silent: false });
-					throw new Error(message || 'An unknown error occurred');
+				const v = variablesFn ? variablesFn() : undefined;
+				const result = await graphqlQuery<TData>(document as any, {
+					variables: v as any,
+					skipLoading: true,
+					skipCache: true,
+				});
+				if (!result.success) {
+					throw new Error(result.error || 'An unknown error occurred');
 				}
+				return result.data as TData;
 			},
 			enabled: options?.enabled,
 			staleTime: options?.staleTime,
@@ -67,13 +70,15 @@ export function useAppMutation<TData, TVariables extends Record<string, any> = R
 ) {
 	return createMutation<TData, Error, TVariables>(() => ({
 		mutationFn: async (variables: TVariables): Promise<TData> => {
-			const client = await getGraphQLClient();
-			try {
-				return await client.request(document as any, variables as any);
-			} catch (error) {
-				const { message } = handleGraphQLError(error, { silent: false });
-				throw new Error(message || 'An unknown error occurred');
+			const result = await graphqlMutation<TData>(document as any, {
+				variables: variables as TVariables,
+				skipLoading: true,
+				silent: false,
+			});
+			if (!result.success) {
+				throw new Error(result.error || 'An unknown error occurred');
 			}
+			return result.data as TData;
 		},
 		onSuccess: (data: TData, variables: TVariables, context: unknown) => {
 			if (!options?.silent) {

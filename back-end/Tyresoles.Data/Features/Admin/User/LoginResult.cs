@@ -10,6 +10,7 @@ public sealed class LoginResult
     public List<Menu>? Menus { get; init; }
     public List<UserLocation>? Locations {  get; init; } 
     public string? Token { get; init; }
+    public string? RefreshToken { get; init; }
     /// <summary>When true, client must redirect to change-password. Use RequirePasswordChangeReason to choose form (Security PIN vs current password).</summary>
     public bool RequirePasswordChange { get; init; }
     /// <summary>FirstLogin = show Security PIN form; AdminReset or Expired = show current password form.</summary>

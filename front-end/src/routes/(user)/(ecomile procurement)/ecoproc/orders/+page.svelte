@@ -2,7 +2,7 @@
   import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
-  import MasterList from "$lib/components/venUI/masterList/MasterList.svelte";
+  import { DataGrid, type DataGridColumn } from '$lib/components/venUI/datagrid';
   import { Icon } from "$lib/components/venUI/icon";
   import { TableCell, TableHead } from "$lib/components/ui/table";
   import { Button } from "$lib/components/ui/button";
@@ -126,21 +126,29 @@
     if (!get(fetchParamsStore)) return;
     void fetchOrders();
   });
+
+  const columns: DataGridColumn<OrderInfo>[] = [
+    { accessorKey: 'date', header: 'Date' },
+    { accessorKey: 'orderNo', header: 'Order No' },
+    { accessorKey: 'supplier', header: 'Supplier' },
+    { accessorKey: 'location', header: 'Location' },
+    { accessorKey: 'manager', header: 'Manager' },
+    { accessorKey: 'qty', header: 'Qty' },
+    { accessorKey: 'amount', header: 'Amount' }
+  ];
 </script>
 
-<MasterList
+
+<DataGrid
   title="Tyres Booking"
   description="Open Ecomile Procurement Orders"
   {items}
+  {columns}
   {loading}
-  loadingMore={false}
-  {error}
-  hasMore={false}
-  {totalCount}
   bind:searchQuery
-  bind:viewMode
-  onRefresh={reload}
-  onLoadMore={() => {}}
+  mobileCardTitleKey="supplier"
+  mobileCardSubtitleKey="orderNo"
+  onRowClick={(item) => goto('/ecoproc/orders/' + item.orderNo)}
 >
   {#snippet actions()}
     <Button
@@ -154,72 +162,4 @@
       {creatingOrder ? "Creating…" : "New Order"}
     </Button>
   {/snippet}
-
-  {#snippet tableHeader()}
-    <TableHead class="w-[110px]">Date</TableHead>
-    <TableHead class="w-[150px]">Order No</TableHead>
-    <TableHead>Supplier</TableHead>
-    <TableHead class="w-[120px]">Location</TableHead>
-    <TableHead class="w-[110px]">Manager</TableHead>
-    <TableHead class="w-[70px] text-right">Qty</TableHead>
-    <TableHead class="w-[110px] text-right">Amount</TableHead>
-  {/snippet}
-
-  {#snippet tableRow(item)}
-    <TableCell class="font-medium text-muted-foreground">{item.date || "—"}</TableCell>
-    <TableCell>
-      <button
-        class="text-primary hover:underline font-semibold text-left focus:outline-none"
-        onclick={() => goto(`/ecoproc/orders/${item.orderNo}`)}
-      >
-        {item.orderNo}
-      </button>
-    </TableCell>
-    <TableCell>{item.supplier || "—"}</TableCell>
-    <TableCell>{item.location || item.respCenter || "—"}</TableCell>
-    <TableCell>{item.manager || "—"}</TableCell>
-    <TableCell class="text-right tabular-nums">{item.qty ?? 0}</TableCell>
-    <TableCell class="text-right tabular-nums">{formatAmount(item.amount)}</TableCell>
-  {/snippet}
-
-  {#snippet gridItem(item)}
-    <div
-      class="flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary/50 hover:shadow-md h-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      tabindex="0"
-      role="button"
-      onclick={() => goto(`/ecoproc/orders/${item.orderNo}`)}
-      onkeydown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          goto(`/ecoproc/orders/${item.orderNo}`);
-        }
-      }}
-    >
-      <div class="flex items-center justify-between">
-        <span class="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
-          {item.date || "—"}
-        </span>
-        <span class="text-sm font-semibold text-primary">{item.orderNo}</span>
-      </div>
-      <div>
-        <h3 class="font-semibold text-card-foreground line-clamp-2">
-          {item.supplier || "Unknown Supplier"}
-        </h3>
-        <p class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-          <Icon name="map-pin" class="size-3" />
-          {item.location || item.respCenter || "—"}
-        </p>
-      </div>
-      <div class="mt-auto pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
-        <span class="flex items-center gap-1">
-          <Icon name="user" class="size-3" />
-          {item.manager || "—"}
-        </span>
-        <span class="flex items-center gap-1 font-medium">
-          <Icon name="package" class="size-3" />
-          {item.qty ?? 0} tyres
-        </span>
-      </div>
-    </div>
-  {/snippet}
-</MasterList>
+</DataGrid>

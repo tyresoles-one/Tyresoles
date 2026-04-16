@@ -36,6 +36,11 @@ export interface UsePaginatedListConfig<T> {
 	skipCache?: boolean;
 	/** Maps search text to GraphQL variables (e.g. `where`). See SmartPagination. */
 	mapSearchToVariables?: (term: string) => Record<string, unknown>;
+	/** See SmartPagination `serverVariableAllowlist`. */
+	serverVariableAllowlist?: readonly string[];
+	/** See SmartPagination `paginationMode` / `pageInfoPath`. */
+	paginationMode?: 'offset' | 'cursor';
+	pageInfoPath?: string;
 }
 
 export interface UsePaginatedListReturn<T> {
@@ -78,17 +83,35 @@ export function usePaginatedList<T>(
 		pageSize: config.pageSize ?? 50,
 		dataPath: config.dataPath,
 		skipCache: config.skipCache ?? true,
-		mapSearchToVariables: config.mapSearchToVariables
+		mapSearchToVariables: config.mapSearchToVariables,
+		serverVariableAllowlist: config.serverVariableAllowlist,
+		paginationMode: config.paginationMode,
+		pageInfoPath: config.pageInfoPath
 	});
 
-	// Sync search query with pagination
+	/** Ensures Svelte tracks list updates (plain getters on `pagination.items` alone can miss invalidation). */
+	const items = $derived(pagination.items);
+
+	/**
+	 * Sync search to pagination only when the user changes the term.
+	 * Do not run debounced `setSearch` on mount: the constructor already loads, and a delayed
+	 * `reset()` + `load()` would clear cursor state and break "Load More" (cursor pagination).
+	 */
+	let previousSearchTerm: string | null = null;
 	$effect(() => {
-		pagination.setSearch(searchQuery);
+		const q = searchQuery;
+		if (previousSearchTerm === null) {
+			previousSearchTerm = q;
+			return;
+		}
+		if (q === previousSearchTerm) return;
+		previousSearchTerm = q;
+		pagination.setSearch(q);
 	});
 
 	return {
 		get items() {
-			return pagination.items;
+			return items;
 		},
 		get loading() {
 			return pagination.loading;

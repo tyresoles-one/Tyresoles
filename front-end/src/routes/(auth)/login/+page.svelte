@@ -8,8 +8,7 @@
   } from "$lib/components/venUI/form";
   import { focusManager } from "$lib/components/venUI/form/focus-manager";
   import { Button } from "$lib/components/ui/button";
-  import { graphqlMutation } from "$lib/services/graphql";
-  import PageHeading from "$lib/components/venUI/page-heading/PageHeading.svelte";
+  import { graphqlMutation } from "$lib/services/graphql";  
   import { goto } from "$app/navigation";
   import { toast } from "$lib/components/venUI/toast";
   import { authStore } from "$lib/stores/auth";
@@ -108,7 +107,9 @@
 
         authStore.set({
           token: loginData.token ?? "",
+          refreshToken: loginData.refreshToken ?? "",
           username,
+          userSpecialToken: loginData.user?.userSpecialToken ?? "",
           expiresAt: typeof expiresAt === "string" ? expiresAt : "",
           user: loginData.user ?? null,
           menus: loginData.menus ?? null,

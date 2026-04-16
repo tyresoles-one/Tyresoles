@@ -1,0 +1,236 @@
+# ── Queries ──────────────────────────────────
+
+query NavEditRequestTypes($activeOnly: Boolean) {
+  navEditRequestTypes(activeOnly: $activeOnly) {
+    id
+    name
+    code
+    description
+    icon
+    navTable
+    navPrimaryKeyColumn
+    fieldsJson
+    isActive
+    sortOrder
+  }
+}
+
+query NavEditRequestTypeById($id: Int!) {
+  navEditRequestTypeById(id: $id) {
+    id
+    name
+    code
+    description
+    icon
+    navTable
+    navPrimaryKeyColumn
+    fieldsJson
+    isActive
+    sortOrder
+  }
+}
+
+query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int) {
+  navEditLookupRecords(requestTypeId: $requestTypeId, search: $search, take: $take) {
+    key
+    value
+  }
+}
+
+query NavEditGetRecord($requestTypeId: Int!, $recordKey: String!) {
+  navEditGetRecord(requestTypeId: $requestTypeId, recordKey: $recordKey) {
+    key
+    value
+  }
+}
+
+query NavEditMyRequests {
+  navEditMyRequests {
+    id
+    requestTypeId
+    requestTypeName
+    requestTypeCode
+    requestTypeIcon
+    recordKey
+    requestBody
+    userId
+    userFullName
+    status
+    statusLabel
+    remark
+    adminRemark
+    processedBy
+    processedAt
+    createdAt
+    updatedAt
+    approvals {
+      id
+      level
+      role
+      roleLabel
+      approverUserIds
+      approvedBy
+      status
+      statusLabel
+      comment
+      actionDate
+    }
+  }
+}
+
+query NavEditAllRequests($statusFilter: Int) {
+  navEditAllRequests(statusFilter: $statusFilter) {
+    id
+    requestTypeId
+    requestTypeName
+    requestTypeCode
+    requestTypeIcon
+    recordKey
+    requestBody
+    userId
+    userFullName
+    status
+    statusLabel
+    remark
+    adminRemark
+    processedBy
+    processedAt
+    createdAt
+    updatedAt
+    approvals {
+      id
+      level
+      role
+      roleLabel
+      approverUserIds
+      approvedBy
+      status
+      statusLabel
+      comment
+      actionDate
+    }
+  }
+}
+
+query NavEditPendingApprovals {
+  navEditPendingApprovals {
+    id
+    requestTypeId
+    requestTypeName
+    requestTypeCode
+    requestTypeIcon
+    recordKey
+    requestBody
+    userId
+    userFullName
+    status
+    statusLabel
+    remark
+    createdAt
+    approvals {
+      id
+      level
+      role
+      roleLabel
+      approverUserIds
+      approvedBy
+      status
+      statusLabel
+      comment
+      actionDate
+    }
+  }
+}
+
+query NavEditNavTables {
+  navEditNavTables
+}
+
+query NavEditNavTableColumns($tableName: String!) {
+  navEditNavTableColumns(tableName: $tableName)
+}
+
+query NavEditRequestById($requestId: UUID!) {
+  navEditRequestById(requestId: $requestId) {
+    id
+    requestTypeId
+    requestTypeName
+    requestTypeCode
+    requestTypeIcon
+    recordKey
+    requestBody
+    userId
+    userFullName
+    status
+    statusLabel
+    remark
+    adminRemark
+    processedBy
+    processedAt
+    createdAt
+    updatedAt
+    approvals {
+      id
+      level
+      role
+      roleLabel
+      approverUserIds
+      approvedBy
+      status
+      statusLabel
+      comment
+      actionDate
+    }
+  }
+}
+
+# ── Mutations ────────────────────────────────
+
+mutation NavEditSaveRequestType($input: NavEditRequestTypeInput!) {
+  navEditSaveRequestType(input: $input) {
+    success
+    message
+  }
+}
+
+mutation NavEditDeleteRequestType($id: Int!) {
+  navEditDeleteRequestType(id: $id) {
+    success
+    message
+  }
+}
+
+mutation NavEditSubmitRequest($input: NavEditRequestInput!) {
+  navEditSubmitRequest(input: $input) {
+    success
+    message
+  }
+}
+
+mutation NavEditResendNotifications($requestId: UUID!) {
+  navEditResendNotifications(requestId: $requestId) {
+    success
+    message
+  }
+}
+
+mutation NavEditApproveRequest($requestId: UUID!, $level: Int!, $comment: String) {
+  navEditApproveRequest(requestId: $requestId, level: $level, comment: $comment) {
+    success
+    message
+  }
+}
+
+mutation NavEditRejectRequest($requestId: UUID!, $comment: String, $isApproval: Boolean, $level: Int) {
+  navEditRejectRequest(requestId: $requestId, comment: $comment, isApproval: $isApproval, level: $level) {
+    success
+    message
+  }
+}
+
+mutation NavEditProcessRequest($requestId: UUID!, $adminRemark: String) {
+  navEditProcessRequest(requestId: $requestId, adminRemark: $adminRemark) {
+    success
+    message
+  }
+}

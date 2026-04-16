@@ -1,0 +1,36 @@
+query GetVehicleMasterList(
+  $entityType: String
+  $entityCode: String
+  $department: String
+  $respCenter: String
+  $take: Int
+  $after: String
+  $where: VehiclesFilterInput
+  $order: [VehiclesSortInput!]
+) {
+  vehicles: myVehicles(
+    entityType: $entityType
+    entityCode: $entityCode
+    department: $department
+    respCenter: $respCenter
+    first: $take
+    after: $after
+    where: $where
+    order: $order
+  ) {
+    items: nodes {
+      no
+      name
+      mobileNo
+      gstNo
+      responsibilityCenter
+      lineNo
+      status
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}

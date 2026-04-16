@@ -111,7 +111,7 @@ export {
   extractBestGraphQLErrorMessage,
 } from "./config";
 
-export type { GraphQLConfig, GraphQLErrorContext } from "./config";
+export type { GraphQLConfig, GraphQLErrorContext, UnauthorizedInfo } from "./config";
 
 // Type definitions
 export type {

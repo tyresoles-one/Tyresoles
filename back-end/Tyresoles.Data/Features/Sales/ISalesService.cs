@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Dataverse.NavLive;
 using Tyresoles.Data.Features.Common;
 using Tyresoles.Sql.Abstractions;
@@ -60,10 +61,10 @@ public interface ISalesService
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter = null);
+        IReadOnlyList<string>? respCenters = null);
 
     /// <summary>
-    /// Returns a query for areas. Optional responsibilityCenter filters Area by Responsibility Center.
+    /// Returns a query for areas. Optional responsibility centers filter Area by Responsibility Center (union).
     /// Partner/PartnerGroup: areas from customers' Area Code (Dealer Code = entityCode).
     /// Employee: areas whose Team is in TeamSalesperson.TeamCode for Code = entityCode.
     /// </summary>
@@ -72,17 +73,17 @@ public interface ISalesService
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter = null);
+        IReadOnlyList<string>? respCenters = null);
 
     /// <summary>
-    /// Returns a query for regions. Not implemented until Region entity exists (next phase).
+    /// Returns a query for regions. Optional responsibility centers filter Territory by Responsibility Center (union).
     /// </summary>
     IQueryable<Territory> GetMyRegionsQuery(
         ITenantScope scope,
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter = null);
+        IReadOnlyList<string>? respCenters = null);
 
     /// <summary>
     /// Returns a Dealer.

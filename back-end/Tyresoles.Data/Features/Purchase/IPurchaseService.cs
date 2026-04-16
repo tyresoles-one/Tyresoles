@@ -31,6 +31,11 @@ public interface IPurchaseService
         string vendorNo,
         CancellationToken cancellationToken = default);
 
+    Vendor VendorByCode(
+        ITenantScope scope,
+        string code,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Item / casing numbers (port of legacy Db.Production.ItemNos). Branch CASING + FromGroupDetail uses Group Category / Group Details;
     /// otherwise Item with optional item category and product group filters. Returned as an <c>IQueryable</c> of <see cref="CasingItem"/> for GraphQL paging, filtering, and sorting.
@@ -69,4 +74,13 @@ public interface IPurchaseService
     /// Port of legacy <c>Db.Production.ProcurementMarkets</c>.
     /// </summary>
     IQueryable<CodeName> ProcurementMarkets(ITenantScope scope);
+
+    IQueryable<Models.UnitOfMeasure> GetUnitOfMeasures(ITenantScope scope);
+    IQueryable<Models.ItemCategory> GetItemCategories(ITenantScope scope);
+    IQueryable<Models.ProductGroup> GetProductGroups(ITenantScope scope);
+    IQueryable<Models.GenProductPostingGroup> GetGenProductPostingGroups(ITenantScope scope);
+    IQueryable<Models.GSTGroup> GetGSTGroups(ITenantScope scope);
+    IQueryable<Models.HsnSac> GetHsnSacs(ITenantScope scope);
+    IQueryable<Models.InventoryPostingGroup> GetInventoryPostingGroups(ITenantScope scope);
+    IQueryable<Models.Item> GetItems(ITenantScope scope);
 }

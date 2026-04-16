@@ -182,7 +182,7 @@
     const urlId = $page.url.searchParams.get("id");
 
     // Backend expects userId for permission-based production reports list
-    getProductionReportMeta(user?.id?.toString() ?? undefined)
+    getProductionReportMeta(user?.userId?.toString() ?? undefined)
       .then((rawList) => {
         const list = enrichMeta(rawList);
         console.log(list);
@@ -401,10 +401,11 @@
     };
 
     if (requiredKeys.includes("dateRange"))
-      zodShape.dateRange = z.object(
-        { start: z.any(), end: z.any() },
-        { required_error: "Date range is required" },
-      );
+      zodShape.dateRange = z
+        .object({ start: z.any(), end: z.any() })
+        .refine((d) => d && d.start && d.end, {
+          message: "Date range is required",
+        });
     if (requiredKeys.includes("view"))
       zodShape.view = z.string().min(1, "View mapping is required");
     if (requiredKeys.includes("type"))
@@ -495,6 +496,7 @@
       entityCode: user?.entityCode ?? undefined,
       entityType: user?.entityType ?? undefined,
       entityDepartment: user?.department ?? undefined,
+      userSpecialToken: authStore.get().userSpecialToken || user?.userSpecialToken,
     };
   }
 

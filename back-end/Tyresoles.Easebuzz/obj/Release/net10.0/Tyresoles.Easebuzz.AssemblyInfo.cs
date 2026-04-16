@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Easebuzz payment gateway integration for Tyresoles. Configurable via appsettings," +
     " one-line AddEasebuzz() registration, minimal boilerplate.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d9b48db97ecf6c55916a8e5dd9b505a87502abe6")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tyresoles.Easebuzz")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tyresoles.Easebuzz")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

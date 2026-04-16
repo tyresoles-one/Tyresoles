@@ -1,0 +1,48 @@
+mutation RefreshToken($token: String!, $refreshToken: String!) {
+  refreshToken(token: $token, refreshToken: $refreshToken) {
+    success
+    message
+    token
+    refreshToken
+    requirePasswordChange
+    requirePasswordChangeReason
+    user {
+      userId
+      userSecurityId
+      fullName
+      userType
+      title
+      entityType
+      entityCode
+      department
+      respCenter
+      workDate
+      avatar
+      userSpecialToken
+    }
+    locations {
+      code
+      name
+      sale
+      purchase
+      production
+      payroll
+    }
+    menus {
+      label
+      icon
+      subMenus {
+        label
+        icon
+        items {
+          code
+          label
+          icon
+          action
+          order
+          options
+        }
+      }
+    }
+  }
+}

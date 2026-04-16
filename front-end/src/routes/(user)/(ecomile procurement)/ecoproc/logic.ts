@@ -23,25 +23,11 @@ import type {
     GetProductionProcMarketsQuery, GetProductionProcMarketsQueryVariables,
     GetGroupDetailsQuery, GetGroupDetailsQueryVariables,
     InsertProductionCasingItemsMutation, InsertProductionCasingItemsMutationVariables,
-    FetchParamsInput,
     CasingItemInput,
 } from '$lib/services/graphql/generated/graphql';
+import { toFetchParamsInput } from '$lib/business/fetch-params';
 
-export const toFetchParamsInput = (p: FetchParams): FetchParamsInput => ({
-    areas: (p.areas as string[]) ?? [],
-    from: (p.from as string) ?? '',
-    nos: (p.nos as string[]) ?? [],
-    regions: p.regions ?? [],
-    reportName: (p.reportName as string) ?? '',
-    respCenters: p.respCenters ?? [],
-    to: (p.to as string) ?? '',
-    type: p.type ?? '',
-    userCode: p.userCode ?? '',
-    userDepartment: p.userDepartment ?? '',
-    userSpecialToken: (p.userSpecialToken as string) ?? '',
-    userType: (p.userType as string) ?? '',
-    view: p.view ?? '',
-});
+export { toFetchParamsInput };
 
 export const fetchMasters = () => {
     Promise.all([

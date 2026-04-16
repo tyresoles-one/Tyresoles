@@ -1,5 +1,6 @@
 mod app_config;
 mod rdplaunch;
+mod remote_assist;
 mod service_checker;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,6 +24,7 @@ pub fn run() {
     // 2. Auto-update + process plugins
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
+    .plugin(tauri_plugin_notification::init())
     // 3. Invoke handler for frontend commands
     .invoke_handler(tauri::generate_handler![
       app_config::read_app_config,
@@ -34,6 +36,7 @@ pub fn run() {
       service_checker::start_service,
       service_checker::stop_service,
       service_checker::restart_service,
+      remote_assist::remote_assist_pointer,
     ])
     // 4. Setup hook — runs after plugins are initialized.
     //    Eagerly create the config file so it exists before the frontend loads.

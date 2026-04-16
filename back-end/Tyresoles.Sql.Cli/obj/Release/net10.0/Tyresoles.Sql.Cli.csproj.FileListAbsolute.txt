@@ -75,3 +75,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Cli\obj\Release\net10.0\refint\Tyr
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Cli\obj\Release\net10.0\Tyresoles.Sql.Cli.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Cli\obj\Release\net10.0\Tyresoles.Sql.Cli.genruntimeconfig.cache
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Cli\obj\Release\net10.0\ref\Tyresoles.Sql.Cli.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Cli\obj\Release\net10.0\Tyresoles.Sql.Cli.sourcelink.json

@@ -25,7 +25,7 @@
 import { graphqlQuery } from '$lib/services/graphql';
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 
-export interface UseEntityDetailConfig<TQuery> {
+export interface UseEntityDetailConfig<TQuery, TEntity = unknown> {
 	/** Entity ID (code, userName, etc.) or getter for reactive updates */
 	id: string | (() => string);
 	/** GraphQL query document */
@@ -34,6 +34,13 @@ export interface UseEntityDetailConfig<TQuery> {
 	dataPath: string;
 	/** Function to generate cache key */
 	cacheKey: (id: string) => string;
+	/**
+	 * When set, builds GraphQL variables from the route id (e.g. `{ param: { nos: [id] } }`).
+	 * If omitted, variables default to `{ [idParamName ?? detectIdParam(dataPath)]: id }`.
+	 */
+	variables?: (id: string) => Record<string, unknown>;
+	/** Map full query result to a single entity (e.g. first row of a list field). */
+	mapResponse?: (data: TQuery) => TEntity | null;
 	/** Name of ID parameter in GraphQL query (default: auto-detect from dataPath) */
 	idParamName?: string;
 	/** Cache TTL in milliseconds (default: 30000) */
@@ -70,7 +77,7 @@ function detectIdParam(dataPath: string): string {
  * Load and manage single entity detail
  */
 export function useEntityDetail<TQuery, TEntity>(
-	config: UseEntityDetailConfig<TQuery>
+	config: UseEntityDetailConfig<TQuery, TEntity>
 ): UseEntityDetailReturn<TEntity> {
 	let loading = $state(true);
 	let error = $state<string | undefined>(undefined);
@@ -94,15 +101,21 @@ export function useEntityDetail<TQuery, TEntity>(
 		entity = null;
 
 		try {
+			const variables = config.variables
+				? config.variables(currentId)
+				: { [idParam]: currentId };
+
 			const result = await graphqlQuery<TQuery>(config.query, {
-				variables: { [idParam]: currentId },
+				variables: variables as Record<string, unknown>,
 				cacheKey: config.cacheKey(currentId),
 				cacheTTL: config.cacheTTL ?? 30_000,
 				silent: true
 			});
 
 			if (result.success && result.data) {
-				entity = ((result.data as any)[config.dataPath] ?? null) as TEntity;
+				entity = config.mapResponse
+					? config.mapResponse(result.data as TQuery)
+					: (((result.data as any)[config.dataPath] ?? null) as TEntity);
 			} else {
 				error = result.error ?? 'Failed to load';
 			}

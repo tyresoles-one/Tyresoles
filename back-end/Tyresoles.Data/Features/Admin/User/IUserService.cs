@@ -3,7 +3,10 @@ namespace Tyresoles.Data.Features.Admin.User;
 public interface IUserService
 {
     /// <param name="platform">Optional: "web" (filter by Web App), "win" (filter by ERP App). If null/empty, no platform filter is applied.</param>
-    Task<LoginResult> LoginAsync(string username, string password, string? platform = null, CancellationToken cancellationToken = default);
+    Task<LoginResult> LoginAsync(string username, string password, string? platform = null, string? ipAddress = null, string? userAgent = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Refreshes an access token using a refresh token if the session is still valid.</summary>
+    Task<LoginResult> RefreshTokenAsync(string token, string refreshToken, string? ipAddress = null, string? userAgent = null, CancellationToken cancellationToken = default);
 
     /// <summary>Get profile for a user by userId (UserName or MobileNo). Returns null if not found.</summary>
     Task<ProfileResult?> GetProfileAsync(string userId, CancellationToken cancellationToken = default);

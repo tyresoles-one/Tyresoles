@@ -8,6 +8,9 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Separator } from '$lib/components/ui/separator';
+	import FormField from '$lib/components/venUI/form/FormField.svelte';
+	import DetailItem from '$lib/components/venUI/detail-item/DetailItem.svelte';
+	import AsyncButton from '$lib/components/venUI/button/AsyncButton.svelte';
 	import {
 		Card,
 		CardContent,
@@ -180,20 +183,17 @@
 								<Skeleton class="h-10 w-full" />
 							</div>
 						{:else}
-							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-muted-foreground">User ID</span>
-								<span class="font-medium text-foreground">{profile?.userId}</span>
-							</div>
+							<DetailItem label="User ID">
+									<span class="font-medium text-foreground">{profile?.userId}</span>
+								</DetailItem>
 							<Separator />
-							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-muted-foreground">Last Password Changed</span>
-								<span class="text-foreground">
+							<DetailItem label="Last Password Changed">
+									<span class="text-foreground">
 									{profile?.lastPasswordChanged ? new Date(profile.lastPasswordChanged).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Never'}
 								</span>
-							</div>
+								</DetailItem>
 							<Separator />
-							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-muted-foreground">Security PIN</span>
+							<DetailItem label="Security PIN">
 								<div class="flex items-center justify-between mt-1">
 									{#if editingPin}
 										<Input
@@ -218,7 +218,7 @@
 										</Button>
 									{/if}
 								</div>
-							</div>
+							</DetailItem>
 						{/if}
 					</CardContent>
 					<CardFooter class="border-t bg-muted/10 px-6 py-4">
@@ -252,58 +252,39 @@
 							</div>
 						{:else}
 							<div class="grid gap-6 sm:grid-cols-2">
-								<div class="space-y-2">
-									<Label for="fullName">Full Name</Label>
-									<div class="relative">
-										<Icon name="user" class="absolute left-3 top-3 size-4 text-muted-foreground" />
-										<Input
+								<FormField id="fullName" label="Full Name" icon="user">
+									<Input
 											id="fullName"
 											placeholder="Enter your full name"
 											class="pl-9"
 											bind:value={fullName}
 										/>
-									</div>
-								</div>
+								</FormField>
 								
-								<div class="space-y-2">
-									<Label for="email">Email Address</Label>
-									<div class="relative">
-										<Icon name="mail" class="absolute left-3 top-3 size-4 text-muted-foreground" />
-										<Input
+								<FormField id="email" label="Email Address" icon="mail">
+									<Input
 											id="email"
 											type="email"
 											placeholder="Enter email address"
 											class="pl-9"
 											bind:value={email}
 										/>
-									</div>
-								</div>
+								</FormField>
 
-								<div class="space-y-2">
-									<Label for="mobileNo">Mobile Number</Label>
-									<div class="relative">
-										<Icon name="phone" class="absolute left-3 top-3 size-4 text-muted-foreground" />
-										<Input
+								<FormField id="mobileNo" label="Mobile Number" icon="phone">
+									<Input
 											id="mobileNo"
 											type="tel"
 											placeholder="Enter mobile number"
 											class="pl-9"
 											bind:value={mobileNo}
 										/>
-									</div>
-								</div>
+								</FormField>
 							</div>
 						{/if}
 					</CardContent>
 					<CardFooter class="flex justify-end border-t bg-muted/10 px-6 py-4">
-						<Button onclick={handleSave} disabled={loading || saving} class="min-w-[120px] transition-all hover:shadow-md">
-							{#if saving}
-								<Icon name="loader-2" class="mr-2 size-4 animate-spin" />
-								Saving...
-							{:else}
-								Save Changes
-							{/if}
-						</Button>
+						<AsyncButton onclick={handleSave} loading={saving} disabled={loading} loadingText="Saving..." class="min-w-[120px] transition-all hover:shadow-md">Save Changes</AsyncButton>
 					</CardFooter>
 				</Card>
 

@@ -46,3 +46,9 @@ Use `HttpContext.User` or inject `IHttpContextAccessor` and read claims, e.g.:
 ## Session store
 
 Default is `InMemorySessionStore` (single instance; sessions lost on restart). For multiple instances or persistence, implement `ISessionStore` (e.g. Redis) and register it in `Program.cs` instead of `InMemorySessionStore`.
+
+## Server-side session enforcement
+
+After JWT signature and lifetime checks, **`JwtBearer` `OnTokenValidated`** loads `ISessionStore` and ensures the `sessionId` claim still exists in the store. If the session was removed (`killSession` / expiry) or is expired, authentication fails with a message containing `TY_SESSION_REVOKED`. The SPA uses that marker to show a “session ended” toast instead of a generic expiry message.
+
+This gives **immediate logout** after an admin ends a session: the user’s next API call receives **401** and the client clears local auth.

@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_9",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_12",
     "RelativePath": "",
     "HttpMethod": "GET",
     "IsController": false,
@@ -112,7 +112,7 @@
   },
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_11",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_14",
     "RelativePath": "api/easebuzz/status",
     "HttpMethod": "GET",
     "IsController": false,
@@ -334,8 +334,135 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "GetIceServers",
+    "RelativePath": "api/remote-assist/ice",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "Tyresoles.Web.Controllers.IceServersResponse",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "CreateSession",
+    "RelativePath": "api/remote-assist/sessions",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "Tyresoles.Web.Controllers.CreateSessionRequest",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Tyresoles.Web.Controllers.CreateSessionResponse",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "GetSession",
+    "RelativePath": "api/remote-assist/sessions/{sessionId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Tyresoles.Web.Controllers.SessionStatusResponse",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "EndSession",
+    "RelativePath": "api/remote-assist/sessions/{sessionId}/end",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "SetRemoteControl",
+    "RelativePath": "api/remote-assist/sessions/{sessionId}/remote-control",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      },
+      {
+        "Name": "body",
+        "Type": "Tyresoles.Web.Controllers.RemoteControlRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "JoinSession",
+    "RelativePath": "api/remote-assist/sessions/join",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "Tyresoles.Web.Controllers.JoinSessionRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Tyresoles.Web.Controllers.JoinSessionResponse",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_10",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_13",
     "RelativePath": "api/reports/{reportName}/pdf",
     "HttpMethod": "GET",
     "IsController": false,

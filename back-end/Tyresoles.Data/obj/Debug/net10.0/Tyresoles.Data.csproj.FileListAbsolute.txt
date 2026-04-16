@@ -40,3 +40,4 @@ d:\Work Desk\Tyresoles\back-end\_buildcheck4\Tyresoles.Data.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Data.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Data.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Data.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Debug\net10.0\Tyresoles.Data.sourcelink.json

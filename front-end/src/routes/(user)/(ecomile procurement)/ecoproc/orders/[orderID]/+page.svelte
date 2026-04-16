@@ -264,7 +264,7 @@
     buyFromVendorNo: z.string().min(1, "Supplier is required"),
   });
 
-  const form = CreateForm<{ buyFromVendorNo: string }>({
+  let form = CreateForm<{ buyFromVendorNo: string }>({
     schema: headerSchema,
     initialValues: { buyFromVendorNo: "" },
     onSubmit: async (values) => {
@@ -600,7 +600,7 @@
                 >
                   <div class="min-w-0 flex-1">
                     <MasterSelect
-                      {form}
+                      bind:form
                       fieldName="buyFromVendorNo"
                       masterType="vendors"
                       label="Supplier"

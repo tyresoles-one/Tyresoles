@@ -382,6 +382,7 @@
       entityCode: user?.entityCode ?? undefined,
       entityType: user?.entityType ?? undefined,
       entityDepartment: user?.department ?? undefined,
+      userSpecialToken: authStore.get().userSpecialToken || user?.userSpecialToken,
     };
   }
 

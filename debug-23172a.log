@@ -1,2 +1,0 @@
-{"sessionId":"23172a","hypothesisId":"H1","location":"ProteanDataService.cs:ewbPayload","message":"docDateCulture","data":{"docInvariant":"26/03/2026","currentCulture":"en-IN"},"timestamp":1774634220831}
-{"sessionId":"23172a","hypothesisId":"H2_H3","location":"ProteanDataService.cs:ewbPayload","message":"stateCodes","data":{"rcState":"KA","fromStateFound":true,"toStateFound":true,"fromCode":"29","toCode":""},"timestamp":1774634220852}

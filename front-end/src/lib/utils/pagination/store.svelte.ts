@@ -23,6 +23,18 @@ interface PaginationOptions<TVariables> {
    * Use for GraphQL fields that filter via `where` (e.g. Hot Chocolate UseFiltering).
    */
   mapSearchToVariables?: (term: string) => Partial<TVariables>;
+  /**
+   * If set, server `load` sends only `take` plus these keys from `baseVariables` (undefined omitted).
+   * Use when the GraphQL operation does not declare `skip` / `orderBy` / `order` — extra keys can break requests.
+   */
+  serverVariableAllowlist?: readonly string[];
+  /**
+   * `cursor`: Relay-style paging via `after` + `pageInfo.hasNextPage` / `endCursor` (no `skip`).
+   * Requires `pageInfoPath` and a query that accepts `after` and returns `pageInfo`.
+   */
+  paginationMode?: "offset" | "cursor";
+  /** Dot path to PageInfo on the GraphQL response (e.g. `dealers.pageInfo`). Used when `paginationMode` is `cursor`. */
+  pageInfoPath?: string;
 }
 
 export class SmartPagination<T, TVariables extends Variables = Variables> {
@@ -37,8 +49,20 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
   // Pagination State
   currentPage = $state(1);
   pageSize = $state(50);
-  /** True when more pages exist. For client strategy, items = current page slice; for server, items = current page. */
-  hasMore = $derived(this.currentPage * this.pageSize < this.totalCount);
+  /** Cursor mode: last response `pageInfo.hasNextPage` (offset mode ignores this). */
+  lastHasNextPage = $state(false);
+
+  private paginationMode: "offset" | "cursor" = "offset";
+  private pageInfoPath?: string;
+  /** Next `after` value for cursor paging (from last response `pageInfo.endCursor`). */
+  private _cursorAfter: string | null = null;
+
+  /** True when more pages exist. Cursor mode uses `pageInfo.hasNextPage`; offset uses totalCount vs loaded. */
+  hasMore = $derived(
+    this.paginationMode === "cursor"
+      ? this.lastHasNextPage
+      : this.currentPage * this.pageSize < this.totalCount,
+  );
 
   // Sort State
   sortField = $state<string | null>(null);
@@ -53,6 +77,7 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
   private countPath: string;
   private skipCache: boolean;
   private mapSearchToVariables?: (term: string) => Partial<TVariables>;
+  private serverVariableAllowlist?: readonly string[];
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private requestId = 0;
@@ -72,8 +97,21 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
       options.countPath ??
       (options.dataPath ? `${options.dataPath}.totalCount` : "");
     this.mapSearchToVariables = options.mapSearchToVariables;
+    this.serverVariableAllowlist = options.serverVariableAllowlist;
+    this.paginationMode = options.paginationMode ?? "offset";
+    this.pageInfoPath = options.pageInfoPath;
 
+    this.mergeSearchIntoBase("");
     this.load();
+  }
+
+  /** Applies `mapSearchToVariables(term)` into `baseVariables` without reset/load (used on init). */
+  private mergeSearchIntoBase(term: string) {
+    if (!this.mapSearchToVariables) return;
+    this.baseVariables = {
+      ...this.baseVariables,
+      ...this.mapSearchToVariables(term),
+    } as TVariables;
   }
 
   setSearch(term: string) {
@@ -93,7 +131,14 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
   }
 
   setVariables(vars: Partial<TVariables>) {
+    const incomingKeys = Object.keys(vars as object);
+    const allow = this.serverVariableAllowlist;
+    /** DataGrid syncs TanStack `order` here; ops with an allowlist (e.g. GetDealers) omit `order` — do not reset cursor. */
+    const affectsServerQuery =
+      !allow?.length ||
+      incomingKeys.some((k) => allow.includes(k));
     this.baseVariables = { ...this.baseVariables, ...vars };
+    if (!affectsServerQuery) return;
     this.reset();
     this.load();
   }
@@ -127,6 +172,8 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
     this.totalCount = 0;
     this.currentPage = 1;
     this.allClientData = [];
+    this._cursorAfter = null;
+    this.lastHasNextPage = false;
   }
 
   async load(append = false) {
@@ -157,19 +204,41 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
     }
   }
 
+  private buildServerRequestVariables(
+    skip: number,
+    append: boolean,
+  ): Record<string, unknown> {
+    const base = this.baseVariables as Record<string, unknown>;
+    if (!this.serverVariableAllowlist?.length) {
+      return {
+        ...base,
+        skip,
+        take: this.pageSize,
+        orderBy: this.sortField,
+        desc: this.sortDirection === "desc",
+      };
+    }
+    const vars: Record<string, unknown> = { take: this.pageSize };
+    if (this.paginationMode === "cursor") {
+      vars.after = append ? this._cursorAfter : null;
+    }
+    for (const key of this.serverVariableAllowlist) {
+      if (key === "after") continue;
+      if (!(key in base)) continue;
+      const v = base[key];
+      if (v === undefined) continue;
+      vars[key] = v;
+    }
+    return vars;
+  }
+
   private async loadServerMode(reqId: number, append: boolean) {
     const skip = (this.currentPage - 1) * this.pageSize;
 
-    const vars = {
-      ...this.baseVariables,
-      skip,
-      take: this.pageSize,
-      orderBy: this.sortField, // Backend must support this
-      desc: this.sortDirection === "desc",
-    };
+    const vars = this.buildServerRequestVariables(skip, append);
 
     const result = await graphqlQuery(this.query, {
-      variables: vars,
+      variables: vars as TVariables,
       skipCache: this.skipCache,
     });
 
@@ -183,6 +252,19 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
         this.items = items;
       }
       this.totalCount = count;
+
+      if (this.paginationMode === "cursor" && this.pageInfoPath) {
+        const pi = this.getByPath(result.data, this.pageInfoPath) as
+          | { hasNextPage?: boolean; endCursor?: string | null }
+          | undefined;
+        if (pi) {
+          this.lastHasNextPage = pi.hasNextPage ?? false;
+          this._cursorAfter = pi.endCursor ?? null;
+        } else {
+          this.lastHasNextPage = false;
+          this._cursorAfter = null;
+        }
+      }
     } else if (result.error) {
       this.error = result.error;
     }

@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -26,7 +27,11 @@ using Tyresoles.Data.Features.Sales.Dashboard;
 using Tyresoles.Data.Features.Payroll;
 using Tyresoles.Data.Features.Production;
 using Tyresoles.Data.Features.Calendar;
+using Tyresoles.Data.Features.Accounts;
+using Tyresoles.Data.Features.Accounts.Models;
+using Tyresoles.Data.Features.RemoteAssist;
 using Tyresoles.Sql.Abstractions;
+using Tyresoles.Web.Features.RemoteAssist;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -93,13 +98,15 @@ if (useRedis)
 }
 else
 {
-    builder.Services.AddScoped<ISessionStore, InMemorySessionStore>();
+    // InMemorySessionStore holds a per-instance dictionary; must be singleton so login and GetSessions share the same store.
+    builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 }
 builder.Services.AddScoped<IDataverseDataService, DataverseDataService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<ISalesReportService, SalesReportService>();
 builder.Services.AddScoped<IPayrollReportService, PayrollReportService>();
+builder.Services.AddScoped<Tyresoles.Data.Features.Payroll.IPayrollService, Tyresoles.Data.Features.Payroll.PayrollService>();
 builder.Services.AddScoped<IProductionReportService, ProductionReportService>();
 builder.Services.AddScoped<IProductionService, ProductionService>();
 builder.Services.AddScoped<Tyresoles.Data.Features.Accounts.Reports.IAccountsReportService, Tyresoles.Data.Features.Accounts.Reports.AccountsReportService>();
@@ -108,8 +115,10 @@ builder.Services.AddScoped<ScopedQueryCache>();
 builder.Services.AddScoped<IProteanDataService, ProteanDataService>();
 builder.Services.AddScoped<IProteanService, ProteanService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<IFixedAssetService, FixedAssetService>();
 builder.Services.AddScoped<IProcurementService, ProcurementService>();
 builder.Services.AddScoped<ICommonDataService, CommonDataService>();
+builder.Services.AddScoped<Tyresoles.Data.Features.Accounts.IAccountService, Tyresoles.Data.Features.Accounts.AccountService>();
 builder.Services.Configure<NavWebServiceSettings>(builder.Configuration.GetSection(NavWebServiceSettings.SectionName));
 builder.Services.AddScoped<Connector>();
 builder.Services.AddProtean();
@@ -134,6 +143,28 @@ builder.Services.AddDbContext<CalendarDbContext>(options =>
     });
 });
 builder.Services.AddScoped<ICalendarService, CalendarService>();
+builder.Services.Configure<RemoteAssistOptions>(builder.Configuration.GetSection(RemoteAssistOptions.SectionName));
+builder.Services.Configure<RemoteAssistIceOptions>(builder.Configuration.GetSection(RemoteAssistOptions.SectionName));
+builder.Services.AddSingleton<RemoteAssistControlGate>();
+builder.Services.AddSingleton<IRemoteAssistControlNotifier>(sp => sp.GetRequiredService<RemoteAssistControlGate>());
+builder.Services.AddScoped<IRemoteAssistService, RemoteAssistService>();
+builder.Services.AddSingleton<RemoteAssistSignalingHub>();
+builder.Services.AddSingleton<RemoteAssistJwtValidator>();
+
+// NavisionEdits module: separate DbContext on same Db_Extra database
+builder.Services.AddDbContext<Tyresoles.Data.Features.NavisionEdits.NavEditDbContext>(options =>
+{
+    var conn = builder.Configuration.GetConnectionString("Calendar")
+        ?? "Server=(localdb)\\mssqllocaldb;Database=TyresolesCalendar;Trusted_Connection=True;TrustServerCertificate=True";
+    options.UseSqlServer(conn, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    });
+});
+builder.Services.AddScoped<Tyresoles.Data.Features.NavisionEdits.INavEditService, Tyresoles.Data.Features.NavisionEdits.NavEditService>();
 
 // JWT: expiry options for UserService (Data layer); token generation in Web.
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -167,8 +198,37 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sessionId = context.Principal?.FindFirst("sessionId")?.Value;
+                if (string.IsNullOrWhiteSpace(sessionId))
+                {
+                    context.Fail($"{SessionAuthConstants.RevokedMarker}: Session is missing from token.");
+                    return;
+                }
+
+                var store = context.HttpContext.RequestServices.GetRequiredService<ISessionStore>();
+                var session = await store.GetAsync(sessionId, context.HttpContext.RequestAborted).ConfigureAwait(false);
+                if (session is null)
+                {
+                    context.Fail($"{SessionAuthConstants.RevokedMarker}: Session ended or expired.");
+                }
+            }
+        };
     });
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("RemoteAssist", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 60;
+        o.QueueLimit = 0;
+    });
+});
 
 builder.Services.AddCors(options =>
 {
@@ -321,9 +381,149 @@ catch (Exception ex)
 }
 
 app.UseWebSockets();
+
+// Ensure NavisionEdits tables exist in Db_Extra
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var navEditDb = scope.ServiceProvider.GetRequiredService<Tyresoles.Data.Features.NavisionEdits.NavEditDbContext>();
+        await navEditDb.Database.ExecuteSqlRawAsync(@"
+            IF OBJECT_ID('dbo.NavEditRequestTypes', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[NavEditRequestTypes] (
+                    [Id] int NOT NULL IDENTITY,
+                    [Name] nvarchar(200) NOT NULL,
+                    [Code] nvarchar(50) NOT NULL,
+                    [Description] nvarchar(500) NULL,
+                    [Icon] nvarchar(50) NULL,
+                    [NavTable] nvarchar(200) NOT NULL,
+                    [NavPrimaryKeyColumn] nvarchar(200) NOT NULL,
+                    [FieldsJson] nvarchar(max) NOT NULL,
+                    [IsActive] bit NOT NULL DEFAULT 1,
+                    [SortOrder] int NOT NULL DEFAULT 0,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [CreatedBy] nvarchar(128) NOT NULL DEFAULT '',
+                    [UpdatedAt] datetime2 NULL,
+                    [UpdatedBy] nvarchar(128) NULL,
+                    CONSTRAINT [PK_NavEditRequestTypes] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_NavEditRequestTypes_Code] ON dbo.[NavEditRequestTypes] ([Code]);
+                CREATE INDEX [IX_NavEditRequestTypes_IsActive] ON dbo.[NavEditRequestTypes] ([IsActive]);
+            END
+
+            IF OBJECT_ID('dbo.NavEditRequests', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[NavEditRequests] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [RequestTypeId] int NOT NULL,
+                    [RecordKey] nvarchar(200) NOT NULL,
+                    [RequestBody] nvarchar(max) NOT NULL,
+                    [UserId] nvarchar(128) NOT NULL,
+                    [UserFullName] nvarchar(200) NULL,
+                    [Status] int NOT NULL DEFAULT 1,
+                    [Remark] nvarchar(1000) NULL,
+                    [AdminRemark] nvarchar(1000) NULL,
+                    [ProcessedBy] nvarchar(128) NULL,
+                    [ProcessedAt] datetime2 NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NULL,
+                    CONSTRAINT [PK_NavEditRequests] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_NavEditRequests_Types] FOREIGN KEY ([RequestTypeId]) REFERENCES dbo.[NavEditRequestTypes] ([Id])
+                );
+                CREATE INDEX [IX_NavEditRequests_UserId] ON dbo.[NavEditRequests] ([UserId]);
+                CREATE INDEX [IX_NavEditRequests_Status] ON dbo.[NavEditRequests] ([Status]);
+                CREATE INDEX [IX_NavEditRequests_CreatedAt] ON dbo.[NavEditRequests] ([CreatedAt]);
+            END
+
+            IF OBJECT_ID('dbo.NavEditApprovals', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[NavEditApprovals] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [RequestId] uniqueidentifier NOT NULL,
+                    [Level] int NOT NULL,
+                    [Role] nvarchar(100) NOT NULL,
+                    [RoleLabel] nvarchar(200) NULL,
+                    [ApproverUserIdsJson] nvarchar(max) NULL,
+                    [ApprovedBy] nvarchar(128) NULL,
+                    [Status] int NOT NULL DEFAULT 0,
+                    [Comment] nvarchar(1000) NULL,
+                    [ActionDate] datetime2 NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_NavEditApprovals] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_NavEditApprovals_Request] FOREIGN KEY ([RequestId]) REFERENCES dbo.[NavEditRequests] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_NavEditApprovals_RequestId] ON dbo.[NavEditApprovals] ([RequestId]);
+                CREATE INDEX [IX_NavEditApprovals_RequestId_Level] ON dbo.[NavEditApprovals] ([RequestId], [Level]);
+            END
+
+            IF OBJECT_ID('dbo.NavEditApprovals', 'U') IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM sys.columns c
+                INNER JOIN sys.tables t ON c.object_id = t.object_id
+                WHERE t.name = 'NavEditApprovals' AND SCHEMA_NAME(t.schema_id) = 'dbo' AND c.name = 'ApproverUserIdsJson')
+            BEGIN
+                ALTER TABLE dbo.[NavEditApprovals] ADD [ApproverUserIdsJson] nvarchar(max) NULL;
+            END
+        ");
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Could not initialize NavisionEdits tables. Edit request features may be unavailable.");
+}
+
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var calendarDb = scope.ServiceProvider.GetRequiredService<CalendarDbContext>();
+        await calendarDb.Database.ExecuteSqlRawAsync(@"
+            IF OBJECT_ID('dbo.RemoteAssistSessions', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[RemoteAssistSessions] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [JoinCode] nvarchar(16) NOT NULL,
+                    [HostUserId] nvarchar(128) NOT NULL,
+                    [HostDisplayName] nvarchar(200) NULL,
+                    [ViewerUserId] nvarchar(128) NULL,
+                    [ViewerDisplayName] nvarchar(200) NULL,
+                    [Status] int NOT NULL DEFAULT 0,
+                    [CreatedAtUtc] datetime2 NOT NULL,
+                    [ExpiresAtUtc] datetime2 NOT NULL,
+                    [EndedAtUtc] datetime2 NULL,
+                    [EndedByUserId] nvarchar(128) NULL,
+                    [ControlApprovedAtUtc] datetime2 NULL,
+                    CONSTRAINT [PK_RemoteAssistSessions] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_RemoteAssistSessions_JoinCode] ON dbo.[RemoteAssistSessions] ([JoinCode]);
+                CREATE INDEX [IX_RemoteAssistSessions_HostUserId] ON dbo.[RemoteAssistSessions] ([HostUserId]);
+                CREATE INDEX [IX_RemoteAssistSessions_ExpiresAtUtc] ON dbo.[RemoteAssistSessions] ([ExpiresAtUtc]);
+            END
+
+            IF OBJECT_ID('dbo.RemoteAssistSessions', 'U') IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM sys.columns c
+                INNER JOIN sys.tables t ON c.object_id = t.object_id
+                WHERE SCHEMA_NAME(t.schema_id) = 'dbo' AND t.name = 'RemoteAssistSessions' AND c.name = 'ControlApprovedAtUtc')
+            BEGIN
+                ALTER TABLE dbo.[RemoteAssistSessions] ADD [ControlApprovedAtUtc] datetime2 NULL;
+            END
+        ");
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Could not initialize RemoteAssist tables. Remote assist may be unavailable.");
+}
+
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // Emit one Tyresoles.Sql log at startup so the category appears in the log file; SQL queries log when you run them (e.g. login mutation).
 app.Lifetime.ApplicationStarted.Register(() =>
@@ -378,6 +578,7 @@ app.MapGet("/api/easebuzz/status", (IEasebuzzPaymentService paymentService) =>
 
 app.MapGraphQL();
 app.MapControllers();
+app.MapRemoteAssistWebSocket();
 
 app.Run();
 

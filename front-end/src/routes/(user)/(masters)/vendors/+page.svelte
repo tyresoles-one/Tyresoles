@@ -1,157 +1,222 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	// Reusable composables
 	import { usePaginatedList } from '$lib/composables';
 
-	// Reusable components
-	import { EntityCard } from '$lib/components/venUI/entityCard';
-	import { TableActions } from '$lib/components/venUI/tableActions';
+	import { authStore } from '$lib/stores/auth';
+	import { toFetchParamsInput } from '$lib/business/fetch-params';
+	import type { FetchParams } from '$lib/business/models';
+	import { graphqlMutation } from '$lib/services/graphql';
+	import { toast } from '$lib/components/venUI/toast';
 
 	// UI
 	import { Button } from '$lib/components/ui/button';
 	import { Icon } from '$lib/components/venUI/icon';
-	import { TableCell, TableHead } from '$lib/components/ui/table';
-	import MasterList from '$lib/components/venUI/masterList/MasterList.svelte';
+	import { DataGrid, type DataGridColumn, type FilterRule } from '$lib/components/venUI/datagrid';
 
 	// GraphQL
-	import { GetMyVendorsDocument } from '$lib/services/graphql/generated/types';
-	import type { GetMyVendorsQuery } from '$lib/services/graphql/generated/types';
+	import {
+		CreateProductionVendorDocument,
+		GetMyVendorsDocument
+	} from '$lib/services/graphql/generated/types';
+	import type {
+		CreateProductionVendorMutation,
+		FetchParamsInput,
+		GetMyVendorsQuery,
+		LoginUser
+	} from '$lib/services/graphql/generated/types';
 
-	type Vendor = NonNullable<GetMyVendorsQuery['myVendors']>['items'][number];
+	type Vendor = NonNullable<NonNullable<GetMyVendorsQuery['myVendors']>['items']>[number];
 	type ViewMode = 'grid' | 'table';
 
 	let viewMode = $state<ViewMode>('grid');
+	let filterRules = $state<FilterRule[]>([]);
+
+	/** Ecomile procurement (`ECOPROC`): scope `myVendors` to this manager via `ecoMgr`. */
+	function ecoMgrForUser(u: LoginUser | null | undefined): string | null {
+		if (u?.userType?.toUpperCase() !== 'ECOPROC' || !u.entityCode?.trim()) return null;
+		return u.entityCode.trim();
+	}
+
+	function ecoMgrFromAuth(): string | null {
+		return ecoMgrForUser(authStore.get().user);
+	}
+
+	function buildFilterRulesWhere(rules: FilterRule[]): Record<string, any>[] | undefined {
+		if (rules.length === 0) return undefined;
+		return rules.map((rule) => {
+			return { [rule.columnId]: { [rule.operator]: rule.value } };
+		});
+	}
+
+	/** Maps MasterList search AND filters to Hot Chocolate `where` on `myVendors` (server-side filter). */
+	function vendorsSearchToWhere(term: string, rulesForWhere: FilterRule[] = filterRules): Record<string, unknown> {
+		const q = term.trim();
+		const filterConds = buildFilterRulesWhere(rulesForWhere);
+		const andConds: Record<string, any>[] = [];
+
+		if (q) {
+			andConds.push({
+				or: [
+					{ no: { contains: q } },
+					{ name: { contains: q } },
+					{ city: { contains: q } },
+					{ phoneNo: { contains: q } },					
+					{ contact: { contains: q } }
+				]
+			});
+		}
+
+		if (filterConds && filterConds.length > 0) {
+			andConds.push(...filterConds);
+		}
+
+		let wherePayload: Record<string, unknown>;
+		if (andConds.length === 0) {
+			wherePayload = { where: null };
+		} else if (andConds.length === 1) {
+			wherePayload = { where: andConds[0] };
+		} else {
+			wherePayload = { where: { and: andConds } };
+		}
+
+		const ecoMgr = ecoMgrFromAuth();
+		return { ...wherePayload, ecoMgr: ecoMgr ?? null };
+	}
 
 	const list = usePaginatedList<Vendor>({
 		query: GetMyVendorsDocument,
 		dataPath: 'myVendors',
-		pageSize: 50
+		pageSize: 50,
+		mapSearchToVariables: (term) => vendorsSearchToWhere(term, filterRules),
+		serverVariableAllowlist: ['respCenter', 'categories', 'ecoMgr', 'where', 'order'],
+		paginationMode: 'cursor',
+		pageInfoPath: 'myVendors.pageInfo'
 	});
 
+	onMount(() => {
+		const unsub = authStore.subscribe((auth) => {
+			list.pagination.setVariables({ ecoMgr: ecoMgrForUser(auth.user) });
+		});
+		return unsub;
+	});
+
+	function handleFilterRulesChange(rules: FilterRule[]) {
+		filterRules = rules;
+		// Pass `rules` explicitly — `filterRules` may not be updated yet this tick (Svelte batching).
+		const vars = vendorsSearchToWhere(list.searchQuery.value, rules);
+		list.pagination.setVariables(vars);
+		list.onRefresh();
+	}
+
 	function vendorDetailPath(d: Vendor) {
-		console.log(d);
 		const id = d.no?.trim();
 		return id ? `/vendors/${encodeURIComponent(id)}` : '/vendors';
 	}
+
+	function formatVendorBalance(value: unknown): string {
+		if (value === null || value === undefined || value === '') return '—';
+		const n = typeof value === 'number' ? value : parseFloat(String(value));
+		if (Number.isNaN(n)) return '—';
+		return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	}
+
+	const columns: DataGridColumn<Vendor>[] = [
+		{ accessorKey: 'no', header: 'Vendor No' },
+		{ accessorKey: 'name', header: 'Vendor Name' },
+		{ accessorKey: 'city', header: 'City' },
+		{ accessorKey: 'phoneNo', header: 'Mobile No' },
+		{
+			accessorKey: 'balance',
+			header: 'Balance',
+			meta: { align: 'right' as const },
+			cell: ({ getValue }) => formatVendorBalance(getValue())
+		}
+	];
+
+	let creatingVendor = $state(false);
+
+	/** Same shape as ecoproc `ensureFetchParams` — required by `createProductionVendor` → `CreateVendorAsync`. */
+	function buildCreateVendorParam(): FetchParamsInput | null {
+		const u = authStore.get().user;
+		if (!u?.userId?.trim()) return null;
+		const fp: FetchParams = {
+			respCenters: u.respCenter ? [u.respCenter] : [],
+			userCode: u.userId,
+			userDepartment: u.department ?? '',
+			userName: u.fullName ?? '',
+			userSpecialToken: u.userSpecialToken ?? '',
+			userType: u.userType ?? '',
+			regions: [],
+			view: '',
+			type: ''
+		};
+		return toFetchParamsInput(fp);
+	}
+
+	async function addVendor() {
+		if (creatingVendor) return;
+		const param = buildCreateVendorParam();
+		if (!param) {
+			toast.error('Sign in required to create a vendor.');
+			return;
+		}
+		creatingVendor = true;
+		try {
+			const res = await graphqlMutation<CreateProductionVendorMutation>(CreateProductionVendorDocument, {
+				variables: { param }
+			});
+			if (!res.success || !res.data) {
+				toast.error(res.error ?? 'Failed to create vendor.');
+				return;
+			}
+			const newNo = res.data.createProductionVendor?.trim();
+			if (!newNo) {
+				toast.error('Server did not return a vendor number.');
+				return;
+			}
+			toast.success('Vendor created.');
+			await goto(`/vendors/${encodeURIComponent(newNo)}`);
+		} finally {
+			creatingVendor = false;
+		}
+	}
 </script>
 
-<div class="min-h-screen bg-background pb-20">
-	<MasterList
+<div class="min-h-screen bg-background pb-20 pt-8">
+	<DataGrid
 		title="Vendors"
-		description="View and manage dealers"
+		description="View and manage vendors"
 		items={list.items}
-		totalCount={list.totalCount}
-		bind:searchQuery={list.searchQuery.value}
-		bind:viewMode
+		{columns}
+		pagination={list.pagination}
 		loading={list.loading}
 		loadingMore={list.loadingMore}
-		error={list.error}
-		hasMore={list.hasMore}
-		onLoadMore={list.onLoadMore}
-		onRefresh={list.onRefresh}
+		bind:searchQuery={list.searchQuery.value}
+		mobileCardTitleKey="name"
+		mobileCardSubtitleKey="no"
+		onRowClick={(vendor: Vendor) => goto(vendorDetailPath(vendor))}
+		showFilters={true}
+		{filterRules}
+		onFilterRulesChange={handleFilterRulesChange}
 	>
-		{#snippet filters()}
-			<!-- Inline filter bar (avoids SSR snippet scope issue with FilterChip/FilterSeparator) -->
-			<div class="hidden sm:flex items-center gap-1.5 p-1 bg-muted/30 rounded-lg border border-border/20">
-				<span class="px-2.5 py-1 text-xs font-medium text-muted-foreground">All dealers</span>
-			</div>
-			<div class="w-px h-6 bg-border/80 mx-1 hidden sm:block"></div>
-		{/snippet}
-
 		{#snippet actions()}
 			<Button
 				size="sm"
 				class="gap-2 shrink-0 bg-primary/90 hover:bg-primary shadow-sm hover:shadow-md transition-all"
+				disabled={creatingVendor}
+				onclick={() => void addVendor()}
 			>
-				<Icon name="plus" class="size-3.5" />
-				<span class="hidden sm:inline">Add Dealer</span>
-				<span class="sm:hidden">Add</span>
+				{#if creatingVendor}
+					<Icon name="loader-2" class="size-3.5 animate-spin" />
+				{:else}
+					<Icon name="plus" class="size-3.5" />
+				{/if}
+				<span class="hidden sm:inline">{creatingVendor ? 'Creating…' : 'Add Vendor'}</span>
+				<span class="sm:hidden">{creatingVendor ? '…' : 'Add'}</span>
 			</Button>
 		{/snippet}
-
-		{#snippet gridItem(vendor: Vendor)}
-			<EntityCard
-				icon="store"
-				title={vendor.name || '—'}
-				subtitle={vendor.code}
-				metadata={[
-					...(vendor.depot?.trim()
-						? [{ icon: 'map-pin' as const, label: 'Location', value: vendor.depot }]
-						: []),
-					...(vendor.phoneNo?.trim() ? [{ icon: 'phone' as const, label: 'Phone', value: vendor.phoneNo }] : []),
-					...(vendor.dealershipName?.trim()
-						? [{ icon: 'user' as const, label: 'Dealership', value: vendor.dealershipName }]
-						: []),
-					...(vendor.eMail?.trim()
-						? [{ icon: 'mail' as const, label: 'Email', value: vendor.eMail }]
-						: [])
-				]}
-				onclick={() => goto(vendorDetailPath(vendor))}
-			/>
-		{/snippet}
-
-		{#snippet tableHeader()}
-			<TableHead class="w-[80px] text-center">Code</TableHead>
-			<TableHead class="cursor-pointer hover:text-primary transition-colors">Name</TableHead>
-			<TableHead class="hidden md:table-cell">Location</TableHead>
-			<TableHead class="hidden lg:table-cell">Contact</TableHead>
-			<TableHead class="text-right">Actions</TableHead>
-		{/snippet}
-
-		{#snippet tableRow(vendor: Vendor)}
-			<TableCell class="text-center p-2">
-				<div
-					class="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary/5 text-primary ring-2 ring-transparent"
-				>
-					<Icon name="store" class="size-5" />
-				</div>
-				<code class="mt-1 block text-[10px] font-mono text-muted-foreground truncate max-w-[70px] mx-auto">{vendor.code || '—'}</code>
-			</TableCell>
-			<TableCell>
-				<div class="font-medium text-foreground">{vendor.name || 'N/A'}</div>
-				<div class="text-xs text-muted-foreground md:hidden font-mono">{vendor.code}</div>
-			</TableCell>
-			<TableCell class="hidden md:table-cell">
-				<span class="text-sm text-muted-foreground">{vendor.depot?.trim() || '—'}</span>
-			</TableCell>
-			<TableCell class="hidden lg:table-cell">
-				<div class="flex flex-col gap-1 text-xs">
-					{#if vendor.dealershipName?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="user" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{vendor.dealershipName}</span>
-						</div>
-					{/if}
-					{#if vendor.eMail?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="mail" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{vendor.eMail}</span>
-						</div>
-					{/if}
-					{#if vendor.phoneNo?.trim()}
-						<div class="flex items-center gap-2 text-muted-foreground">
-							<Icon name="phone" class="size-3 shrink-0" />
-							<span class="truncate max-w-[140px]">{vendor.phoneNo}</span>
-						</div>
-					{/if}
-					{#if !vendor.dealershipName?.trim() && !vendor.phoneNo?.trim() && !vendor.eMail?.trim()}
-						<span class="text-muted-foreground/60">—</span>
-					{/if}
-				</div>
-			</TableCell>
-			<TableCell class="text-right">
-				<TableActions
-					title={vendor.name}
-					actions={[
-						{
-							label: 'View Details',
-							icon: 'eye',
-							onClick: () => goto(vendorDetailPath(vendor))
-						}
-					]}
-				/>
-			</TableCell>
-		{/snippet}
-	</MasterList>
+	</DataGrid>
 </div>

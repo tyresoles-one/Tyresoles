@@ -135,6 +135,18 @@ namespace WebService
         [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:PortalForDealer", ReplyAction="*")]
         [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
         System.Threading.Tasks.Task<WebService.PortalForDealer_Result> PortalForDealerAsync(WebService.PortalForDealer request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqCustEdit", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqCustEdit_Result> ReqCustEditAsync(WebService.ReqCustEdit request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqUserSetup", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqUserSetup_Result> ReqUserSetupAsync(WebService.ReqUserSetup request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqGLEntry", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqGLEntry_Result> ReqGLEntryAsync(WebService.ReqGLEntry request);
     }
     
     [System.Diagnostics.DebuggerStepThroughAttribute()]
@@ -1985,6 +1997,165 @@ namespace WebService
         }
     }
     
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqCustEdit", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqCustEdit
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string customerNo;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        public string dealerCode;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=2)]
+        public string areaCode;
+        
+        public ReqCustEdit()
+        {
+        }
+        
+        public ReqCustEdit(string customerNo, string dealerCode, string areaCode)
+        {
+            this.customerNo = customerNo;
+            this.dealerCode = dealerCode;
+            this.areaCode = areaCode;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqCustEdit_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqCustEdit_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqCustEdit_Result()
+        {
+        }
+        
+        public ReqCustEdit_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqUserSetup", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqUserSetup
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string userid;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        public string respCenter;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=2)]
+        [System.Xml.Serialization.XmlElementAttribute(DataType="date")]
+        public System.DateTime fromDate;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=3)]
+        [System.Xml.Serialization.XmlElementAttribute(DataType="date")]
+        public System.DateTime toDate;
+        
+        public ReqUserSetup()
+        {
+        }
+        
+        public ReqUserSetup(string userid, string respCenter, System.DateTime fromDate, System.DateTime toDate)
+        {
+            this.userid = userid;
+            this.respCenter = respCenter;
+            this.fromDate = fromDate;
+            this.toDate = toDate;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqUserSetup_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqUserSetup_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqUserSetup_Result()
+        {
+        }
+        
+        public ReqUserSetup_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqGLEntry", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqGLEntry
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public int entryNo;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        public string glAccountNo;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=2)]
+        public string respCenter;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=3)]
+        public decimal amount;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=4)]
+        [System.Xml.Serialization.XmlElementAttribute(DataType="date")]
+        public System.DateTime postingDate;
+        
+        public ReqGLEntry()
+        {
+        }
+        
+        public ReqGLEntry(int entryNo, string glAccountNo, string respCenter, decimal amount, System.DateTime postingDate)
+        {
+            this.entryNo = entryNo;
+            this.glAccountNo = glAccountNo;
+            this.respCenter = respCenter;
+            this.amount = amount;
+            this.postingDate = postingDate;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqGLEntry_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqGLEntry_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqGLEntry_Result()
+        {
+        }
+        
+        public ReqGLEntry_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
     public interface WebServe_PortChannel : WebService.WebServe_Port, System.ServiceModel.IClientChannel
     {
@@ -2641,6 +2812,54 @@ namespace WebService
             WebService.PortalForDealer inValue = new WebService.PortalForDealer();
             inValue.dealerCode = dealerCode;
             return ((WebService.WebServe_Port)(this)).PortalForDealerAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqCustEdit_Result> WebService.WebServe_Port.ReqCustEditAsync(WebService.ReqCustEdit request)
+        {
+            return base.Channel.ReqCustEditAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqCustEdit_Result> ReqCustEditAsync(string customerNo, string dealerCode, string areaCode)
+        {
+            WebService.ReqCustEdit inValue = new WebService.ReqCustEdit();
+            inValue.customerNo = customerNo;
+            inValue.dealerCode = dealerCode;
+            inValue.areaCode = areaCode;
+            return ((WebService.WebServe_Port)(this)).ReqCustEditAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqUserSetup_Result> WebService.WebServe_Port.ReqUserSetupAsync(WebService.ReqUserSetup request)
+        {
+            return base.Channel.ReqUserSetupAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqUserSetup_Result> ReqUserSetupAsync(string userid, string respCenter, System.DateTime fromDate, System.DateTime toDate)
+        {
+            WebService.ReqUserSetup inValue = new WebService.ReqUserSetup();
+            inValue.userid = userid;
+            inValue.respCenter = respCenter;
+            inValue.fromDate = fromDate;
+            inValue.toDate = toDate;
+            return ((WebService.WebServe_Port)(this)).ReqUserSetupAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqGLEntry_Result> WebService.WebServe_Port.ReqGLEntryAsync(WebService.ReqGLEntry request)
+        {
+            return base.Channel.ReqGLEntryAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqGLEntry_Result> ReqGLEntryAsync(int entryNo, string glAccountNo, string respCenter, decimal amount, System.DateTime postingDate)
+        {
+            WebService.ReqGLEntry inValue = new WebService.ReqGLEntry();
+            inValue.entryNo = entryNo;
+            inValue.glAccountNo = glAccountNo;
+            inValue.respCenter = respCenter;
+            inValue.amount = amount;
+            inValue.postingDate = postingDate;
+            return ((WebService.WebServe_Port)(this)).ReqGLEntryAsync(inValue);
         }
         
         public virtual System.Threading.Tasks.Task OpenAsync()

@@ -20,3 +20,4 @@ d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Easebuzz.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Easebuzz.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Easebuzz.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Easebuzz.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Easebuzz\obj\Debug\net10.0\Tyresoles.Easebuzz.sourcelink.json

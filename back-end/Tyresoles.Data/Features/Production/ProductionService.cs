@@ -214,9 +214,30 @@ WHERE [Blocked] = 0 {whereCat}";
             BankIFSC = param.BankIFSC,
             BankBranch = param.BankBranch,
             PanNo = param.PanNo,
-            AdhaarNo = param.AdhaarNo
+            AdhaarNo = param.AdhaarNo,
+            GSTRegistrationNo = param.GSTRegistrationNo
         };
-        return await _connector.UpdateVendorAsync(navVendor);
+        var updateSuccess = await _connector.UpdateVendorAsync(navVendor);
+        
+        if (updateSuccess && !string.IsNullOrEmpty(param.GSTRegistrationNo))
+        {
+            try
+            {
+                await _connector.InsertGSTINAsync(new Tyresoles.Data.Features.Common.PartyGstin
+                {
+                    Type = "Vendor",
+                    Code = param.No,
+                    Gstin = param.GSTRegistrationNo,
+                    Status = "ACT" // Default to active for now
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update GSTIN for vendor {VendorNo} via secondary InsertGSTINAsync call. Primary update succeeded.", param.No);
+            }
+        }
+        
+        return updateSuccess;
     }
 
     public async Task<List<VendorModel>> GetVendorsAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default)
@@ -243,6 +264,7 @@ SELECT
     Vend.[Phone No_] as MobileNo, Vend.[Ecomile Proc_ Mgr] as EcoMgrCode, Vend.[Name on Invoice] as NameOnInvoice,
     Vend.[Bank Name] as BankName, Vend.[Bank IFSC Code] as BankIFSC, Vend.[Bank A_c No] as BankAccNo, Vend.[Post Code] as PostCode,
     Vend.[Bank Branch] as BankBranch, Vend.[Self Invoice] as SelfInvoice, Vend.[P_A_N_ No_] as PanNo, Vend.[Adhaar No_] as AdhaarNo,
+    Vend.[GST Registration No_] as GSTRegistrationNo,
     ISNULL(-Sum(Ledger.[Amount]), 0) as Balance,
     ISNULL(Vend.[State Code], '') as StateCode
 FROM {vendT} as Vend
@@ -251,7 +273,7 @@ WHERE Vend.[Blocked] = 0 {whereMgr} {whereRC} {whereReg}
 GROUP BY 
     Vend.[No_], Vend.[Name], Vend.[Address], Vend.[Address 2], Vend.[City], Vend.[State Code], Vend.[Group Category], Vend.[Post Code],
     Vend.[Group Details], Vend.[Responsibility Center], Vend.[Phone No_], Vend.[Ecomile Proc_ Mgr], Vend.[Name on Invoice],
-    Vend.[Bank Name], Vend.[Bank IFSC Code], Vend.[Bank A_c No], Vend.[Bank Branch], Vend.[Self Invoice], Vend.[P_A_N_ No_], Vend.[Adhaar No_]
+    Vend.[Bank Name], Vend.[Bank IFSC Code], Vend.[Bank A_c No], Vend.[Bank Branch], Vend.[Self Invoice], Vend.[P_A_N_ No_], Vend.[Adhaar No_], Vend.[GST Registration No_]
 {having}";
 
         var result = await scope.QueryAsync<VendorModel>(sql, new { userCode = param.UserCode, rcs = param.RespCenters, regions = param.Regions }, ct);
@@ -268,7 +290,7 @@ GROUP BY
 
         var ecomileTable = scope.GetQualifiedTableName("Ecomile Items_", false);
         var purLineTable = scope.GetQualifiedTableName("Purchase Line", false);
-        string splitter = "0300";
+        string splitter = "0400";
         string prefix = respCenter.Substring(0, 1);
 
         var sql1 = $@"SELECT MAX([New Serial No_]) FROM {ecomileTable} WHERE [Responsibility Center] = @rc AND [New Serial No_] LIKE @like";
@@ -395,7 +417,7 @@ LEFT JOIN {vendorT} AS Vend ON Vend.[No_] = Line.[Buy-from Vendor No_]
 LEFT JOIN {empT} AS E1 ON E1.[No_] = Line.[Inspector]
 LEFT JOIN {empT} AS E2 ON E2.[No_] = Line.[Fact_ Inspector]
 LEFT JOIN {empT} AS E3 ON E3.[No_] = Line.[Fact_ Inspector Final]
-WHERE Line.[Document Type] = 6 {whereStatus} {whereDispatch} {whereRC} {whereMgr}";
+WHERE Line.[Document Type] = 6 {whereStatus} {whereDispatch} {whereMgr}";
 
         var result = await scope.QueryAsync<OrderLineDispatch>(sql, new { nos = nos, rcs = respCenters, userCode = enitityCode }, ct);
         return result.ToList();

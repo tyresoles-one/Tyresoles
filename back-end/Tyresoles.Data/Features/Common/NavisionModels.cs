@@ -129,6 +129,7 @@ public class Vendor
     public string BankBranch { get; set; } = string.Empty;
     public string PanNo { get; set; } = string.Empty;
     public string AdhaarNo { get; set; } = string.Empty;
+    public string GSTRegistrationNo { get; set; } = string.Empty;
     public override string ToString() => JsonSerializer.Serialize(this);
 }
 

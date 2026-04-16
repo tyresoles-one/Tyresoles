@@ -16,3 +16,4 @@ d:\Work Desk\Tyresoles\back-end\_webcheck\Tyresoles.Logger.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Logger.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Logger.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Logger.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Logger\obj\Debug\net10.0\Tyresoles.Logger.sourcelink.json

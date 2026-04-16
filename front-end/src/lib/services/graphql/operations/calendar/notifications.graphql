@@ -1,13 +1,16 @@
 query GetNotifications($limit: Int) {
-  notifications: getNotifications(limit: $limit) {
-    id
-    userId
-    title
-    message
-    type
-    link
-    isRead
-    createdAt
+  getNotifications(limit: $limit) {
+    notifications {
+      id
+      userId
+      title
+      message
+      type
+      link
+      isRead
+      createdAt
+    }
+    serverTimeUtc
   }
 }
 
@@ -25,13 +28,16 @@ mutation MarkAllNotificationsAsRead {
 
 subscription OnNotification($userId: String!) {
   onNotification(userId: $userId) {
-    id
-    userId
-    title
-    message
-    type
-    link
-    isRead
-    createdAt
+    notification {
+      id
+      userId
+      title
+      message
+      type
+      link
+      isRead
+      createdAt
+    }
+    serverTimeUtc
   }
 }

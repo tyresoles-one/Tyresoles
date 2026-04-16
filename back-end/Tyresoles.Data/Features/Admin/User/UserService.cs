@@ -188,7 +188,7 @@ public sealed class UserService : IUserService
         }
     }
 
-    public async Task<LoginResult> LoginAsync(string username, string password, string? platform = null, CancellationToken cancellationToken = default)
+    public async Task<LoginResult> LoginAsync(string username, string password, string? platform = null, string? ipAddress = null, string? userAgent = null, CancellationToken cancellationToken = default)
     {
         if (username.IsEmpty())
             return new LoginResult { Success = false, Message = "Username is required.", User = null };
@@ -310,18 +310,32 @@ public sealed class UserService : IUserService
         var createdAtUtc = DateTime.UtcNow;
         var expiresAtUtc = createdAtUtc.Add(expiresIn);
 
+        var loginUserId = user.UserName ?? string.Empty;
+        // Do not remove other sessions for multi-device support
+        // if (!string.IsNullOrEmpty(loginUserId))
+        //     await _sessionStore.RemoveByUserAsync(loginUserId, cancellationToken);
+
+        var refreshTokenExpiresIn = TimeSpan.FromDays(30); // 30 days refresh token validity
+        var refreshTokenExpiresAtUtc = createdAtUtc.Add(refreshTokenExpiresIn);
+        var refreshToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+
         var sessionId = Guid.NewGuid().ToString("N");
+
         var session = new SessionInfo
         {
             SessionId = sessionId,
-            UserId = user.UserName ?? string.Empty,
+            UserId = loginUserId,
             UserSecurityId = user.UserSecurityID,
             UserType = userType,
             EntityType = entityType,
             EntityCode = entityCode,
             Department = resolvedDepartment,
             CreatedAtUtc = createdAtUtc,
-            ExpiresAtUtc = expiresAtUtc
+            ExpiresAtUtc = refreshTokenExpiresAtUtc, // Session lives as long as the refresh token
+            RefreshToken = refreshToken,
+            RefreshTokenExpiresAtUtc = refreshTokenExpiresAtUtc,
+            IpAddress = ipAddress,
+            UserAgent = userAgent
         };
         await _sessionStore.CreateAsync(session, cancellationToken);
 
@@ -357,9 +371,149 @@ public sealed class UserService : IUserService
             },
             Menus = menus,
             Token = token,
+            RefreshToken = refreshToken,
             Locations = locations,
             RequirePasswordChange = requirePasswordChange,
             RequirePasswordChangeReason = requirePasswordChangeReason
+        };
+    }
+
+    public async Task<LoginResult> RefreshTokenAsync(string token, string refreshToken, string? ipAddress = null, string? userAgent = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(refreshToken))
+            return new LoginResult { Success = false, Message = "Invalid tokens." };
+
+        var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+        if (!handler.CanReadToken(token))
+            return new LoginResult { Success = false, Message = "Invalid access token format." };
+
+        var jwtToken = handler.ReadJwtToken(token);
+        var sessionIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "sessionId");
+        if (sessionIdClaim == null)
+            return new LoginResult { Success = false, Message = "Invalid access token." };
+
+        var sessionId = sessionIdClaim.Value;
+        var session = await _sessionStore.GetAsync(sessionId, cancellationToken);
+        
+        if (session == null || session.RefreshToken != refreshToken || session.RefreshTokenExpiresAtUtc <= DateTime.UtcNow)
+        {
+            if (session != null)
+                await _sessionStore.RemoveAsync(sessionId, cancellationToken);
+            return new LoginResult { Success = false, Message = "Session expired or invalid refresh token." };
+        }
+
+        using var scope = _dataService.ForNavLive();
+        var userGraphRaw = await LoadUserBaseGraphAsync(scope, session.UserId, cancellationToken);
+        var firstRow = userGraphRaw.FirstOrDefault();
+        if (firstRow == null || firstRow.User == null)
+        {
+            await _sessionStore.RemoveAsync(sessionId, cancellationToken);
+            return new LoginResult { Success = false, Message = "User not found." };
+        }
+
+        var user = firstRow.User;
+        var accessControls = (await scope.Query<AccessControl>()
+            .Where(ac => ac.UserSecurityID == user.UserSecurityID)
+            .ToArrayAsync(cancellationToken)).ToList();
+
+        var roleIds = accessControls.Select(ac => ac.RoleID).Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+        var permissions = new List<PermissionSet>();
+        if (roleIds.Count > 0)
+        {
+            permissions = (await scope.Query<PermissionSet>()
+                .Where(ps => roleIds.Contains(ps.RoleID))
+                .ToArrayAsync(cancellationToken)).ToList(); // Platform won't be filtered strictly on refresh since we don't have it explicitly stored unless we use UserAgent
+        }
+
+        var userGraph = BuildUserGraph(firstRow);
+        userGraph.AccessControls = accessControls;
+        userGraph.Permissions = permissions;
+
+        var defLocation = userGraph.Setup;
+        var workDate = GetEffectiveWorkDate(userGraph.DefCenter, userGraph.SecondaryCenter);
+        var (resolvedFullName, resolvedTitle, resolvedDepartment, resolvedUserSpecialToken) = await ResolveDisplayInfoAsync(scope, defLocation, user.FullName, cancellationToken);
+
+        var menus = BuildMenusFromPermissions(userGraph.Permissions, userGraph.AccessControls);
+
+        var qry = scope.Query<RespCenterUserSetup>().Where(c => c.UserID == user.UserName).Select(c => new { c.RespCenter });
+        var respCenters = await scope.Query<ResponsibilityCenter>()
+            .Where(c=>c.Code, qry, SubqueryOperator.In)
+            .ToArrayAsync(cancellationToken);
+        List<UserLocation> locations = new List<UserLocation>();
+        foreach (var location in respCenters)
+        {
+            locations.Add(new UserLocation
+            {
+                Code = location.Code,
+                Name = location.Name,
+                Payroll = location.Payroll,
+                Production = location.Production,
+                Purchase = location.Purchase,
+                Sale = location.Sale,
+            });
+        }
+
+        var expiresInHours = IsDealerOrSales(user.UserType ?? "") ? _jwtExpiryOptions.DealerSalesExpiryHours : _jwtExpiryOptions.DefaultExpiryHours;
+        var expiresIn = TimeSpan.FromHours(expiresInHours);
+        
+        var newAccessToken = _jwtTokenService.GenerateToken(new JwtTokenRequest
+        {
+            UserId = session.UserId,
+            UserSecurityId = session.UserSecurityId,
+            UserType = session.UserType,
+            EntityType = session.EntityType,
+            EntityCode = session.EntityCode,
+            Department = session.Department,            
+            SessionId = sessionId,
+            ExpiresIn = expiresIn
+        });
+
+        // Rotate refresh token
+        var newRefreshToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+        var newRefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(30);
+
+        var updatedSession = new SessionInfo
+        {
+            SessionId = sessionId,
+            UserId = session.UserId,
+            UserSecurityId = session.UserSecurityId,
+            UserType = session.UserType,
+            EntityType = session.EntityType,
+            EntityCode = session.EntityCode,
+            Department = resolvedDepartment,
+            CreatedAtUtc = session.CreatedAtUtc,
+            ExpiresAtUtc = newRefreshTokenExpiresAtUtc,
+            RefreshToken = newRefreshToken,
+            RefreshTokenExpiresAtUtc = newRefreshTokenExpiresAtUtc,
+            IpAddress = ipAddress ?? session.IpAddress,
+            UserAgent = userAgent ?? session.UserAgent
+        };
+        await _sessionStore.CreateAsync(updatedSession, cancellationToken);
+
+        return new LoginResult
+        {
+            Success = true,
+            User = new LoginUser
+            {
+                UserId = user.UserName ?? string.Empty,
+                UserSecurityId = user.UserSecurityID,
+                FullName = resolvedFullName,
+                UserType = user.UserType ?? "",
+                Title = resolvedTitle,
+                UserSpecialToken = resolvedUserSpecialToken,
+                EntityType = updatedSession.EntityType,
+                EntityCode = updatedSession.EntityCode,
+                Department = resolvedDepartment,
+                RespCenter = userGraph.SecondaryCenter?.Code ?? userGraph.DefCenter?.Code ?? defLocation.RespCenter ?? string.Empty,
+                WorkDate = workDate,
+                Avatar = user.Avatar
+            },
+            Menus = menus,
+            Token = newAccessToken,
+            RefreshToken = newRefreshToken,
+            Locations = locations,
+            RequirePasswordChange = false,
+            RequirePasswordChangeReason = null
         };
     }
 

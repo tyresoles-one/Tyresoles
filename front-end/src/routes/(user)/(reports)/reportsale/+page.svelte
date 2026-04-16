@@ -93,6 +93,21 @@
   /** Show resp. centers select only when user has more than one sale location. */
   const showRespCentersSelect = $derived(saleLocations.length > 1);
 
+  /**
+   * When the user picks resp. centers (CSV), scope dealer/area/region masters to the union of those RCs
+   * (GraphQL `respCenters` on myDealers / myAreas / myRegions). Customers still use the first code via MasterSelect.
+   */
+  const respCenterOverrideForMasters = $derived.by(() => {
+    if (!showRespCentersSelect) return undefined;
+    const raw = form.values.respCenters?.trim();
+    if (!raw) return undefined;
+    const codes = raw
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return codes.length ? codes : undefined;
+  });
+
   function getDateRangeForPreset(presetString: string | undefined): {
     start: any;
     end: any;
@@ -164,7 +179,6 @@
 
     getSalesReportMeta(getReportsaleOptions() ?? undefined)
       .then((list) => {
-        console.log(list);
         reportMetaList = list;
         if (list?.length > 0 && !form.values.report) {
           if (urlId) {
@@ -208,7 +222,6 @@
     }
   });
 
-  $inspect(selectedMeta);
   const schema = $derived.by<FormSchema>(() => {
     if (!reportMetaList?.length) return [] as FormSchema;
 
@@ -292,6 +305,7 @@
           fieldName: "customers",
           masterType: "customers",
           label: "Customer Nos",
+          respCenterOverride: respCenterOverrideForMasters,
         },
         colSpan: 1,
       });
@@ -306,6 +320,7 @@
           fieldName: "dealers",
           masterType: "dealers",
           label: "Dealer Codes",
+          respCenterOverride: respCenterOverrideForMasters,
         },
         colSpan: 1,
       });
@@ -320,6 +335,7 @@
           fieldName: "areas",
           masterType: "areas",
           label: "Area Codes",
+          respCenterOverride: respCenterOverrideForMasters,
         },
         colSpan: 1,
       });
@@ -334,6 +350,7 @@
           fieldName: "regions",
           masterType: "regions",
           label: "Region Codes",
+          respCenterOverride: respCenterOverrideForMasters,
         },
         colSpan: 1,
       });
@@ -369,10 +386,11 @@
     };
 
     if (requiredKeys.includes("dateRange"))
-      zodShape.dateRange = z.object(
-        { start: z.any(), end: z.any() },
-        { required_error: "Date range is required" },
-      );
+      zodShape.dateRange = z
+        .object({ start: z.any(), end: z.any() })
+        .refine((d) => d && d.start && d.end, {
+          message: "Date range is required",
+        });
     if (requiredKeys.includes("view"))
       zodShape.view = z.string().min(1, "View mapping is required");
     if (requiredKeys.includes("type"))
@@ -459,6 +477,7 @@
       entityCode: user?.entityCode ?? undefined,
       entityType: user?.entityType ?? undefined,
       entityDepartment: user?.department ?? undefined,
+      userSpecialToken: authStore.get().userSpecialToken || user?.userSpecialToken,
     };
   }
 
@@ -474,8 +493,6 @@
     const output = format || "PDF";
     try {
       const params = getParams(form.values, output);
-      console.log("params", params);
-      console.log("report", form.values.report);
       const { blob, fileName } = await exportReport(form.values.report, params);
 
       if (output === "Excel") {

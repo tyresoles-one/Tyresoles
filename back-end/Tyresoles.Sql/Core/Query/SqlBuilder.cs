@@ -421,7 +421,9 @@ internal class SqlBuilder
              _sb.Append(_select);
              if (_rawSelects.Count > 0)
              {
-                 if (_select != "*") _sb.Append(", ");
+                 // Always separate the projected columns from SelectRaw fragments. When _select is "*",
+                 // we must emit "*, (expr) AS Alias" — omitting the comma produced invalid SQL: "*(".
+                 _sb.Append(", ");
                  _sb.Append(string.Join(", ", _rawSelects));
              }
          }

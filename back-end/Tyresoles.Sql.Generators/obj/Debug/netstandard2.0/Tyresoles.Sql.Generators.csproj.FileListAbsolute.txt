@@ -35,3 +35,4 @@ d:\Work Desk\Tyresoles\back-end\_buildcheck4\Tyresoles.Sql.Generators.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.Generators.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.Generators.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Sql.Generators.pdb
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql.Generators\obj\Debug\netstandard2.0\Tyresoles.Sql.Generators.sourcelink.json

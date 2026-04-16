@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Security.Claims;
 using Dataverse.NavLive;
 using HotChocolate;
@@ -16,8 +17,13 @@ using Tyresoles.Data.Features.Procurement;
 using Tyresoles.Data.Features.Production;
 using Tyresoles.Data.Features.Production.Models;
 using Tyresoles.Data.Features.Common;
+using Tyresoles.Data.Features.Accounts;
+using Tyresoles.Data.Features.Accounts.Models;
 using Tyresoles.Sql.Abstractions;
+using Tyresoles.Web.GraphQL;
 using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
+using Vendor = Dataverse.NavLive.Vendor;
+
 
 namespace Tyresoles.Web;
 
@@ -131,17 +137,17 @@ public class Query
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter,
+        IReadOnlyList<string>? respCenters,
         [Service] IDataverseDataService dataService,
         [Service] ISalesService salesService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
-        return salesService.GetMyDealersQuery(scope, entityType, entityCode, department, respCenter);
+        return salesService.GetMyDealersQuery(scope, entityType, entityCode, department, respCenters);
     }
 
-    /// <summary>My areas. Optional respCenter filters by Responsibility Center. Employee: areas by Team (Team Salesperson). Partner: areas from customers' Area Code (Dealer Code).</summary>
+    /// <summary>My areas. Optional respCenters filter by Responsibility Center (union). Employee: areas by Team (Team Salesperson). Partner: areas from customers' Area Code (Dealer Code).</summary>
     [Authorize]
     [UsePaging(IncludeTotalCount = true, MaxPageSize = 100)]
     [UseProjection]
@@ -151,17 +157,14 @@ public class Query
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter,
+        IReadOnlyList<string>? respCenters,
         [Service] IDataverseDataService dataService,
         [Service] ISalesService salesService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
-        
-        
-            var scope = dataService.ForTenant("NavLive");
-            httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
-            return salesService.GetMyAreasQuery(scope, entityType, entityCode, department, respCenter);
-        
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return salesService.GetMyAreasQuery(scope, entityType, entityCode, department, respCenters);
     }
     /// <summary>My regions (Territery) scoped by entity type/code/department.</summary>
     [Authorize]
@@ -173,14 +176,14 @@ public class Query
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter,
+        IReadOnlyList<string>? respCenters,
         [Service] IDataverseDataService dataService,
         [Service] ISalesService salesService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
-        return salesService.GetMyRegionsQuery(scope, entityType, entityCode, department, respCenter);
+        return salesService.GetMyRegionsQuery(scope, entityType, entityCode, department, respCenters);
     }
 
     /// <summary>Get a single dealer by code.</summary>
@@ -196,6 +199,21 @@ public class Query
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return salesService.GetDealerQuery(scope, code, cancellationToken);
+    }
+
+    /// <summary>Get a single dealer by code.</summary>
+    [Authorize]
+    [GraphQLName("vendorByCode")]
+    public Vendor GetVendorByCode(
+        string code,
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.VendorByCode(scope,code, cancellationToken);
     }
 
     [Authorize]
@@ -256,7 +274,10 @@ public class Query
         return salesService.GetMyVehiclesQuery(scope, entityType, entityCode, department, respCenter);
     }
    
-    /// <summary>NAV Post Code master (PIN, city, state, country). Paged, filterable, sortable for reference UIs.</summary>
+    /// <summary>
+    /// NAV Post Code master (PIN, city, state, country). Source: <see cref="ICommonDataService.GetPostCodesQuery"/>.
+    /// Hot Chocolate: projection, filtering, sorting, and cursor paging (Relay connection).
+    /// </summary>
     [Authorize]
     [UsePaging(IncludeTotalCount = true, MaxPageSize = 200)]
     [UseProjection]
@@ -270,6 +291,25 @@ public class Query
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return commonService.GetPostCodesQuery(scope);
+    }
+
+    /// <summary>
+    /// NAV State master (code, description). Source: <see cref="ICommonDataService.GetStatesQuery"/> (same data as <c>GetStateAsync</c>).
+    /// Hot Chocolate: projection, filtering, sorting, and cursor paging.
+    /// </summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 200)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.State> GetStates(
+        [Service] IDataverseDataService dataService,
+        [Service] ICommonDataService commonService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return commonService.GetStatesQuery(scope);
     }
 
     /// <summary>My vendors scoped by responsibility centers and group categories. Fully compatible with GraphQL projection, filters, sorting, and paging.</summary>
@@ -502,7 +542,7 @@ public class Query
     /// <summary>Get recent notifications for the current user. Requires authentication.</summary>
     [Authorize]
     [GraphQLName("getNotifications")]
-    public async Task<IReadOnlyList<Notification>> GetNotifications(
+    public async Task<NotificationFeedResult> GetNotifications(
         int limit = 50,
         [Service] INotificationService notificationService = null!,
         [Service] IHttpContextAccessor httpContextAccessor = null!,
@@ -513,8 +553,14 @@ public class Query
         {
             var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
-            if (string.IsNullOrEmpty(userId)) return Array.Empty<Notification>();
-            return await notificationService.GetMyNotificationsAsync(userId, limit, cancellationToken);
+            if (string.IsNullOrEmpty(userId))
+                return new NotificationFeedResult { Notifications = Array.Empty<Notification>(), ServerTimeUtc = DateTime.UtcNow };
+            var items = await notificationService.GetMyNotificationsAsync(userId, limit, cancellationToken);
+            return new NotificationFeedResult
+            {
+                Notifications = items,
+                ServerTimeUtc = DateTime.UtcNow
+            };
         }
         catch (Exception ex)
         {
@@ -547,6 +593,205 @@ public class Query
     }
 
     /// <summary>
+    /// NAV G/L Account master. Source: <see cref="IAccountService.GetGLAccounts"/>.
+    /// Hot Chocolate: projection, filtering, sorting, and cursor paging.
+    /// </summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<GLAccount> GetGLAccounts(
+        [Service] IDataverseDataService dataService,
+        [Service] IAccountService accountService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return accountService.GetGLAccounts(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.UnitOfMeasure> GetUnitOfMeasures(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetUnitOfMeasures(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.ItemCategory> GetItemCategories(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetItemCategories(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.ProductGroup> GetProductGroups(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetProductGroups(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.GenProductPostingGroup> GetGenProductPostingGroups(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetGenProductPostingGroups(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.GSTGroup> GetGSTGroups(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetGSTGroups(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.HsnSac> GetHsnSacs(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetHsnSacs(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.InventoryPostingGroup> GetInventoryPostingGroups(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetInventoryPostingGroups(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.Item> GetItems(
+        [Service] IDataverseDataService dataService,
+        [Service] IPurchaseService purchaseService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return purchaseService.GetItems(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.FAClass> GetFAClasses(
+        [Service] IDataverseDataService dataService,
+        [Service] IFixedAssetService fixedAssetService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return fixedAssetService.GetFAClasses(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.FASubclass> GetFASubclasses(
+        [Service] IDataverseDataService dataService,
+        [Service] IFixedAssetService fixedAssetService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return fixedAssetService.GetFASubclasses(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.FixedAsset> GetFixedAssets(
+        [Service] IDataverseDataService dataService,
+        [Service] IFixedAssetService fixedAssetService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return fixedAssetService.GetFixedAssets(scope);
+    }
+
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Tyresoles.Data.Features.Purchase.Models.FixedAssetServiceLog> GetFixedAssetServiceLogs(
+        [Service] IDataverseDataService dataService,
+        [Service] IFixedAssetService fixedAssetService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return fixedAssetService.GetFixedAssetServiceLogs(scope);
+    }
+    
+    /// <summary>
     /// Fetch documents (Invoices, Credit Notes, Claims) based on parameters.
     /// Partially integrated with comprehensive user context filtering.
     /// </summary>
@@ -573,6 +818,16 @@ public class Query
         }
     }
 
+    /// <summary>Get group categories by type and optional comma-separated resp centers. Requires authentication.</summary>
+    [Authorize]
+    public async Task<IReadOnlyList<GroupCategory>> GetGroupCategories(
+        int type,
+        string? respCenters,
+        [Service] ICommonDataService commonService,
+        CancellationToken cancellationToken = default)
+    {
+        return await commonService.GetGroupCategoriesAsync(type, respCenters, cancellationToken);
+    }
 
     /// <summary>Get group details by category and optional comma-separated codes. Requires authentication.</summary>
     [Authorize]
@@ -854,6 +1109,149 @@ public class Query
 
         return procurementService.ProcurementOrderLinesNewNumbering(
             scope, fromDate, toDate, respCenters, view, type, nos, userCode, userSpecialToken);
+    }
+
+    // ── Payroll ────────────────────────────────────────────────
+
+    /// <summary>Paged, filterable, sortable list of NAV Employees for payroll views.</summary>
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    [GraphQLName("payrollEmployees")]
+    public IQueryable<Dataverse.NavLive.Employee> GetPayrollEmployees(
+        Tyresoles.Data.Features.Payroll.ReportFetchParam param,
+        [Service] IDataverseDataService dataService,
+        [Service] Tyresoles.Data.Features.Payroll.IPayrollService payrollService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return payrollService.GetEmployees(scope, param);
+    }
+
+    // ── Navision Edit Requests ─────────────────────────────────
+
+    /// <summary>Get all request types (templates). Admin sees all, users see active only.</summary>
+    [Authorize]
+    [GraphQLName("navEditRequestTypes")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.NavisionEdits.Entities.NavEditRequestType>> GetNavEditRequestTypes(
+        bool? activeOnly,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        return await navEditService.GetRequestTypesAsync(activeOnly ?? true, cancellationToken);
+    }
+
+    /// <summary>Get a single request type by ID.</summary>
+    [Authorize]
+    [GraphQLName("navEditRequestTypeById")]
+    public async Task<Tyresoles.Data.Features.NavisionEdits.Entities.NavEditRequestType?> GetNavEditRequestTypeById(
+        int id,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        return await navEditService.GetRequestTypeByIdAsync(id, cancellationToken);
+    }
+
+    /// <summary>Dynamic record lookup from Nav. Returns dictionaries of column→value.</summary>
+    [Authorize]
+    [GraphQLName("navEditLookupRecords")]
+    public async Task<List<List<Tyresoles.Data.Features.NavisionEdits.KeyValueItem>>> NavEditLookupRecords(
+        int requestTypeId,
+        string? search,
+        int? take,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await navEditService.LookupRecordsAsync(requestTypeId, search, take ?? 20, cancellationToken);
+        return rows.Select(r => r.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value?.ToString() }).ToList()).ToList();
+    }
+
+    /// <summary>Fetch a single Nav record by its primary key.</summary>
+    [Authorize]
+    [GraphQLName("navEditGetRecord")]
+    public async Task<List<Tyresoles.Data.Features.NavisionEdits.KeyValueItem>?> NavEditGetRecord(
+        int requestTypeId,
+        string recordKey,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await navEditService.GetRecordByKeyAsync(requestTypeId, recordKey, cancellationToken);
+        return row?.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value?.ToString() }).ToList();
+    }
+
+    /// <summary>Get my edit requests (for current user).</summary>
+    [Authorize]
+    [GraphQLName("navEditMyRequests")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto>> GetNavEditMyRequests(
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto>();
+        return await navEditService.GetMyRequestsAsync(userId, cancellationToken);
+    }
+
+    /// <summary>Get all edit requests (admin only). Optional status filter.</summary>
+    [Authorize]
+    [GraphQLName("navEditAllRequests")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto>> GetNavEditAllRequests(
+        int? statusFilter,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        Tyresoles.Data.Features.NavisionEdits.Entities.NavEditStatus? filter = statusFilter.HasValue
+            ? (Tyresoles.Data.Features.NavisionEdits.Entities.NavEditStatus)statusFilter.Value
+            : null;
+        return await navEditService.GetAllRequestsAsync(filter, cancellationToken);
+    }
+
+    /// <summary>Get pending approvals for the current user.</summary>
+    [Authorize]
+    [GraphQLName("navEditPendingApprovals")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto>> GetNavEditPendingApprovals(
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        if (string.IsNullOrEmpty(userId)) return Array.Empty<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto>();
+        return await navEditService.GetPendingApprovalsAsync(userId, cancellationToken);
+    }
+
+    /// <summary>Get a single edit request by ID.</summary>
+    [Authorize]
+    [GraphQLName("navEditRequestById")]
+    public async Task<Tyresoles.Data.Features.NavisionEdits.NavEditRequestDto?> GetNavEditRequestById(
+        Guid requestId,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        return await navEditService.GetRequestByIdAsync(requestId, cancellationToken);
+    }
+
+    /// <summary>Nav Live table names (INFORMATION_SCHEMA) for Navision Edits template designer.</summary>
+    [Authorize]
+    [GraphQLName("navEditNavTables")]
+    public async Task<IReadOnlyList<string>> GetNavEditNavTables(
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        return await navEditService.GetNavLiveTableNamesAsync(cancellationToken);
+    }
+
+    /// <summary>Column names for a Nav Live table (INFORMATION_SCHEMA).</summary>
+    [Authorize]
+    [GraphQLName("navEditNavTableColumns")]
+    public async Task<IReadOnlyList<string>> GetNavEditNavTableColumns(
+        string tableName,
+        [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
+        CancellationToken cancellationToken = default)
+    {
+        return await navEditService.GetNavLiveColumnNamesForTableAsync(tableName, cancellationToken);
     }
 }
 

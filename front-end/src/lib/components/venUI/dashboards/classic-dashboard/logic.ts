@@ -94,11 +94,28 @@ function prepareProductSale(
     ) as ProductSale[];
     if (!defaultLocData.length) return;
 
-    for (const defLocData of defaultLocData) {
+    const byProduct = new Map<string, ProductSale>();
+    for (const row of defaultLocData) {
+      const pk = row.product ?? "";
+      const cur = byProduct.get(pk);
+      if (!cur) {
+        byProduct.set(pk, { ...row, data: [...row.data] });
+      } else {
+        cur.data.push(...row.data);
+      }
+    }
+
+    for (const defLocData of byProduct.values()) {
+      const byLabel = new Map<string, Sales>();
+      for (const el of defLocData.data) {
+        if (!byLabel.has(el.label)) byLabel.set(el.label, el);
+      }
+      const elements = [...byLabel.values()];
+
       const newProductSales: ProductSale = { ...defLocData, data: [] };
       const newData: Sales[] = [];
 
-      defLocData.data.forEach((element) => {
+      elements.forEach((element) => {
         const filtered = input.data.filter(
           (d) =>
             d.business === defLocData.business &&
@@ -193,11 +210,32 @@ function prepareActiveCustomer(
     ) as ActiveCustomer[];
     if (!defaultLocData.length) return;
 
-    for (const defLocData of defaultLocData) {
+    // Merge API rows that share the same default location + product (incl. missing
+    // product), then dedupe inner periods by dateRange — avoids duplicate {#each} keys
+    // (group.product / cs.dateRange) in the Active Customers view.
+    const byProduct = new Map<string, ActiveCustomer>();
+    for (const row of defaultLocData) {
+      const pk = row.product ?? "";
+      const cur = byProduct.get(pk);
+      if (!cur) {
+        byProduct.set(pk, { ...row, data: [...row.data] });
+      } else {
+        cur.data.push(...row.data);
+      }
+    }
+
+    for (const defLocData of byProduct.values()) {
+      const byDateRange = new Map<string, CustomerSales>();
+      for (const cs of defLocData.data) {
+        const dk = cs.dateRange ?? "";
+        if (!byDateRange.has(dk)) byDateRange.set(dk, cs);
+      }
+      const dedupedElements = [...byDateRange.values()];
+
       const newCustomer: ActiveCustomer = { ...defLocData, data: [] };
       const newData: CustomerSales[] = [];
 
-      defLocData.data.forEach((element) => {
+      dedupedElements.forEach((element) => {
         const filtered = input.data.filter(
           (d) =>
             d.business === defLocData.business &&
@@ -266,7 +304,18 @@ function prepareCollection(
     ) as CollectionData[];
     if (!defaultLocData.length) return;
 
-    for (const defLocData of defaultLocData) {
+    const byPeriod = new Map<string, CollectionData>();
+    for (const row of defaultLocData) {
+      const pk = row.period ?? "";
+      const cur = byPeriod.get(pk);
+      if (!cur) {
+        byPeriod.set(pk, { ...row, data: [...row.data] });
+      } else {
+        cur.data.push(...row.data);
+      }
+    }
+
+    for (const defLocData of byPeriod.values()) {
       const filtered = input.data.filter(
         (d) =>
           d.business === defLocData.business &&
@@ -306,21 +355,29 @@ function prepareSalesman(
     ) as SalesmanSale[];
     if (!defaultLocData.length) return;
 
+    // One row per unique product for this business+default location. The API can
+    // return duplicate default-loc rows (e.g. same missing product); iterating
+    // each produced duplicate {#each} keys (e.g. undefined) in the Salesperson tabs.
+    const byProduct = new Map<string, SalesmanSale>();
     for (const defLocData of defaultLocData) {
-      const newSalesmanSale: SalesmanSale = { ...defLocData, data: [] };
-      const newData: Record<string, any>[] = [];
+      const pk = defLocData.product ?? "";
+      if (!byProduct.has(pk)) {
+        byProduct.set(pk, { ...defLocData, data: [] });
+      }
+    }
 
+    for (const newSalesmanSale of byProduct.values()) {
       const filtered = input.data.filter(
         (d) =>
-          d.business === defLocData.business &&
-          d.product === defLocData.product &&
+          d.business === newSalesmanSale.business &&
+          d.product === newSalesmanSale.product &&
           busLoc.selections.includes(d.location),
       ) as SalesmanSale[];
 
+      const newData: Record<string, any>[] = [];
       filtered.forEach((fd) => {
         if (fd?.data?.length) newData.push(...fd.data);
       });
-
       newSalesmanSale.data = newData;
       working.data.push(newSalesmanSale);
     }

@@ -18,9 +18,16 @@ function getClient() {
         Authorization: token ? `Bearer ${token}` : '',
       };
     },
-    // Keep alive and retry logic
-    retryAttempts: Infinity,
-    shouldRetry: () => true,
+    /**
+     * Do not force retry on every error type. The previous `shouldRetry: () => true` +
+     * `retryAttempts: Infinity` caused endless reconnect loops when the HTTP→WS upgrade
+     * failed (e.g. 503 from the load balancer), spamming the console.
+     * Defaults: retry transient socket closes only, bounded attempts.
+     */
+    shouldRetry: (errOrCloseEvent) => {
+      if (!getAuthToken()) return false;
+      return typeof CloseEvent !== "undefined" && errOrCloseEvent instanceof CloseEvent;
+    },
   };
 
   client = createClient(options);

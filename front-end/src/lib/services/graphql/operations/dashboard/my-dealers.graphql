@@ -2,18 +2,21 @@ query GetDealers(
   $entityType: String
   $entityCode: String
   $department: String
-  $respCenter: String
+  $respCenters: [String!]
   $take: Int
+  $after: String
   $where: SalespersonPurchaserFilterInput
+  $order: [SalespersonPurchaserSortInput!]
 ) {
   dealers: myDealers(
     entityType: $entityType
     entityCode: $entityCode
     department: $department
-    respCenter: $respCenter
+    respCenters: $respCenters
     first: $take
-    after: null
+    after: $after
     where: $where
+    order: $order
   ) {
     items: nodes {
       code
@@ -22,6 +25,10 @@ query GetDealers(
       depot
       eMail
       dealershipName
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
     totalCount
   }

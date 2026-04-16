@@ -16,6 +16,9 @@
   import { VenForm, type FormSchema } from "$lib/components/venUI/form";
   import { Button } from "$lib/components/ui/button";
   import ReportViewer from "$lib/components/venUI/report-viewer/ReportViewer.svelte";
+
+  /** Matches ReportViewer `ReportOutputFormat`. */
+  type PayrollReportOutputFormat = "PDF" | "Excel" | "Word";
   import { Icon } from "$lib/components/venUI/icon";
   import { DatePresets } from "$lib/components/venUI/date-picker";
   import {
@@ -132,10 +135,65 @@
     reportMetaList?.find((m) => m.name === form.values.report),
   );
 
+  /** Comma-separated `pdf` / `excel` / `word` from API meta (camelCase or PascalCase JSON). */
+  function readOutputFormatsFromMeta(meta: ReportMeta | undefined): string {
+    if (!meta) return "";
+    const m = meta as ReportMeta & { OutputFormats?: string };
+    const s = (m.outputFormats ?? m.OutputFormats ?? "").trim();
+    return s;
+  }
+
+  /**
+   * Export formats for ReportViewer: driven by `ReportMeta.outputFormats`.
+   * If missing (e.g. DB-only fallback rows), default to `pdf,excel` (matches payroll API).
+   */
+  const payrollViewerOutputFormats = $derived.by(() => {
+    const s = readOutputFormatsFromMeta(selectedMeta);
+    return s || "pdf,excel";
+  });
+
+  /** First format listed in meta (e.g. `pdf` before `excel`) as the default export toggle. */
+  const payrollDefaultExportFormat = $derived.by((): PayrollReportOutputFormat => {
+    const first = payrollViewerOutputFormats.split(",")[0]?.trim().toLowerCase() ?? "";
+    if (first === "excel" || first === "xlsx" || first === "xls") return "Excel";
+    if (first === "word" || first === "docx" || first === "doc") return "Word";
+    return "PDF";
+  });
+
   /** Show resp. centers when multiple payroll locations or report requires it. */
   const showRespCentersSelect = $derived(
     payrollLocations.length > 1 || (selectedMeta?.showRespCenters ?? false),
   );
+
+  /**
+   * Comma-separated resp. center codes for `GetGroupCategories` when selecting departments
+   * (aligned with `getParams` resp. center resolution).
+   */
+  const groupCategoryRespCenters = $derived.by(() => {
+    const useSelect =
+      payrollLocations.length > 1 || (selectedMeta?.showRespCenters ?? false);
+    const user = $authStore.user;
+    if (useSelect) {
+      const raw = form.values.respCenters?.trim();
+      if (raw) return raw;
+      return user?.respCenter ?? "";
+    }
+    return user?.respCenter ?? "";
+  });
+
+  /**
+   * First department code from the Departments field (`regions`) for `payrollEmployees`
+   * (`ReportFetchParam.department`). Backend matches a single NAV department; if several are selected, the first is used.
+   */
+  const payrollEmployeeDepartment = $derived.by(() => {
+    const raw = form.values.regions?.trim();
+    if (!raw) return undefined;
+    const codes = raw
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return codes[0] ?? undefined;
+  });
 
   function getDateRangeForPreset(presetString: string | undefined): {
     start: unknown;
@@ -168,15 +226,12 @@
   }
 
   onMount(() => {
-    const user = authStore.get().user;
     const urlId = $page.url.searchParams.get("id");
     const menuOpts = getReportpayrollMenuOptions();
 
-    console.log("menuOpts", menuOpts);
     getPayrollReportMeta(getReportpayrollMenuOptions() ?? undefined)
       .then((list) => {
         let filtered: ReportMeta[] = list ?? [];
-        console.log("list", filtered, list);
         if (menuOpts) {
           const codes = menuOpts
             .split(",")
@@ -186,9 +241,7 @@
             filtered = filtered.filter((m) => codes.includes(m.code));
           }
         }
-        console.log("filtered", filtered);
         reportMetaList = filtered;
-        console.log("reportMetaList", reportMetaList);
         if (filtered.length > 0 && !form.values.report) {
           if (urlId) {
             const matched = filtered.find(
@@ -348,8 +401,10 @@
         required: requiredKeys.includes("regions"),
         props: {
           fieldName: "regions",
-          masterType: "regions",
-          label: "Region Codes",
+          masterType: "departments",
+          label: "Departments",
+          groupCategoriesType: 1,
+          groupCategoryRespCenters,
         },
         colSpan: 1,
       });
@@ -357,12 +412,17 @@
 
     if (selectedMeta?.showNos) {
       fields.push({
-        type: "field",
-        name: "nos",
-        label: "Document No(s)",
+        type: "custom",
+        component: MasterSelect,
         required: requiredKeys.includes("nos"),
-        inputType: "text",
-        placeholder: "Enter Doc No(s) separated by comma",
+        props: {
+          fieldName: "nos",
+          masterType: "payrollEmployees",
+          label: "Employee Nos",
+          respCenterOverride: splitCSV(form.values.respCenters),
+          payrollDepartment: payrollEmployeeDepartment,
+        },
+        colSpan: 1,
       });
     }
 
@@ -422,9 +482,9 @@
     if (requiredKeys.includes("regions"))
       zodShape.regions = z
         .string()
-        .min(1, "Please select at least one Region Code");
+        .min(1, "Please select at least one department");
     if (requiredKeys.includes("nos"))
-      zodShape.nos = z.string().min(1, "Please enter at least one document no.");
+      zodShape.nos = z.string().min(1, "Please select at least one employee.");
 
     form.setSchema(z.object(zodShape) as unknown as ZodSchema<ReportPayrollForm>);
   });
@@ -525,6 +585,7 @@
       entityCode: user?.entityCode ?? undefined,
       entityType: user?.entityType ?? undefined,
       entityDepartment: user?.department ?? undefined,
+      userSpecialToken: authStore.get().userSpecialToken || user?.userSpecialToken,
     };
   }
 
@@ -643,16 +704,19 @@
       </p>
     </div>
   {:else}
-    <ReportViewer
-      {form}
-      {schema}
-      {pdfData}
-      fileName={pdfFileName}
-      outputFormats={selectedMeta?.outputFormats}
-      isLoading={loading}
-      onFilter={(format) => generateReport(format)}
-      class="w-full"
-    />
+    {#key form.values.report}
+      <ReportViewer
+        {form}
+        {schema}
+        {pdfData}
+        fileName={pdfFileName}
+        outputFormats={payrollViewerOutputFormats}
+        defaultExportFormat={payrollDefaultExportFormat}
+        isLoading={loading}
+        onFilter={(format) => generateReport(format)}
+        class="w-full"
+      />
+    {/key}
 
     {#if error}
       <div class="px-6 py-2">

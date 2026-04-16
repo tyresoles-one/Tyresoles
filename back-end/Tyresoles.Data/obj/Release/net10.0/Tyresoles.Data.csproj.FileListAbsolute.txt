@@ -19,3 +19,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Release\net10.0\Tyresoles.Dat
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Release\net10.0\refint\Tyresoles.Data.dll
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Release\net10.0\Tyresoles.Data.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Release\net10.0\ref\Tyresoles.Data.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Data\obj\Release\net10.0\Tyresoles.Data.sourcelink.json

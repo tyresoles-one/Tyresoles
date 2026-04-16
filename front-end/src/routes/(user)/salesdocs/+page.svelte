@@ -77,7 +77,7 @@
   let respCenters = $state("");
   let customers = $state("");
   
-  const filterForm = $state({
+  let filterForm = $state({
     values: {
       respCenters: "",
       customers: ""
@@ -378,7 +378,7 @@
           {#if showRespCenterMaster}
             <div class="filter-item">
               <MasterSelect 
-                form={filterForm} 
+                bind:form={filterForm} 
                 fieldName="respCenters" 
                 masterType="respCenters" 
                 label="Resp. Center" 
@@ -389,7 +389,7 @@
 
           <div class="filter-item">
             <MasterSelect 
-              form={filterForm} 
+              bind:form={filterForm} 
               fieldName="customers" 
               masterType="customers" 
               label="Customers" 

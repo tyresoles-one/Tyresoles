@@ -25,7 +25,8 @@ export async function fetchDocuments(view: string, respCenters: string[], search
             }
         }
     });
-    return res.data?.getMyDocuments || [];
+    const rows = res.data?.getMyDocuments || [];
+    return rows;
 }
 
 export async function verifyEInvoice(type: string, no: string): Promise<{ pdf: string }> {

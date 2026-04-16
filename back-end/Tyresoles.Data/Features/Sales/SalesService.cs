@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
@@ -5,6 +6,7 @@ using Dataverse.NavLive;
 using Tyresoles.Data.Constants;
 using Tyresoles.Data.Features.Common;
 using Tyresoles.Data.Infrastructure;
+using Tyresoles.Sql;
 using Tyresoles.Sql.Abstractions;
 using Tyresoles.Sql.GraphQL;
 using Tyresoles.Data;
@@ -512,23 +514,31 @@ public sealed class SalesService : ISalesService
         return query.AsQueryable(scope);
     }
 
+    private static string[] NormalizeRespCentersFilter(IReadOnlyList<string>? respCenters)
+    {
+        if (respCenters is null || respCenters.Count == 0)
+            return [];
+        return respCenters
+            .Select(s => s?.Trim())
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Select(s => s!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public IQueryable<SalespersonPurchaser> GetMyDealersQuery(
         ITenantScope scope,
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter = null)
+        IReadOnlyList<string>? respCenters = null)
     {
-        // Non-sales employees (e.g. Administration) must match dealers across responsibility centers when searching;
-        // otherwise Responsibility Center = user's respCenter excludes dealers in other RCs before GraphQL where applies.
-        var isEmployeeNonSales = entityType == EntityTypes.Employee
-            && !string.IsNullOrWhiteSpace(department)
-            && !string.Equals(department, Departments.Sales, StringComparison.OrdinalIgnoreCase);
-
-        var narrowByRespCenter = respCenter.HasValue() && !isEmployeeNonSales;
-
+        var rcFilter = NormalizeRespCentersFilter(respCenters);
+        // Align with GetMyCustomersQuery / GetMyAreasQuery: when respCenters is supplied (GraphQL), filter SQL.
+        // Previously non-sales employees skipped this filter so COUNT(*) ignored respCenter; explicit client requests
+        // (e.g. reportsale MasterSelect respCenterOverride) must scope dealers by responsibility center.
         var query = scope.Query<SalespersonPurchaser>()
-            .WhereIf(narrowByRespCenter, a => a.ResponsibilityCenter == respCenter);
+            .WhereIf(rcFilter.Length > 0, a => a.ResponsibilityCenter, rcFilter);
 
         switch (entityType)
         {
@@ -569,12 +579,13 @@ public sealed class SalesService : ISalesService
         string? entityType,
         string? entityCode,
         string? department,
-        string? respCenter = null)
+        IReadOnlyList<string>? respCenters = null)
     {        
 
         ArgumentNullException.ThrowIfNull(scope);       
+        var rcFilter = NormalizeRespCentersFilter(respCenters);
         IQuery<Area> query = scope.Query<Area>()
-            .WhereIf(respCenter.HasValue(), a => a.ResponsibilityCenter == respCenter);
+            .WhereIf(rcFilter.Length > 0, a => a.ResponsibilityCenter, rcFilter);
 
         switch (entityType)
         {
@@ -620,11 +631,12 @@ public sealed class SalesService : ISalesService
         ITenantScope scope,
         string? entityType,
         string? entityCode,
-        string? department, string? respCenter = null)
+        string? department, IReadOnlyList<string>? respCenters = null)
     {
+        var rcFilter = NormalizeRespCentersFilter(respCenters);
         var query = scope.Query<Territory>()
             .Where(c => c.Type == 1)
-            .WhereIf(respCenter.HasValue(), c => c.ResponsibilityCenter == respCenter);
+            .WhereIf(rcFilter.Length > 0, c => c.ResponsibilityCenter, rcFilter);
 
         switch (entityType)
         {

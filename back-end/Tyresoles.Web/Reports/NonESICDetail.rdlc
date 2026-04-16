@@ -123,7 +123,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">No.</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -159,7 +159,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Emp Id</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -195,7 +195,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Name</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -231,7 +231,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Join Date</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -267,7 +267,7 @@
                                 <TextRun>
                                   <Value>Leave Date</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -303,7 +303,7 @@
                                 <TextRun>
                                   <Value>Esic In Date</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -339,7 +339,7 @@
                                 <TextRun>
                                   <Value>Esic Out Date</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -375,7 +375,7 @@
                                 <TextRun>
                                   <Value>Basic + DA</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -411,7 +411,7 @@
                                 <TextRun>
                                   <Value>Gross Salary</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -452,7 +452,7 @@
                                 <TextRun>
                                   <Value>=Fields!MonthName.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontSize>11pt</FontSize>
                                   </Style>
                                 </TextRun>
@@ -502,7 +502,7 @@
                                 <TextRun>
                                   <Value>=RowNumber(Nothing)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -534,7 +534,7 @@
                                 <TextRun>
                                   <Value>=Fields!EmpId.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -566,7 +566,7 @@
                                 <TextRun>
                                   <Value>=Fields!Name.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -598,7 +598,7 @@
                                 <TextRun>
                                   <Value>=Fields!JoinDate.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <Format>dd-MM-yy</Format>
                                   </Style>
                                 </TextRun>
@@ -633,7 +633,7 @@
                                 <TextRun>
                                   <Value>=Fields!LeaveDate.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -667,7 +667,7 @@
                                 <TextRun>
                                   <Value>=Fields!EsicInDate.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -701,7 +701,7 @@
                                 <TextRun>
                                   <Value>=Fields!EsicOutDate.Value</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -735,7 +735,7 @@
                                 <TextRun>
                                   <Value>=if(Fields!BasicDA.Value=0,0,Fields!BasicDA.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
                                 </TextRun>
@@ -770,7 +770,7 @@
                                 <TextRun>
                                   <Value>=if(Fields!GrossSalary.Value=0,0,Fields!GrossSalary.Value)</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
                                 </TextRun>
@@ -810,7 +810,7 @@
                                 <TextRun>
                                   <Value EvaluationMode="Constant">Total For Month :</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -849,7 +849,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -883,7 +883,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -917,7 +917,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -951,7 +951,7 @@
                                 <TextRun>
                                   <Value />
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
@@ -985,7 +985,7 @@
                                 <TextRun>
                                   <Value>=iif(Sum(Fields!BasicDA.Value)=0,0,Sum(Fields!BasicDA.Value))</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
@@ -1020,7 +1020,7 @@
                                 <TextRun>
                                   <Value>=iif(Sum(Fields!GrossSalary.Value)=0,0,Sum(Fields!GrossSalary.Value))</Value>
                                   <Style>
-                                    <FontFamily>comic Sans MS</FontFamily>
+                                    <FontFamily>cambria</FontFamily>
                                     <FontWeight>Bold</FontWeight>
                                     <Format>#,0.00;(#,0.00);'-'</Format>
                                   </Style>
@@ -1130,7 +1130,7 @@
                     <TextRun>
                       <Value>=First(Fields!CompanyName.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                         <FontSize>11pt</FontSize>
                       </Style>
                     </TextRun>
@@ -1160,7 +1160,7 @@
                     <TextRun>
                       <Value>=First(Fields!LocationName.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                       </Style>
                     </TextRun>
                   </TextRuns>
@@ -1191,7 +1191,7 @@
                     <TextRun>
                       <Value>=First(Fields!ReportName.Value, "DataSet_Result")</Value>
                       <Style>
-                        <FontFamily>comic Sans MS</FontFamily>
+                        <FontFamily>cambria</FontFamily>
                         <FontSize>14pt</FontSize>
                       </Style>
                     </TextRun>

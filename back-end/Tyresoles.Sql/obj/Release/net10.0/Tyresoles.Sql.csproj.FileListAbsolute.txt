@@ -12,3 +12,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\refint\Tyresol
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.xml
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\ref\Tyresoles.Sql.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Sql\obj\Release\net10.0\Tyresoles.Sql.sourcelink.json

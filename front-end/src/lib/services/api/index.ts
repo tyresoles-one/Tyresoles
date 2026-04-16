@@ -27,7 +27,14 @@ export async function secureFetch(url: string, options: RequestInit = {}): Promi
 
   if (response.status === 401) {
     console.warn(`[API] 401 Unauthorized detected for ${finalUrl}. Triggering logout...`);
-    clearUserSession();
+    let revoked = false;
+    try {
+      const text = await response.clone().text();
+      revoked = text.includes("TY_SESSION_REVOKED");
+    } catch {
+      /* ignore */
+    }
+    void clearUserSession({ reason: revoked ? "revoked" : "expired" });
   }
 
   return response;

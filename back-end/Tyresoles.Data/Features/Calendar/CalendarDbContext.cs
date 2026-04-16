@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Tyresoles.Data.Features.Calendar.Entities;
+using Tyresoles.Data.Features.RemoteAssist.Entities;
 
 namespace Tyresoles.Data.Features.Calendar;
 
 public class CalendarDbContext : DbContext
 {
     public CalendarDbContext(DbContextOptions<CalendarDbContext> options) : base(options) { }
+
+    public DbSet<RemoteAssistSession> RemoteAssistSessions => Set<RemoteAssistSession>();
 
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<RecurrenceRule> RecurrenceRules => Set<RecurrenceRule>();
@@ -123,6 +126,20 @@ public class CalendarDbContext : DbContext
         {
             e.HasKey(x => new { x.UserId, x.Channel });
             e.Property(x => x.UserId).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<RemoteAssistSession>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.JoinCode).HasMaxLength(16);
+            e.HasIndex(x => x.JoinCode).IsUnique();
+            e.Property(x => x.HostUserId).HasMaxLength(128);
+            e.Property(x => x.HostDisplayName).HasMaxLength(200);
+            e.Property(x => x.ViewerUserId).HasMaxLength(128);
+            e.Property(x => x.ViewerDisplayName).HasMaxLength(200);
+            e.Property(x => x.EndedByUserId).HasMaxLength(128);
+            e.HasIndex(x => x.HostUserId);
+            e.HasIndex(x => x.ExpiresAtUtc);
         });
     }
 }

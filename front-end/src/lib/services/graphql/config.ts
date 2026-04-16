@@ -16,6 +16,8 @@ export interface GraphQLErrorContext {
   silent?: boolean;
 }
 
+export type UnauthorizedInfo = { revoked?: boolean };
+
 export interface GraphQLConfig {
   /** When true (default), show a toast for GraphQL errors unless the request used silent: true. */
   showErrorToasts: boolean;
@@ -23,8 +25,8 @@ export interface GraphQLConfig {
   onError?: (normalizedMessage: string, context?: GraphQLErrorContext) => void;
   /** Override how the error message is derived from the raw error. */
   getErrorMessage?: (error: unknown) => string;
-  /** Global hook for unauthorized errors (401 or UNAUTHENTICATED code). */
-  onUnauthorized?: () => void;
+  /** Global hook for unauthorized errors (401 or UNAUTHENTICATED code). `revoked` is true when the server ended the session (e.g. admin kill). */
+  onUnauthorized?: (info?: UnauthorizedInfo) => void;
 }
 
 const defaultConfig: GraphQLConfig = {
@@ -168,6 +170,12 @@ export function handleGraphQLError(
         : errors.map((e) => extractBestGraphQLErrorMessage(e)).join(" · ")
       : getFriendlyError(error);
 
+  const revokedByServer =
+    message.includes('TY_SESSION_REVOKED') ||
+    rawErrorMessage.includes('TY_SESSION_REVOKED') ||
+    String(error).includes('TY_SESSION_REVOKED') ||
+    errors.some((e) => String(e.message ?? '').includes('TY_SESSION_REVOKED'));
+
   const context: GraphQLErrorContext = {
     errors,
     code,
@@ -177,13 +185,11 @@ export function handleGraphQLError(
   graphQLConfig.onError?.(message, context);
 
   if (isUnauthorized) {
-    console.warn("[GraphQL] Unauthorized access detected", { code, message, error });
-    if (graphQLConfig.onUnauthorized) {
-      graphQLConfig.onUnauthorized();
-    }
+    console.warn("[GraphQL] Unauthorized access detected", { code, message, error, revokedByServer });
+    graphQLConfig.onUnauthorized?.({ revoked: revokedByServer });
   }
 
-  if (message && !options?.silent && graphQLConfig.showErrorToasts) {
+  if (message && !options?.silent && graphQLConfig.showErrorToasts && !isUnauthorized) {
     toast.error(message);
   }
 

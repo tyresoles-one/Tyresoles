@@ -222,6 +222,11 @@
               const d = parseDateFns(value, valueFormat, new Date());
               if (!isNaN(d.getTime())) {
                 parsed = fromDate(d, getLocalTimeZone());
+              } else {
+                const fallback = new Date(value);
+                if (!isNaN(fallback.getTime())) {
+                  parsed = fromDate(fallback, getLocalTimeZone());
+                }
               }
             } else {
               if (value.includes("T")) parsed = parseDateTime(value);
@@ -230,13 +235,24 @@
           } catch (e) {}
         }
 
-        // If still valid
-        if (parsed) {
+        // Only assign calendar values (not raw strings — avoids breaking Calendar / `"hour" in parsed`).
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "day" in parsed
+        ) {
           calendarValue = parsed;
         }
 
         // Sync time using parsed result (local) instead of calendarValue (state)
-        if (parsed && "hour" in parsed) {
+        // `in` requires an object; Nav / legacy values may leave `parsed` as a non-ISO string.
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "hour" in parsed
+        ) {
           timeHour = parsed.hour;
           timeMinute = parsed.minute;
           timeSecond = parsed.second;
@@ -249,7 +265,12 @@
   $effect(() => {
     // This effect depends on calendarValue
     if (calendarValue) {
-      if (mode === "single" && "day" in calendarValue) {
+      if (
+        mode === "single" &&
+        typeof calendarValue === "object" &&
+        calendarValue !== null &&
+        "day" in calendarValue
+      ) {
         viewDate = calendarValue;
       } else if (mode === "range" && calendarValue.start) {
         viewDate = calendarValue.start;

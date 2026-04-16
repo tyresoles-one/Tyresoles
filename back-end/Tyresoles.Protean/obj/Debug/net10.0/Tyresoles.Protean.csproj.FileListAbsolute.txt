@@ -44,3 +44,4 @@ d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Protean.deps.json
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Protean.dll
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Protean.pdb
 d:\Work Desk\Tyresoles\back-end\_webcheck2\Tyresoles.Protean.xml
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Protean\obj\Debug\net10.0\Tyresoles.Protean.sourcelink.json

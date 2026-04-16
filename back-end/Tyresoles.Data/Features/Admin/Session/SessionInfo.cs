@@ -10,6 +10,10 @@ public sealed class SessionInfo
     public string EntityType { get; init; } = string.Empty;
     public string EntityCode { get; init; } = string.Empty;
     public string Department { get; init; } = string.Empty;
+    public string? IpAddress { get; init; }
+    public string? UserAgent { get; init; }
     public DateTime CreatedAtUtc { get; init; }
     public DateTime ExpiresAtUtc { get; init; }
+    public string? RefreshToken { get; init; }
+    public DateTime? RefreshTokenExpiresAtUtc { get; init; }
 }

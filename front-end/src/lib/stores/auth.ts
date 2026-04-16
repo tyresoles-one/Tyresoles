@@ -9,7 +9,9 @@ import type { LoginUser, Menu, UserLocation } from '$lib/services/graphql/genera
 
 export type AuthData = {
 	token: string;
+	refreshToken: string;
 	username: string;
+	userSpecialToken: string;
 	expiresAt: string;
 	user: LoginUser | null;
 	/** Navigation menus from login response (Menu[]). */
@@ -24,7 +26,9 @@ export type AuthData = {
 
 const initialAuthData: AuthData = {
 	token: '',
+	refreshToken: '',
 	username: '',
+	userSpecialToken: '',
 	expiresAt: '',
 	user: null,
 	menus: null,
@@ -80,6 +84,10 @@ export function isAuthenticated(): boolean {
  */
 export function getAuthToken(): string {
 	return authStore.get().token;
+}
+
+export function getRefreshToken(): string {
+	return authStore.get().refreshToken;
 }
 
 export function getUser(): LoginUser | null {

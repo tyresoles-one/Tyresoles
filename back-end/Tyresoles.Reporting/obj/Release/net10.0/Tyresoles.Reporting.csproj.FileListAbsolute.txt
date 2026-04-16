@@ -10,3 +10,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\obj\Release\net10.0\Tyresole
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\obj\Release\net10.0\refint\Tyresoles.Reporting.dll
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\obj\Release\net10.0\Tyresoles.Reporting.pdb
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\obj\Release\net10.0\ref\Tyresoles.Reporting.dll
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Reporting\obj\Release\net10.0\Tyresoles.Reporting.sourcelink.json

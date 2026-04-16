@@ -6,9 +6,15 @@
     type AppConfig,
   } from "$lib/config/runtime";
   import { toast } from "svelte-sonner";
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   import { isTauri } from "$lib/tauri";
+  import {
+    getNativePermissionLabel,
+    isNativeAlertsEnabled,
+    requestNativeNotificationPermission,
+    setNativeAlertsEnabled,
+  } from "$lib/services/native-notifications";
   import { Icon } from "$lib/components/venUI/icon";
   import { Button } from "$lib/components/ui/button";
 
@@ -25,6 +31,51 @@
   onDestroy(unsub);
 
   let saving = $state(false);
+
+  let nativeAlertsEnabled = $state(false);
+  let nativePermissionHint = $state("");
+
+  onMount(() => {
+    nativeAlertsEnabled = isNativeAlertsEnabled();
+    void refreshNativePermissionHint();
+  });
+
+  async function refreshNativePermissionHint() {
+    nativePermissionHint = await getNativePermissionLabel();
+  }
+
+  async function handleNativeAlertsChange(checked: boolean) {
+    if (checked) {
+      setNativeAlertsEnabled(true);
+      nativeAlertsEnabled = true;
+      const r = await requestNativeNotificationPermission();
+      await refreshNativePermissionHint();
+      if (r === "denied") {
+        toast.error("Notification permission was denied");
+        setNativeAlertsEnabled(false);
+        nativeAlertsEnabled = false;
+      } else if (r === "granted") {
+        toast.success("Native alerts enabled");
+      }
+    } else {
+      setNativeAlertsEnabled(false);
+      nativeAlertsEnabled = false;
+    }
+  }
+
+  async function handleRequestNativePermission() {
+    const r = await requestNativeNotificationPermission();
+    await refreshNativePermissionHint();
+    if (r === "granted") {
+      toast.success("Notification permission granted");
+      setNativeAlertsEnabled(true);
+      nativeAlertsEnabled = true;
+    } else if (r === "denied") {
+      toast.error("Permission denied");
+    } else if (r === "unsupported") {
+      toast.error("Notifications are not supported here");
+    }
+  }
 
   async function handleSave() {
     if (!draft) return;
@@ -80,6 +131,44 @@
         </div>
       </section>
     {/if}
+
+    <section class="settings-panel native-alerts-section">
+      <header class="settings-header">
+        <h2>Native alerts</h2>
+        <p class="settings-subtitle">
+          Show system notifications when a new in-app notification arrives while this tab or
+          window is in the background (does not replace the in-app bell when you are
+          actively viewing the app).
+        </p>
+      </header>
+      <div class="native-alerts-controls">
+        <label class="native-alerts-toggle">
+          <input
+            type="checkbox"
+            checked={nativeAlertsEnabled}
+            onchange={(e) =>
+              void handleNativeAlertsChange(e.currentTarget.checked)}
+          />
+          <span>Enable native / desktop notifications</span>
+        </label>
+        <p class="hint native-permission-hint">
+          Permission: <strong>{nativePermissionHint || "…"}</strong>
+        </p>
+        <div class="native-alerts-actions">
+          <button
+            type="button"
+            class="btn btn--ghost"
+            onclick={() => void handleRequestNativePermission()}
+          >
+            Request system permission…
+          </button>
+        </div>
+        <p class="hint native-alerts-note">
+          On mobile browsers, notifications may require installing the app or using a
+          supported browser. Desktop Tauri and Chromium-based browsers work best.
+        </p>
+      </div>
+    </section>
 
     {#if $authStore.user?.userType.toUpperCase() === "SUPER"}
       <section class="settings-panel">
@@ -376,6 +465,39 @@
     font-weight: 800;
     color: #333;
     text-transform: uppercase;
+  }
+
+  .native-alerts-section {
+    margin-top: 0;
+  }
+
+  .native-alerts-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .native-alerts-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .native-alerts-toggle input {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .native-permission-hint {
+    margin: 0;
+  }
+
+  .native-alerts-note {
+    font-size: 0.75rem;
+    opacity: 0.85;
   }
 
   .hint {

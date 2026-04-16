@@ -12,6 +12,7 @@
   import { goto } from "$app/navigation";
   import { Button } from "$lib/components/ui/button";
   import { getImages } from "$lib/config/system";
+  import NotificationDropdown from "$lib/components/venUI/dashboards/NotificationDropdown.svelte";
   let { children } = $props();
 
   const images = $derived(getImages());
@@ -61,6 +62,7 @@
     </div>
 
     <div class="ml-auto flex items-center gap-3">
+      <NotificationDropdown class="shrink-0" />
       <Dropdown
         align="end"
         items={[

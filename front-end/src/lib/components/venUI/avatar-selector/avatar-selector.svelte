@@ -10,12 +10,14 @@
 		selectedIndex?: number;
 		/** Maximum number of images to show in the selector */
 		maxImages?: number;
+		class?: string;
 		onValueChange?: (index: number) => void;
 	}
 
 	let {
 		selectedIndex = $bindable(0),
 		maxImages = 8,
+		class: className,
 		onValueChange
 	}: Props = $props();
 
@@ -38,7 +40,7 @@
 	const previewImage = $derived(images[clampAvatarIndex(selectedIndex)]);
 </script>
 
-<div class="space-y-6 flex flex-col items-center ">	
+<div class={cn("space-y-6 flex flex-col items-center", className)}>	
 
 	<Popover.Root bind:open={popoverOpen}>
 		<Popover.Trigger class="group w-full h-auto p-4 bg-transparent hover:bg-muted/50 border border-transparent hover:border-border/60 transition-all rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">

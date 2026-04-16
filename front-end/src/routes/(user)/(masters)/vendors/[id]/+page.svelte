@@ -3,259 +3,236 @@
 	import { goto } from '$app/navigation';
 	import { useEntityDetail, useMutation } from '$lib/composables';
 	import { PageHeading } from '$lib/components/venUI/page-heading';
-	import { StatusBadge } from '$lib/components/venUI/statusBadge';
+	
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Input } from '$lib/components/ui/input';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Icon } from '$lib/components/venUI/icon';
-	import { Select } from '$lib/components/venUI/select';
-	import { DatePicker } from '$lib/components/venUI/date-picker';
-	import { gql } from 'graphql-request';
-	const GetDealerByCodeDocument: any = gql`
-		query GetDealerByCode($code: String!) {
-			dealerByCode(code: $code) {
-				code
-				name
-				dealershipName
-				eMail
-				mobileNo
-				businessModel
-				product
-				status
-				investmentAmount
-				dealershipExpDate
-				dealershipStartDate
-				dateOfBirth
-				dateOfAniversary
-				brandedShop
-				panNo
-				gstNo
-				aadharNo
-				bankName
-				bankACNo
-				bankBranch
-				bankIFSC
-			}
-		}
-	`;
-	const UpdateDealerDocument: any = gql`
-		mutation SaveDealer($input: SaveDealerInput!) {
-			saveDealer(input: $input) {
-				success
-				message
-			}
-		}
-	`;
-	type GetDealerByCodeQuery = { dealerByCode: Record<string, any> };
-	type SaveDealerInput = {
-		code: string;
-		name: string;
-		dealershipName: string;
-		eMail: string;
-		mobileNo: string;
-		businessModel: number;
-		product: number;
-		status: number;
-		investmentAmount: number;
-		dealershipStartDate: string;
-		dealershipExpDate: string;
-		dateOfBirth: string;
-		dateOfAniversary: string;
-		brandedShop: number;
-		panNo: string;
-		gstNo: string;
-		aadharNo: string;
-		bankName: string;
-		bankACNo: string;
-		bankBranch: string;
-		bankIFSC: string;
-	};
-	type UpdateDealerInput = { input: SaveDealerInput };
-	import { formatDateForDisplay, prepareDateForMutation } from '$lib/utils/date';
+	
+    import FormField from '$lib/components/venUI/form/FormField.svelte';
+	import FormSectionHeader from '$lib/components/venUI/form/FormSectionHeader.svelte';
+	import MasterSelect from '$lib/components/venUI/master-select/MasterSelect.svelte';
+	
 	import { secureFetch } from '$lib/services/api';
 	import { focusManager } from '$lib/components/venUI/form/focus-manager';
+	import {
+		GetVendorByCodeDocument,
+		UpdateProductionVendorDocument,
+		type GetVendorByCodeQuery
+	} from '$lib/services/graphql/generated/types';
+
+	type VendorModel = {
+		no: string;
+		name: string;
+		address: string;
+		address2: string;
+		city: string;
+		category: string;
+		detail: string;
+		respCenter: string;
+		mobileNo: string;
+		ecoMgrCode: string;
+		nameOnInvoice: string;
+		bankName: string;
+		bankIFSC: string;
+		bankAccNo: string;
+		postCode: string;
+		bankBranch: string;
+		selfInvoice: boolean;
+		panNo: string;
+		adhaarNo: string;
+		gstRegistrationNo: string;
+		balance: number;
+		stateCode: string;
+	};
+
+	type UpdateProductionVendorInput = { param: VendorModel };
+
+	/** Maps `Query.vendorByCode` (NAV `Vendor`) to `VendorModelInput` / form fields. */
+	function mapVendorRowToModel(
+		v: NonNullable<GetVendorByCodeQuery['vendorByCode']>
+	): VendorModel {
+		const bal = v.balance;
+		const balanceNum =
+			typeof bal === 'number' ? bal : bal != null && bal !== '' ? Number(bal) : NaN;
+		return {
+			no: v.no ?? '',
+			name: v.name ?? '',
+			address: v.address ?? '',
+			address2: v.address2 ?? '',
+			city: v.city ?? '',
+			category: v.groupCategory ?? '',
+			detail: v.groupDetails ?? '',
+			respCenter: v.responsibilityCenter ?? '',
+			mobileNo: v.phoneNo ?? '',
+			ecoMgrCode: v.ecomileProcMgr ?? '',
+			nameOnInvoice: v.nameOnInvoice ?? '',
+			bankName: v.bankName ?? '',
+			bankIFSC: v.bankIFSCCode ?? '',
+			bankAccNo: v.bankACNo ?? '',
+			postCode: v.postCode ?? '',
+			bankBranch: v.bankBranch ?? '',
+			selfInvoice: !!v.selfInvoice,
+			panNo: v.panNo ?? '',
+			adhaarNo: v.adhaarNo ?? '',
+			gstRegistrationNo: v.gstRegistrationNo ?? '',
+			balance: Number.isFinite(balanceNum) ? balanceNum : 0,
+			stateCode: v.stateCode ?? ''
+		};
+	}
 
 	function normalizeString(value: string) {
 		return value.trim().toUpperCase().replace(/\s/g, '');
 	}
 
-	/** Route `[id]`: dealer business code passed in the URL (GraphQL `code` argument). */
-	const dealerId = $derived(decodeURIComponent($page.params.id ?? '').trim());
+	/** Route `[id]`: vendor number passed in the URL. */
+	const vendorId = $derived(decodeURIComponent($page.params.id ?? '').trim());
 
-	const dealerDetail = useEntityDetail<GetDealerByCodeQuery, GetDealerByCodeQuery['dealerByCode']>({
-		id: () => dealerId,
-		query: GetDealerByCodeDocument,
-		dataPath: 'dealerByCode',
-		cacheKey: (id) => `dealer-${id}`
+	const vendorDetail = useEntityDetail<GetVendorByCodeQuery, VendorModel>({
+		id: () => vendorId,
+		query: GetVendorByCodeDocument,
+		variables: (id) => ({ code: id }),
+		dataPath: 'vendorByCode',
+		mapResponse: (data) => {
+			const row = data.vendorByCode;
+			if (!row || !String(row.no ?? '').trim()) return null;
+			return mapVendorRowToModel(row);
+		},
+		cacheKey: (id) => `vendor-${id}`
 	});
 
-	const dealer = $derived(dealerDetail.entity.value);
+	const vendor = $derived(vendorDetail.entity.value);
 
-	const updateDealerMutation = useMutation<unknown, { input: SaveDealerInput }>({
-		mutation: UpdateDealerDocument,
-		successMessage: 'Dealer saved successfully',
-		confirmTitle: 'Save dealer',
-		confirmMessage: 'Are you sure you want to save changes to this dealer?',
-		clearCache: (vars) => `dealer-${vars.input.code}`,
+	const updateVendorMutation = useMutation<unknown, UpdateProductionVendorInput>({
+		mutation: UpdateProductionVendorDocument,
+		successMessage: 'Vendor saved successfully',
+		confirmTitle: 'Save vendor',
+		confirmMessage: 'Are you sure you want to save changes to this vendor?',
+		clearCache: (vars) => `vendor-${vars.param.no}`,
 		onSuccess: async () => {
-			await dealerDetail.reload();
+			await vendorDetail.reload();
 		}
 	});
 
-	const businessModelOptions = [
-		{ value: 0, label: '' },
-		{ value: 1, label: 'CPA-Ecomiles' },
-		{ value: 2, label: 'CNC-Ecomiles' },
-		{ value: 3, label: 'CNC-Ecomiles & Rtd' },
-		{ value: 4, label: 'CNC-Rtd' },
-		{ value: 5, label: 'CPA-Ecomiles & Rtd on demand' }
-	];
-
-	const productOptions = [
-		{ value: 0, label: '' },
-		{ value: 1, label: 'Ecomile' },
-		{ value: 2, label: 'Retd' }
-	];
-
-	type FormData = {
-		name: string;
-		dealershipName: string;
-		eMail: string;
-		mobileNo: string;
-		businessModel: number;
-		product: number;
-		status: number;
-		investmentAmount: number;
-		dealershipExpDate: string;
-		dealershipStartDate: string;
-		dateOfBirth: string;
-		dateOfAniversary: string;
-		brandedShop: boolean;
-		panNo: string;
-		gstNo: string;
-		aadharNo: string;
-		bankName: string;
-		bankACNo: string;
-		bankBranch: string;
-		bankIfsc: string;
-	};
+	type FormData = Omit<VendorModel, 'balance'>;
 
 	let form = $state<FormData>({
+		no: '',
 		name: '',
-		dealershipName: '',
-		eMail: '',
+		address: '',
+		address2: '',
+		city: '',
+		category: '',
+		detail: '',
+		respCenter: '',
 		mobileNo: '',
-		businessModel: 0,
-		product: 0,
-		status: 0,
-		investmentAmount: 0,
-		dealershipExpDate: '',
-		dealershipStartDate: '',
-		dateOfBirth: '',
-		dateOfAniversary: '',
-		brandedShop: false,
-		panNo: '',
-		gstNo: '',
-		aadharNo: '',
+		ecoMgrCode: '',
+		nameOnInvoice: '',
 		bankName: '',
-		bankACNo: '',
+		bankIFSC: '',
+		bankAccNo: '',
+		postCode: '',
 		bankBranch: '',
-		bankIfsc: ''
+		selfInvoice: false,
+		panNo: '',
+		adhaarNo: '',
+		gstRegistrationNo: '',
+		stateCode: ''
 	});
 
-	function syncFormFromDealer(d: NonNullable<typeof dealer>) {
+	let fieldErrors = $state<Partial<Record<keyof FormData, string>>>({});
+
+	/** Stable reference for MasterSelect `bind:form` (avoid inline `{ values: form }` each render). */
+	let vendorMasterForm = $state.raw({
+		get values() {
+			return form;
+		},
+		setTouched(_n: string) {}
+	});
+
+	function syncFormFromVendor(v: VendorModel) {
 		form = {
-			name: d.name ?? '',
-			dealershipName: d.dealershipName ?? '',
-			eMail: d.eMail ?? '',
-			mobileNo: d.mobileNo ?? '',
-			businessModel: d.businessModel ?? 0,
-			product: d.product ?? 0,
-			status: d.status ?? 0,
-			investmentAmount: Number(d.investmentAmount ?? 0),
-			dealershipExpDate: formatDateForDisplay(d.dealershipExpDate),
-			dealershipStartDate: formatDateForDisplay(d.dealershipStartDate),
-			dateOfBirth: formatDateForDisplay(d.dateOfBirth),
-			dateOfAniversary: formatDateForDisplay(d.dateOfAniversary),
-			brandedShop: (d.brandedShop ?? 0) === 1,
-			panNo: d.panNo ?? '',
-			gstNo: d.gstNo ?? '',
-			aadharNo: d.aadharNo ?? '',
-			bankName: d.bankName ?? '',
-			bankACNo: d.bankACNo ?? '',
-			bankBranch: d.bankBranch ?? '',
-			bankIfsc: d.bankIFSC ?? ''
+			no: v.no || '',
+			name: v.name || '',
+			address: v.address || '',
+			address2: v.address2 || '',
+			city: v.city || '',
+			category: v.category || '',
+			detail: v.detail || '',
+			respCenter: v.respCenter || '',
+			mobileNo: v.mobileNo || '',
+			ecoMgrCode: v.ecoMgrCode || '',
+			nameOnInvoice: v.nameOnInvoice || '',
+			bankName: v.bankName || '',
+			bankIFSC: v.bankIFSC || '',
+			bankAccNo: v.bankAccNo || '',
+			postCode: v.postCode || '',
+			bankBranch: v.bankBranch || '',
+			selfInvoice: !!v.selfInvoice,
+			panNo: v.panNo || '',
+			adhaarNo: v.adhaarNo || '',
+			gstRegistrationNo: v.gstRegistrationNo || '',
+			stateCode: v.stateCode || ''
 		};
+        fieldErrors = {};
 	}
 
-	async function saveDealer() {
-		if (!dealer?.code) return;
-		const input: SaveDealerInput = {
-			code: dealer.code,
-			name: form.name,
-			dealershipName: form.dealershipName,
-			eMail: form.eMail,
-			mobileNo: form.mobileNo,
-			businessModel: Number(form.businessModel),
-			product: Number(form.product),
-			status: Number(form.status),
-			investmentAmount: Number(form.investmentAmount),
-			dealershipExpDate: prepareDateForMutation(form.dealershipExpDate),
-			dealershipStartDate: prepareDateForMutation(form.dealershipStartDate),
-			dateOfBirth: prepareDateForMutation(form.dateOfBirth),
-			dateOfAniversary: prepareDateForMutation(form.dateOfAniversary),
-			brandedShop: form.brandedShop ? 1 : 0,
-			panNo: form.panNo,
-			gstNo: form.gstNo,
-			aadharNo: form.aadharNo,
-			bankName: form.bankName,
-			bankACNo: form.bankACNo,
-			bankBranch: form.bankBranch,
-			bankIFSC: form.bankIfsc
-		};
-		await updateDealerMutation.execute({ input });
+    function validateVendorForm(): boolean {
+        const errors: Partial<Record<keyof FormData, string>> = {};
+        if (!form.name.trim()) errors.name = 'Name is required.';
+        if (!form.mobileNo.trim()) errors.mobileNo = 'Mobile number is required.';
+        if (form.bankIFSC.trim() && form.bankIFSC.trim().length !== 11) errors.bankIFSC = 'IFSC must be 11 characters.';
+        
+        fieldErrors = errors;
+        return Object.keys(errors).length === 0;
+    }
+
+	function formatVendorBalanceInr(value: number): string {
+		return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	}
+
+	async function saveVendor() {
+		if (!vendorId) return;
+        if (!validateVendorForm()) return;
+
+		await updateVendorMutation.execute({ param: { ...form, no: vendorId, balance: vendor?.balance || 0 } });
 	}
 
 	function cancelEdit() {
-		if (dealer) syncFormFromDealer(dealer);
+		if (vendor) syncFormFromVendor(vendor);
 	}
 
-	/** Match FormGenerator: after VenSelect picks a value, move focus like Enter would. */
+	/** NAV Post Code row: sync PIN + city + state when picked from either City or Post code MasterSelect. */
+	function onPostCodePicked(d: { value: string; meta?: Record<string, unknown> }) {
+		const city = typeof d.meta?.city === 'string' ? d.meta.city.trim() : '';
+		const st = typeof d.meta?.stateCode === 'string' ? d.meta.stateCode.trim() : '';
+		if (city) form.city = city;
+		if (st) form.stateCode = st;
+	}
+
 	function triggerNextFocus() {
 		const trigger = document.activeElement as HTMLElement | null;
 		if (trigger) {
 			trigger.dispatchEvent(new CustomEvent('ven-form:next-focus', { bubbles: true }));
 		}
-	}
+	}	
 
-	// Auto-calculate expiry date as 1 year after start date
+	// Sync form when vendor loads
 	$effect(() => {
-		if (form.dealershipStartDate && form.dealershipStartDate !== '1753-01-01') {
-			const startDate = new Date(form.dealershipStartDate);
-			const expiryDate = new Date(startDate);
-			expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-			form.dealershipExpDate = expiryDate.toISOString().slice(0, 10);
-		}
+		if (vendor) syncFormFromVendor(vendor);
 	});
 
-	// Sync form when dealer loads
-	$effect(() => {
-		if (dealer) syncFormFromDealer(dealer);
-	});
+	let ifscLookupLoading = $state(false);
+	let ifscLookupError = $state('');
 
 	let gstLegalName = $state('');
 	let gstLookupLoading = $state(false);	
 	let gstLookupError = $state('');
 
-	let ifscLookupLoading = $state(false);
-	let ifscLookupError = $state('');
-
-	$inspect(form);
-
 	$effect(() => {
-		const gstin = normalizeString(form.gstNo);
+		const gstin = normalizeString(form.gstRegistrationNo);
 		const ac = new AbortController();
 
 		if (gstin.length !== 15) {
@@ -298,8 +275,6 @@
 			}
 		}, 400);
 
-
-
 		return () => {
 			clearTimeout(tid);
 			ac.abort();
@@ -307,13 +282,10 @@
 	});
 
 	$effect(() => {
-		const ifsc = normalizeString(form.bankIfsc);
+		const ifsc = normalizeString(form.bankIFSC);
 		const ac = new AbortController();
 
-		console.log(ifsc, 'ifsc');
-
 		if (ifsc.length !== 11) {
-			
 			ifscLookupLoading = false;
 			ifscLookupError = '';
 			return;
@@ -324,14 +296,14 @@
 			ifscLookupError = '';
 			
 			try {
-				const res = await fetch(`https://ifsc.razorpay.com/${encodeURIComponent(ifsc)}`).catch((ex)=>{
+				const res = await fetch(`https://ifsc.razorpay.com/${encodeURIComponent(ifsc)}`).catch(() => {
 					ifscLookupError = "Could't fetch IFSC";
-				}).finally(()=>{
+				}).finally(() => {
 					ifscLookupLoading = false;
 				})
 				
 				if (ac.signal.aborted) return;
-				if (typeof res !== 'object') {
+				if (typeof res !== 'object' || !res) {
 					ifscLookupError ="Could't fetch IFSC details.";
 					return;
 				} 
@@ -343,7 +315,6 @@
 			} catch (e) {
 				if (ac.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return;
 				ifscLookupError = e instanceof Error ? e.message : 'IFSC lookup failed';
-				
 			} finally {
 				if (!ac.signal.aborted) ifscLookupLoading = false;
 			}
@@ -354,66 +325,72 @@
 			ac.abort();
 		};
 	});
-
-	
 </script>
 
 <div class="min-h-screen bg-background pb-12">
 	<PageHeading
-		backHref="/dealers"
+		backHref="/vendors"
 		backLabel="Back to list"
-		loading={dealerDetail.loading}
-		icon="store"
+		loading={vendorDetail.loading}
+		icon="truck"
 	>
 		{#snippet title()}
-			{#if dealer}
-				{dealer.name || dealer.code}
+			{#if vendor}
+				{vendor.name || vendor.no}
 			{:else}
-				Dealer
+				Vendor
 			{/if}
 		{/snippet}
 		{#snippet description()}
-			{#if dealer?.code}
-				<code class="font-mono text-xs">{dealer.code}</code>
+			{#if vendor?.no}
+				<code class="font-mono text-xs">{vendor.no}</code>
 			{:else}
-				Edit dealer details
+				Edit vendor details
 			{/if}
 		{/snippet}
 		{#snippet actions()}
-			{#if dealer}
-				<StatusBadge status={dealer.status ?? 0} class="shrink-0 hidden sm:inline-flex text-xs" />
-				<Button variant="outline" size="sm" onclick={cancelEdit} disabled={dealerDetail.loading || updateDealerMutation.saving}>
-					Cancel
-				</Button>
-				<Button
-					size="sm"
-					onclick={saveDealer}
-					disabled={dealerDetail.loading || updateDealerMutation.saving}
-					class="min-w-[80px]"
-				>
-					{#if updateDealerMutation.saving}
-						<Icon name="loader-2" class="size-4 animate-spin mr-2" />
-						Saving...
-					{:else}
-						<Icon name="save" class="size-4 mr-2" />
-						Save
-					{/if}
-				</Button>
+			{#if vendor}
+				<div class="flex items-center gap-2 flex-wrap justify-end">
+					<div
+						class="px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider inline-flex items-center gap-1 tabular-nums {vendor.balance < 0
+							? 'bg-destructive/10 text-destructive border-destructive/25'
+							: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}"
+					>
+						Balance: ₹{formatVendorBalanceInr(vendor.balance)}
+					</div>
+					<Button variant="outline" size="sm" onclick={cancelEdit} disabled={vendorDetail.loading || updateVendorMutation.saving}>
+						Cancel
+					</Button>
+					<Button
+						size="sm"
+						onclick={saveVendor}
+						disabled={vendorDetail.loading || updateVendorMutation.saving}
+						class="min-w-[80px]"
+					>
+						{#if updateVendorMutation.saving}
+							<Icon name="loader-2" class="size-4 animate-spin mr-2" />
+							Saving...
+						{:else}
+							<Icon name="save" class="size-4 mr-2" />
+							Save
+						{/if}
+					</Button>
+				</div>
 			{/if}
 		{/snippet}
 	</PageHeading>
 
 	<main class="container mx-auto px-4 py-6 max-w-5xl space-y-6">
-		{#if !dealerId}
+		{#if !vendorId}
 			<Card class="border-destructive/30">
 				<CardContent class="pt-6">
-					<p class="text-sm text-muted-foreground">No dealer ID in URL.</p>
-					<Button variant="outline" size="sm" class="mt-3" onclick={() => goto('/dealers')}>
+					<p class="text-sm text-muted-foreground">No vendor ID in URL.</p>
+					<Button variant="outline" size="sm" class="mt-3" onclick={() => goto('/vendors')}>
 						Back to list
 					</Button>
 				</CardContent>
 			</Card>
-		{:else if dealerDetail.loading}
+		{:else if vendorDetail.loading}
 			<Card class="border-border/40">
 				<CardHeader>
 					<Skeleton class="h-6 w-64" />
@@ -424,375 +401,210 @@
 					<Skeleton class="h-4 w-1/2" />
 				</CardContent>
 			</Card>
-		{:else if dealerDetail.error}
+		{:else if vendorDetail.error}
 			<Card class="border-destructive/30">
 				<CardContent class="pt-6">
-					<p class="text-sm text-destructive">{dealerDetail.error}</p>
-					<Button variant="outline" size="sm" class="mt-3" onclick={() => dealerDetail.reload()}>
+					<p class="text-sm text-destructive">{vendorDetail.error}</p>
+					<Button variant="outline" size="sm" class="mt-3" onclick={() => vendorDetail.reload()}>
 						Retry
 					</Button>
 				</CardContent>
 			</Card>
-		{:else if !dealer}
+		{:else if !vendor}
 			<Card class="border-border/40">
 				<CardContent class="pt-6">
 					<p class="text-sm text-muted-foreground">
-						Dealer <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{dealerId}</code> not found.
+						Vendor <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{vendorId}</code> not found.
 					</p>
-					<Button variant="outline" size="sm" class="mt-3" onclick={() => goto('/dealers')}>
+					<Button variant="outline" size="sm" class="mt-3" onclick={() => goto('/vendors')}>
 						Back to list
 					</Button>
 				</CardContent>
 			</Card>
 		{:else}
-			<!-- Single Unified Card -->
-			<Card class="border-border/50 shadow-lg bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-sm">	
-				<CardContent class="pt-6 pb-6 space-y-6">
+			<Card class="border-border/50 shadow-lg bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-sm overflow-hidden">				
+				<CardContent class=" pb-8 space-y-10">
 					<form
 						class="contents"
 						onsubmit={(e) => e.preventDefault()}
 						use:focusManager={{ autoFocus: true }}
 					>
-					<!-- Basic Information Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-								<Icon name="user" class="size-3.5" />
-								Basic Details
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-							<div class="space-y-1.5">
-								<label for="dealer-name" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="user" class="size-3" />
-									Name
-								</label>
-								<Input
-									id="dealer-name"
-									bind:value={form.name}
-									placeholder="Enter dealer name"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-dealership" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="building" class="size-3" />
-									Dealership Name
-								</label>
-								<Input
-									id="dealer-dealership"
-									bind:value={form.dealershipName}
-									placeholder="Enter dealership name"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-phone" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="phone" class="size-3" />
-									Mobile Number
-								</label>
-								<Input
-									id="dealer-phone"
-									bind:value={form.mobileNo}
-									placeholder="Enter mobile number"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-email" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="mail" class="size-3" />
-									Email Address
-								</label>
-								<Input
-									id="dealer-email"
-									type="email"
-									bind:value={form.eMail}
-									placeholder="Enter email"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-status" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="activity" class="size-3" />
-									Status
-								</label>
-								<select
-									id="dealer-status"
-									bind:value={form.status}
-									class="flex h-9 w-full rounded-md border border-border/60 bg-background px-3 py-1 text-sm shadow-sm outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring transition-colors"
-								>
-									<option value={0}>Active</option>
-									<option value={1}>Inactive</option>
-								</select>
-							</div>
-						</div>
-					</div>
-
-					<!-- Business Details Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2 p-4">
-								<Icon name="briefcase" class="size-3.5" />
-								Business Information
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="layers" class="size-3" />
-									Business Model
-								</label>
-								<Select
-									options={businessModelOptions}
-									bind:value={form.businessModel}
-									valueKey="value"
-									labelKey="label"
-									placeholder="Select model..."
-									searchPlaceholder="Search..."
-									class="h-9 w-full text-sm bg-background border-border/60"
-									onSelect={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="package" class="size-3" />
-									Product
-								</label>
-								<Select
-									options={productOptions}
-									bind:value={form.product}
-									valueKey="value"
-									labelKey="label"
-									placeholder="Select product..."
-									searchPlaceholder="Search..."
-									class="h-9 w-full text-sm bg-background border-border/60"
-									onSelect={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="investment" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="indian-rupee" class="size-3" />
-									Investment Amount
-								</label>
-								<Input
-									id="investment"
-									type="number"
-									bind:value={form.investmentAmount}
-									placeholder="0.00"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
-									step="0.01"
-								/>
-							</div>
-							<div class="space-y-1.5 flex items-end">
-								<label class="flex items-center gap-2.5 cursor-pointer px-3 py-2 rounded-md hover:bg-accent/50 transition-colors w-full">
-									<Switch bind:checked={form.brandedShop} />
-									<span class="text-xs font-medium flex items-center gap-1.5">
-										<Icon name="badge-check" class="size-3.5" />
-										Branded Shop
-									</span>
-								</label>
-							</div>
-						</div>
-					</div>
-
-					<!-- Important Dates Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-border/40 via-border/60 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-2 p-4">
-								<Icon name="calendar" class="size-3.5" />
-								Important Dates
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-border/40 via-border/60 to-transparent"></div>
-						</div>
-						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="calendar-plus" class="size-3" />
-									Dealership Start
-								</label>
-								<DatePicker
-									valueType="text"
-									valueFormat="yyyy-MM-dd"
-									bind:value={form.dealershipStartDate}
-									placeholder="Select date..."
-									onValueChange={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="calendar-x" class="size-3" />
-									Dealership Expiry
-								</label>
-								<DatePicker
-									valueType="text"
-									valueFormat="yyyy-MM-dd"
-									bind:value={form.dealershipExpDate}
-									placeholder="Select date..."
-									onValueChange={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="cake" class="size-3" />
-									Date of Birth
-								</label>
-								<DatePicker
-									valueType="text"
-									valueFormat="yyyy-MM-dd"
-									bind:value={form.dateOfBirth}
-									placeholder="Select date..."
-									onValueChange={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="heart" class="size-3" />
-									Anniversary Date
-								</label>
-								<DatePicker
-									valueType="text"
-									valueFormat="yyyy-MM-dd"
-									bind:value={form.dateOfAniversary}
-									placeholder="Select date..."
-									onValueChange={() => setTimeout(triggerNextFocus, 50)}
-								/>
-							</div>
-						</div>
-					</div>
-
-					<!-- Tax & Bank Details Section -->
-					<div class="space-y-3">
-						<div class="flex items-center gap-2 mb-4">
-							<div class="h-px flex-1 bg-gradient-to-r from-primary/20 via-primary/40 to-transparent"></div>
-							<h3 class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2 p-4">
-								<Icon name="credit-card" class="size-3.5" />
-								Tax & Banking
-							</h3>
-							<div class="h-px flex-1 bg-gradient-to-l from-primary/20 via-primary/40 to-transparent"></div>
-						</div>
-
-						<!-- Tax IDs -->
-						<div class="grid gap-3 sm:grid-cols-3">
-							<div class="space-y-1.5">
-								<label for="dealer-gst" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="file-text" class="size-3" />
-									GST Number
-								</label>
-								<Input
-									id="dealer-gst"
-									bind:value={form.gstNo}
-									placeholder="GST No"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors font-mono"
-									autocomplete="off"
-								/>
-								{#if gstLookupLoading}
-									<p class="text-xs text-muted-foreground flex items-center gap-1.5" aria-live="polite">
-										<Icon name="loader-2" class="size-3 animate-spin shrink-0" />
-										Fetching legal name…
-									</p>
-								{:else if gstLookupError}
-									<p class="text-xs text-destructive" aria-live="polite">{gstLookupError}</p>
-								{:else if gstLegalName}
-									<p class="text-xs text-muted-foreground" aria-live="polite">
-										<span class="font-medium text-foreground/80">Legal name:</span>
-										{gstLegalName}
-									</p>
-								{/if}
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-pan" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="id-card" class="size-3" />
-									PAN Number
-								</label>
-								<Input
-									id="dealer-pan"
-									bind:value={form.panNo}
-									placeholder="PAN No"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors font-mono"
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<label for="dealer-aadhar" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-									<Icon name="fingerprint-pattern" class="size-3" />
-									Aadhar Number
-								</label>
-								<Input
-									id="dealer-aadhar"
-									bind:value={form.aadharNo}
-									placeholder="Aadhar No"
-									class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors font-mono"
-								/>
-							</div>
-						</div>
-
-						<!-- Bank Details -->
-						<div class="pt-3 mt-2 border-t border-border/30">
-							<div class="grid gap-3 sm:grid-cols-2">
-								<div class="space-y-1.5">
-									<label for="bank-ifsc" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="key" class="size-3" />
-										IFSC Code
-									</label>
+						<!-- Basic Information Section -->
+						<div class="space-y-6">
+							<FormSectionHeader title="Basic Details" icon="user" />
+							
+							<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+								<FormField id="vendor-name" label="Vendor Name" icon="user" required error={fieldErrors.name}>
 									<Input
-										id="bank-ifsc"
-										bind:value={form.bankIfsc}
-										placeholder="IFSC code"
-										class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors font-mono"
+										id="vendor-name"
+										bind:value={form.name}
+										placeholder="Enter vendor name"
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
 									/>
-									{#if ifscLookupLoading}
-										<p class="text-xs text-muted-foreground flex items-center gap-1.5" aria-live="polite">
+								</FormField>
+								<FormField id="vendor-mobile" label="Mobile Number" icon="phone" required error={fieldErrors.mobileNo}>
+									<Input
+										id="vendor-mobile"
+										bind:value={form.mobileNo}
+										placeholder="Enter mobile number"
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
+									/>
+								</FormField>								
+							</div>
+						</div>
+
+						<!-- Address Section -->
+						<div class="space-y-6 mt-4">
+							<FormSectionHeader title="Address Details" icon="map-pin" />
+							<div class="grid gap-6 sm:grid-cols-2">
+								<FormField id="vendor-addr1" label="Address Line 1" icon="map">
+									<Input
+										id="vendor-addr1"
+										bind:value={form.address}
+										placeholder="Building, street..."
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
+									/>
+								</FormField>
+								<FormField id="vendor-addr2" label="Address Line 2" icon="map">
+									<Input
+										id="vendor-addr2"
+										bind:value={form.address2}
+										placeholder="Area, landmark..."
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
+									/>
+								</FormField>
+								<div class="grid grid-cols-2 gap-4">
+									<FormField id="vendor-city" label="City" icon="building-2">
+										<MasterSelect
+											bind:form={vendorMasterForm}
+											fieldName="postCode"
+											masterType="postCodes"
+											label=""
+											placeholder="Search city or PIN…"
+											singleSelect
+											onPicked={onPostCodePicked}
+										/>
+									</FormField>
+									<FormField id="vendor-pincode" label="Post Code" icon="hash">
+										<MasterSelect
+											bind:form={vendorMasterForm}
+											fieldName="postCode"
+											masterType="postCodes"
+											label=""
+											placeholder="Search PIN / city…"
+											singleSelect
+											onPicked={onPostCodePicked}
+										/>
+									</FormField>
+								</div>
+								<FormField id="vendor-state" label="State Code" icon="flag">
+									<MasterSelect
+										bind:form={vendorMasterForm}
+										fieldName="stateCode"
+										masterType="states"
+										label=""
+										placeholder="Search state code or name…"
+										singleSelect
+									/>
+								</FormField>
+							</div>
+						</div>
+
+						<!-- Banking & Tax Section -->
+						<div class="space-y-6 mt-4">
+							<FormSectionHeader title="Tax & Banking" icon="credit-card" />
+							<div class="grid gap-6 sm:grid-cols-4">
+								<FormField id="vendor-gst" label="GST Number" icon="file-text" error={gstLookupError}>
+									<Input
+										id="vendor-gst"
+										bind:value={form.gstRegistrationNo}
+										placeholder="GST No"
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50 font-mono text-sm uppercase"
+										autocomplete="off"
+									/>
+									{#if gstLookupLoading}
+										<p class="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-1" aria-live="polite">
 											<Icon name="loader-2" class="size-3 animate-spin shrink-0" />
-											Fetching Bank Details…
+											Fetching legal name…
 										</p>
-									{:else if ifscLookupError}
-										<p class="text-xs text-destructive" aria-live="polite">{ifscLookupError}</p>
+									{:else if gstLegalName}
+										<p class="text-[10px] text-muted-foreground mt-1" aria-live="polite">
+											<span class="font-medium text-foreground/80">Legal name:</span>
+											{gstLegalName}
+										</p>
 									{/if}
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-name" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="landmark" class="size-3" />
-										Bank Name
-									</label>
+								</FormField>
+								<FormField id="vendor-pan" label="PAN Number" icon="id-card">
 									<Input
-										id="bank-name"
-										bind:value={form.bankName}
-										placeholder="Enter bank name"
-										class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
+										id="vendor-pan"
+										bind:value={form.panNo}
+										placeholder="PAN No"
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50 font-mono text-sm uppercase"
 									/>
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-branch" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="map-pin" class="size-3" />
-										Bank Branch
-									</label>
+								</FormField>
+								<FormField id="vendor-aadhar" label="Aadhar Number" icon="fingerprint">
 									<Input
-										id="bank-branch"
-										bind:value={form.bankBranch}
-										placeholder="Enter branch"
-										class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
+										id="vendor-aadhar"
+										bind:value={form.adhaarNo}
+										placeholder="Aadhar No"
+										class="h-10 bg-background/50 border-border/60 focus:border-primary/50 font-mono text-sm"
 									/>
-								</div>
-								<div class="space-y-1.5">
-									<label for="bank-ac" class="text-xs font-medium text-muted-foreground flex items-center gap-1">
-										<Icon name="hash" class="size-3" />
-										Account Number
+								</FormField>
+								<div class="flex items-end pb-1.5">
+									<label class="flex items-center gap-3 cursor-pointer px-4 py-2.5 rounded-lg hover:bg-accent/50 transition-all border border-transparent hover:border-border/40 w-full group">
+										<Switch bind:checked={form.selfInvoice} />
+										<span class="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-2">
+											<Icon name="file-check" class="size-3.5" />
+											Self Invoice
+										</span>
 									</label>
-									<Input
-										id="bank-ac"
-										bind:value={form.bankACNo}
-										placeholder="Account number"
-										class="h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors font-mono"
-									/>
 								</div>
-								
+							</div>
+
+							<div class="pt-6 mt-4 border-t border-border/30">
+								<div class="grid gap-6 sm:grid-cols-2">
+									<FormField id="bank-ifsc" label="IFSC Code" icon="key" error={ifscLookupError || fieldErrors.bankIFSC}>
+										<div class="relative">
+											<Input
+												id="bank-ifsc"
+												bind:value={form.bankIFSC}
+												placeholder="IFSC code"
+												class="h-10 bg-background/50 border-border/60 focus:border-primary/50 font-mono uppercase pr-10"
+											/>
+											{#if ifscLookupLoading}
+												<div class="absolute right-3 top-1/2 -translate-y-1/2">
+													<Icon name="loader-2" class="size-4 animate-spin text-primary" />
+												</div>
+											{/if}
+										</div>
+									</FormField>
+									<FormField id="bank-name" label="Bank Name" icon="landmark">
+										<Input
+											id="bank-name"
+											bind:value={form.bankName}
+											placeholder="Bank name"
+											class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
+										/>
+									</FormField>
+									<FormField id="bank-branch" label="Bank Branch" icon="map-pin">
+										<Input
+											id="bank-branch"
+											bind:value={form.bankBranch}
+											placeholder="Branch name"
+											class="h-10 bg-background/50 border-border/60 focus:border-primary/50"
+										/>
+									</FormField>
+									<FormField id="bank-ac" label="Account Number" icon="hash">
+										<Input
+											id="bank-ac"
+											bind:value={form.bankAccNo}
+											placeholder="Account number"
+											class="h-10 bg-background/50 border-border/60 focus:border-primary/50 font-mono"
+										/>
+									</FormField>
+								</div>
 							</div>
 						</div>
-					</div>
 					</form>
 				</CardContent>
 			</Card>
