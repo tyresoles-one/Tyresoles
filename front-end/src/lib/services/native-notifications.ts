@@ -2,14 +2,19 @@
  * OS-level notifications for in-app GraphQL notifications.
  * - Browser: Web Notifications API (HTTPS / localhost; iOS has limited support).
  * - Tauri: @tauri-apps/plugin-notification after permission.
+ * - Capacitor: @capacitor/local-notifications.
  */
 
 import { isTauri } from '$lib/tauri';
+import { isCapacitor } from '$lib/utils/native-token-store';
 
 const STORAGE_KEY = 'tyresoles_nativeAlertsEnabled';
 
 /** When true, only show native toast if the document tab is in the background (avoids duplicate with in-app bell). */
-const ONLY_WHEN_TAB_NOT_VISIBLE = true;
+const ONLY_WHEN_TAB_NOT_VISIBLE = false;
+
+// Track if capacitor listener is registered
+let _capacitorListenerRegistered = false;
 
 export function isNativeAlertsEnabled(): boolean {
   if (typeof localStorage === 'undefined') return false;
@@ -28,7 +33,16 @@ export function isWebNotificationSupported(): boolean {
 /**
  * Current permission without prompting. 'default' means not decided yet.
  */
-export function getWebNotificationPermission(): NotificationPermission | 'unsupported' {
+export async function getWebNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
+  if (isCapacitor()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const status = await LocalNotifications.checkPermissions();
+      return status.display === 'granted' ? 'granted' : status.display === 'denied' ? 'denied' : 'default';
+    } catch {
+      return 'unsupported';
+    }
+  }
   if (!isWebNotificationSupported()) return 'unsupported';
   return Notification.permission;
 }
@@ -43,12 +57,21 @@ export async function getNativePermissionLabel(): Promise<string> {
       return 'Unknown';
     }
   }
-  const p = getWebNotificationPermission();
+  if (isCapacitor()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const status = await LocalNotifications.checkPermissions();
+      return status.display === 'granted' ? 'Granted' : 'Not granted';
+    } catch {
+      return 'Unknown';
+    }
+  }
+  const p = await getWebNotificationPermission();
   return p === 'unsupported' ? 'Not supported in this browser' : p;
 }
 
 /**
- * Request OS permission for notifications (must run from a user gesture in browsers).
+ * Request OS permission for notifications.
  */
 export async function requestNativeNotificationPermission(): Promise<
   'granted' | 'denied' | 'default' | 'unsupported'
@@ -56,10 +79,18 @@ export async function requestNativeNotificationPermission(): Promise<
   if (isTauri()) {
     try {
       const { isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
-      const granted = await isPermissionGranted();
-      if (granted) return 'granted';
+      if (await isPermissionGranted()) return 'granted';
       const result = await requestPermission();
       return result === 'granted' ? 'granted' : 'denied';
+    } catch {
+      return 'denied';
+    }
+  }
+  if (isCapacitor()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const status = await LocalNotifications.requestPermissions();
+      return status.display === 'granted' ? 'granted' : 'denied';
     } catch {
       return 'denied';
     }
@@ -78,6 +109,15 @@ async function hasNativePermission(): Promise<boolean> {
       return false;
     }
   }
+  if (isCapacitor()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const status = await LocalNotifications.checkPermissions();
+      return status.display === 'granted';
+    } catch {
+      return false;
+    }
+  }
   if (!isWebNotificationSupported()) return false;
   return Notification.permission === 'granted';
 }
@@ -85,7 +125,8 @@ async function hasNativePermission(): Promise<boolean> {
 function shouldShowNativeToast(): boolean {
   if (!isNativeAlertsEnabled()) return false;
   if (typeof document === 'undefined') return true;
-  if (ONLY_WHEN_TAB_NOT_VISIBLE && document.visibilityState === 'visible') return false;
+  // Capacitor local notifications handle their own display logic but we might still want to suppress
+  if (ONLY_WHEN_TAB_NOT_VISIBLE && document.visibilityState === 'visible' && !isCapacitor()) return false;
   return true;
 }
 
@@ -114,7 +155,42 @@ async function focusAppWindow(): Promise<void> {
       // fall through
     }
   }
-  window.focus();
+  if (isCapacitor()) {
+    // Background to foreground happens visually when they click the local notification.
+    return;
+  }
+  if (typeof window !== 'undefined') window.focus();
+}
+
+/**
+ * Ensures capacitor click listeners handles routing.
+ */
+async function registerCapacitorListenerIfNeeded() {
+  if (!isCapacitor() || _capacitorListenerRegistered) return;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    await LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
+      const extra = notificationAction.notification.extra;
+      void (async () => {
+        await focusAppWindow();
+        if (extra?.link) await navigateToLink(extra.link);
+      })();
+    });
+    _capacitorListenerRegistered = true;
+  } catch (e) {
+    console.warn('Could not register Capacitor listener', e);
+  }
+}
+
+function hashCode(str: string) {
+  let hash = 0, i, chr;
+  if (str.length === 0) return hash;
+  for (i = 0; i < str.length; i++) {
+    chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return hash;
 }
 
 /**
@@ -133,10 +209,36 @@ export async function showForInAppNotification(n: {
   const title = n.title?.trim() || 'Tyresoles';
   const body = n.message?.trim() || '';
 
+  if (isCapacitor()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      await registerCapacitorListenerIfNeeded();
+      
+      // Use purely numeric ID for capacitor local notifications
+      let capId = 1;
+      try {
+        capId = Math.abs(hashCode(n.id));
+      } catch {}
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title,
+            body,
+            id: capId,
+            extra: { link: n.link ?? null }
+          }
+        ]
+      });
+      return;
+    } catch (e) {
+      console.warn('Capacitor LocalNotification failed', e);
+    }
+  }
+
   /*
    * Browser and Tauri both use the Web Notifications API in the webview (the plugin’s
-   * sendNotification is a thin wrapper around `new Notification`). Using one path gives
-   * reliable click → focus + navigate on every platform.
+   * sendNotification is a thin wrapper around `new Notification`).
    */
   if (!isWebNotificationSupported()) return;
 

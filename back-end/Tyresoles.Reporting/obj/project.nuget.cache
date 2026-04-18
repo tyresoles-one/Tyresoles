@@ -30,5 +30,30 @@
     "C:\\Users\\mades\\.nuget\\packages\\system.servicemodel.http\\10.0.652802\\system.servicemodel.http.10.0.652802.nupkg.sha512",
     "C:\\Users\\mades\\.nuget\\packages\\system.servicemodel.primitives\\10.0.652802\\system.servicemodel.primitives.10.0.652802.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Xml' 10.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx",
+      "projectPath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Reporting\\Tyresoles.Reporting.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Reporting\\Tyresoles.Reporting.csproj",
+      "libraryId": "System.Security.Cryptography.Xml",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Xml' 10.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf",
+      "projectPath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Reporting\\Tyresoles.Reporting.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Reporting\\Tyresoles.Reporting.csproj",
+      "libraryId": "System.Security.Cryptography.Xml",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }

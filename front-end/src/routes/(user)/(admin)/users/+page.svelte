@@ -22,23 +22,17 @@
 
   // GraphQL & utils
   import { gql } from "graphql-request";
+  
   const GetUsersDocument: any = gql`
-    query GetUsers($skip: Int, $take: Int, $where: String, $order: String) {
-      user(username: "dummy") {
-        userId
-      }
-    }
-  `;
-/*
-  const GetUsersDocument: any = gql`
-    query GetUsers($skip: Int, $take: Int, $where: UserFilterInput, $order: [UserSortInput!]) {
-      users(skip: $skip, take: $take, where: $where, order: $order) {
+    query GetUsers($skip: Int, $take: Int, $where: UserFilterInput, $order: [UserSortInput!], $duplicateMobileOnly: Boolean) {
+      users(skip: $skip, take: $take, where: $where, order: $order, duplicateMobileOnly: $duplicateMobileOnly) {
         items {
-          userId
+          userSecurityID
+          userName
           fullName
           userType
           mobileNo
-          emails
+          authenticationEmail
           state
           avatar
         }
@@ -46,16 +40,16 @@
       }
     }
   `;
-*/
 
   type GetUsersQuery = {
     users: {
       items: Array<{
+        userSecurityId?: string;
         userName: string;
         fullName: string;
         userType: string;
         mobileNo?: string;
-        emails?: string;
+        authenticationEmail?: string;
         state: number;
         avatar?: string;
       }>;
@@ -90,28 +84,68 @@
     query: GetUsersDocument,
     dataPath: "users",
     pageSize: 50,
+    manualSearch: true,
+    serverVariableAllowlist: ["where", "order", "duplicateMobileOnly", "skip", "take"],
+    mapSearchToVariables: (term) => {
+      if (!term) return { where: undefined };
+      return {
+        where: {
+          or: [
+            { fullName: { contains: term } },
+            { userName: { contains: term } },
+            { mobileNo: { contains: term } },
+          ],
+        },
+      };
+    },
   });
+
+  import { untrack } from "svelte";
 
   let lastState = $state<number | null | "init">("init");
   let lastUserType = $state<string | undefined | "init">("init");
   let lastDuplicateMobileOnly = $state<true | undefined | "init">("init");
+  let lastSort = $state<string | null>("init");
+
+  let isInitialLoad = true;
+
   $effect(() => {
-    const state =
-      statusFilter === "Active" ? 0 : statusFilter === "Inactive" ? 1 : null;
-    const userType = userTypeFilter || undefined;
-    const duplicateMobileOnly = showDuplicateMobileOnly ? true : undefined;
-    const prevDup =
-      lastDuplicateMobileOnly === "init" ? undefined : lastDuplicateMobileOnly;
-    if (
-      state === lastState &&
-      userType === lastUserType &&
-      duplicateMobileOnly === prevDup
-    )
-      return;
-    lastState = state;
-    lastUserType = userType;
-    lastDuplicateMobileOnly = duplicateMobileOnly;
-    list.pagination.setVariables({ state, userType, duplicateMobileOnly });
+    // Reactive inputs - these trigger the effect
+    const stateVal = statusFilter === "Active" ? 0 : statusFilter === "Inactive" ? 1 : null;
+    const utFilter = userTypeFilter || undefined;
+    const dupOnly = showDuplicateMobileOnly ? true : undefined;
+    const q = list.searchQuery.value;
+    const sField = list.pagination.sortField;
+    const sDir = list.pagination.sortDirection;
+
+    untrack(() => {
+      // Construction of complex objects
+      const filters: any[] = [];
+      if (stateVal !== null) filters.push({ state: { eq: stateVal } });
+      if (utFilter) filters.push({ userType: { eq: utFilter } });
+      
+      const searchVars = q ? list.pagination.mapSearchToVariables?.(q) : null;
+      if (searchVars?.where) filters.push(searchVars.where);
+
+      const where = filters.length > 0 ? { and: filters } : undefined;
+      const order = sField ? [{ [sField]: sDir === "asc" ? "ASC" : "DESC" }] : undefined;
+
+      // Skip update if variables are identical to current ones
+      const current = list.pagination.baseVariables;
+      const hasChanged = 
+        JSON.stringify(where) !== JSON.stringify(current.where) ||
+        dupOnly !== current.duplicateMobileOnly ||
+        JSON.stringify(order) !== JSON.stringify(current.order);
+
+      if (!hasChanged && !isInitialLoad) return;
+      isInitialLoad = false;
+
+      list.pagination.setVariables({ 
+        where, 
+        order, 
+        duplicateMobileOnly: dupOnly 
+      });
+    });
   });
 
   function userTypeName(code: string): string {
@@ -228,6 +262,7 @@
     <Button
       size="sm"
       class="gap-2 shrink-0 bg-primary/90 hover:bg-primary shadow-sm hover:shadow-md transition-all"
+      onclick={() => goto(`/users/new-user`)}
     >
       <Icon name="plus" class="size-3.5" />
       <span class="hidden sm:inline">Add User</span>
@@ -298,12 +333,12 @@
 
             <!-- Metadata Grid -->
             <div class="mt-3 grid gap-1.5">
-              {#if user.emails}
+              {#if user.authenticationEmail}
                 <div
                   class="flex items-center gap-1.5 text-xs text-muted-foreground/80"
                 >
                   <Icon name="mail" class="size-3 shrink-0" />
-                  <span class="truncate">{user.emails}</span>
+                  <span class="truncate">{user.authenticationEmail}</span>
                 </div>
               {/if}
               {#if user.mobileNo}
@@ -431,13 +466,13 @@
             <span class="truncate max-w-[140px]">{user.mobileNo}</span>
           </div>
         {/if}
-        {#if user.emails?.trim()}
+        {#if user.authenticationEmail?.trim()}
           <div class="flex items-center gap-2 text-muted-foreground">
             <Icon name="mail" class="size-3 shrink-0" />
-            <span class="truncate max-w-[140px]">{user.emails}</span>
+            <span class="truncate max-w-[140px]">{user.authenticationEmail}</span>
           </div>
         {/if}
-        {#if !user.mobileNo?.trim() && !user.emails?.trim()}
+        {#if !user.mobileNo?.trim() && !user.authenticationEmail?.trim()}
           <span class="text-muted-foreground/60">—</span>
         {/if}
       </div>

@@ -16,7 +16,7 @@ fn primary_size() -> Result<(u32, u32), String> {
 }
 
 #[tauri::command]
-pub fn remote_assist_pointer(x_norm: f64, y_norm: f64, action: String) -> Result<(), String> {
+pub fn remote_assist_pointer(x_norm: f64, y_norm: f64, action: String, delta_y: Option<i32>) -> Result<(), String> {
     let (sw, sh) = primary_size()?;
     let px = (x_norm.clamp(0.0, 1.0) * sw as f64) as i32;
     let py = (y_norm.clamp(0.0, 1.0) * sh as f64) as i32;
@@ -28,7 +28,14 @@ pub fn remote_assist_pointer(x_norm: f64, y_norm: f64, action: String) -> Result
     match action.as_str() {
         "down" => enigo.button(btn, Direction::Press).map_err(|e| e.to_string()),
         "up" => enigo.button(btn, Direction::Release).map_err(|e| e.to_string()),
-        "move" => Ok(()),
-        _ => Ok(()),
+        "wheel" => {
+            if let Some(dy) = delta_y {
+                // Negative because enigo uses positive for scroll up (or vice-versa depending on platform)
+                enigo.scroll(-dy, enigo::Axis::Vertical).map_err(|e| e.to_string())
+            } else {
+                Ok(())
+            }
+        }
+        "move" | _ => Ok(()),
     }
 }

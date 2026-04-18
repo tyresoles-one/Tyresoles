@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Linq.Expressions;
 using Dataverse.NavLive;
@@ -575,31 +577,20 @@ public sealed class UserService : IUserService
 
         var updates = new List<Expression<Func<Dataverse.NavLive.User, object>>>();
 
-        if (input.FullName != null)
-        {
-            user.FullName = input.FullName;
-            updates.Add(u => u.FullName);
-        }
-        if (input.MobileNo != null)
-        {
-            user.MobileNo = input.MobileNo;
-            updates.Add(u => u.MobileNo);
-        }
-        if (input.Email != null)
-        {
-            user.AuthenticationEmail = input.Email;
-            updates.Add(u => u.AuthenticationEmail);
-        }
-        if (input.Avatar.HasValue)
-        {
-            user.Avatar = input.Avatar.Value;
-            updates.Add(u => u.Avatar);
-        }
-        if (input.SecurityPIN.HasValue)
-        {
-            user.SecurityPin = input.SecurityPIN.Value;
-            updates.Add(u => u.SecurityPin);
-        }
+        if (input.FullName != null) { user.FullName = input.FullName; updates.Add(u => u.FullName); }
+        if (input.UserType != null) { user.UserType = input.UserType; updates.Add(u => u.UserType); }
+        if (input.MobileNo != null) { user.MobileNo = input.MobileNo; updates.Add(u => u.MobileNo); }
+        if (input.Email != null) { user.Emails = input.Email; updates.Add(u => u.Emails); }
+        if (input.AuthenticationEmail != null) { user.AuthenticationEmail = input.AuthenticationEmail; updates.Add(u => u.AuthenticationEmail); }
+        if (input.State.HasValue) { user.State = input.State.Value; updates.Add(u => u.State); }
+        if (input.Avatar.HasValue) { user.Avatar = input.Avatar.Value; updates.Add(u => u.Avatar); }
+        if (input.SecurityPIN.HasValue) { user.SecurityPin = input.SecurityPIN.Value; updates.Add(u => u.SecurityPin); }
+        if (input.CanRunErp.HasValue) { user.CanRunERP = input.CanRunErp.Value; updates.Add(u => u.CanRunERP); }
+        if (input.CanRunOldErp.HasValue) { user.CanRunOldERP = input.CanRunOldErp.Value; updates.Add(u => u.CanRunOldERP); }
+        if (input.AllowAllMasters.HasValue) { user.AllowAllMasters = input.AllowAllMasters.Value; updates.Add(u => u.AllowAllMasters); }
+        if (input.BackupStorageQuotaGB.HasValue) { user.BackupStorageQuotaGB = input.BackupStorageQuotaGB.Value; updates.Add(u => u.BackupStorageQuotaGB); }
+        if (input.BackupAllowedFileTypes != null) { user.BackupAllowedFileTypes = input.BackupAllowedFileTypes; updates.Add(u => u.BackupAllowedFileTypes); }
+        if (input.BackupGDriveFolderID != null) { user.BackupGDriveFolderID = input.BackupGDriveFolderID; updates.Add(u => u.BackupGDriveFolderID); }
 
         if (updates.Count > 0)
         {
@@ -921,9 +912,84 @@ public sealed class UserService : IUserService
         {
             UserId = user.UserName ?? string.Empty,
             FullName = user.FullName ?? string.Empty,
+            UserType = user.UserType ?? string.Empty,
+            MobileNo = user.MobileNo ?? string.Empty,
+            AuthenticationEmail = user.Emails ?? string.Empty,
+            State = user.State,
+            CanRunERP = user.CanRunERP,
+            CanRunOldERP = user.CanRunOldERP,
+            AllowAllMasters = user.AllowAllMasters,
+            BackupStorageQuotaGB = user.BackupStorageQuotaGB,
+            BackupAllowedFileTypes = user.BackupAllowedFileTypes ?? string.Empty,
+            BackupGDriveFolderID = user.BackupGDriveFolderID ?? string.Empty,
             RDPPassword = user.RDPPassword,
             NavConfigName = user.NavConfigName
         };
+    }
+
+    public async Task<bool> UpdatePermissionsAsync(string username, List<UserPermissionInput> permissions, CancellationToken cancellationToken = default)
+    {
+        using var scope = _dataService.ForNavLive();
+        var user = await scope.Query<Dataverse.NavLive.User>().Where(u => u.UserName == username).FirstOrDefaultAsync(cancellationToken);
+        if (user == null) return false;
+
+        await scope.DeleteWhereAsync<AccessControl>(ac => ac.UserSecurityID == user.UserSecurityID, cancellationToken);
+        
+        if (permissions.Count > 0)
+        {
+            var newRecords = permissions.Select(p => new AccessControl
+            {
+                UserSecurityID = user.UserSecurityID,
+                RoleID = p.RoleId,
+                Values = p.Values,
+                HomePath = p.HomePath,
+                AssignerName = "ADMIN", // Or track current admin
+                CompanyName = "" // Assuming shared across companies or empty for global
+            });
+            await scope.BulkInsertAsync(newRecords, cancellationToken);
+        }
+        return true;
+    }
+
+    public async Task<bool> UpdateResponsibilityCentersAsync(string username, List<UserRespCenterInput> assignments, CancellationToken cancellationToken = default)
+    {
+        using var scope = _dataService.ForNavLive();
+        // RespCenterUserSetup uses UserID (string)
+        await scope.DeleteWhereAsync<RespCenterUserSetup>(r => r.UserID == username, cancellationToken);
+
+        if (assignments.Count > 0)
+        {
+            var newRecords = assignments.Select(a => new RespCenterUserSetup
+            {
+                UserID = username,
+                RespCenter = a.RespCenter,
+                Default = a.Default,
+                Type = a.Type,
+                Code = a.Code
+            });
+            await scope.BulkInsertAsync(newRecords, cancellationToken);
+        }
+        return true;
+    }
+
+    public async Task<bool> UpdatePostingSetupAsync(string username, List<UserPostingSetupInput> assignments, CancellationToken cancellationToken = default)
+    {
+        using var scope = _dataService.ForNavLive();
+        // UserSetup uses UserID (string)
+        await scope.DeleteWhereAsync<UserSetup>(u => u.UserID == username, cancellationToken);
+
+        if (assignments.Count > 0)
+        {
+            var newRecords = assignments.Select(a => new UserSetup
+            {
+                UserID = username,
+                ResponsibilityCenter = a.ResponsibilityCenter,
+                AllowPostingFrom = a.AllowPostingFrom,
+                AllowPostingTo = a.AllowPostingTo
+            });
+            await scope.BulkInsertAsync(newRecords, cancellationToken);
+        }
+        return true;
     }
 }
 

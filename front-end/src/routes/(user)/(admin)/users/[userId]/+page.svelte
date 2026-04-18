@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -30,50 +31,91 @@
 
 	// Admin list/mutation operations are not yet in schema/codegen; stubs keep the bundle buildable (see respCenters/+page.svelte).
 	const GetResponsibilityCentersDocument = gql`
-		query GetResponsibilityCenters($natureOfBusiness: [Int!], $skip: Int, $take: Int) {
-			__typename
+		query GetResponsibilityCenters($skip: Int, $take: Int, $where: ResponsibilityCenterFilterInput) {
+			responsibilityCenters(skip: $skip, take: $take, where: $where) {
+				items {
+					code
+					name
+				}
+				totalCount
+			}
 		}
 	` as any;
 	type GetResponsibilityCentersQuery = any;
+
 	const GetEmployeesDocument = gql`
-		query GetEmployees($skip: Int, $take: Int) {
-			__typename
+		query GetEmployees($skip: Int, $take: Int, $where: EmployeeFilterInput) {
+			employees(skip: $skip, take: $take, where: $where) {
+				items {
+					no
+					firstName
+					lastName
+				}
+				totalCount
+			}
 		}
 	` as any;
 	type GetEmployeesQuery = any;
+
 	const GetPermissionSetsDocument = gql`
 		query GetPermissionSets($take: Int) {
-			__typename
+			permissionSets(take: $take) {
+				items {
+					roleID
+					name
+				}
+				totalCount
+			}
 		}
 	` as any;
 	type GetPermissionSetsQuery = any;
+
 	const UpdateUserPermissionsDocument = gql`
-		mutation UpdateUserPermissions {
-			__typename
+		mutation UpdateUserPermissions($userName: String!, $permissions: [UserPermissionInput!]!) {
+			updateUserPermissions(userName: $userName, permissions: $permissions) {
+				success
+				message
+			}
 		}
 	` as any;
 	type UpdateUserPermissionsMutation = any;
+
 	const UpdateUserResponsibilityCentersDocument = gql`
-		mutation UpdateUserResponsibilityCenters {
-			__typename
+		mutation UpdateUserResponsibilityCenters($userName: String!, $assignments: [UserRespCenterInput!]!) {
+			updateUserResponsibilityCenters(userName: $userName, assignments: $assignments) {
+				success
+				message
+			}
 		}
 	` as any;
 	type UpdateUserResponsibilityCentersMutation = any;
+
 	const UpdateUserPostingSetupDocument = gql`
-		mutation UpdateUserPostingSetup {
-			__typename
+		mutation UpdateUserPostingSetup($userName: String!, $assignments: [UserPostingSetupInput!]!) {
+			updateUserPostingSetup(userName: $userName, assignments: $assignments) {
+				success
+				message
+			}
 		}
 	` as any;
 	type UpdateUserPostingSetupMutation = any;
+
 	const UpdateUserDetailsDocument = gql`
-		mutation UpdateUserDetails {
-			__typename
+		mutation UpdateUserDetails($userName: String!, $details: ProfileUpdateInput!) {
+			updateUserDetails(userName: $userName, details: $details) {
+				success
+				message
+			}
 		}
 	` as any;
 	type UpdateUserDetailsMutation = any;
+
 	const GetReportsDocument = gql`
 		query GetReports($category: String!) {
-			__typename
+			reports: reportsByCategory(category: $category) {
+				id
+				name
+			}
 		}
 	` as any;
 
@@ -92,14 +134,34 @@
 		allowPostingTo: string;
 	};
 
+	const GetUserDetailDocument = gql`
+		query GetUserDetail($username: String!) {
+			user(username: $username) {
+				userId
+				fullName
+				userType
+				mobileNo
+				authenticationEmail
+				state
+				canRunERP
+				canRunOldERP
+				allowAllMasters
+				backupStorageQuotaGB
+				backupAllowedFileTypes
+				backupGDriveFolderID
+			}
+		}
+	`;
+
 	// Route param is userName
 	let userId = $derived(decodeURIComponent($page.params.userId ?? '').trim());
+	let isNewUser = $derived(userId === 'new-user');
 	
     // Queries powered by Tanstack for caching, deduping, and auto-loading states
-	const userQuery = useAppQuery<GetUserQuery, any>(
-		GetUserDocument,
+	const userQuery = useAppQuery<any, any>(
+		GetUserDetailDocument,
 		() => ({ username: userId }),
-		() => ({ enabled: !!userId })
+		() => ({ enabled: !!userId && !isNewUser })
 	);
 	const rcQuery = useAppQuery<GetResponsibilityCentersQuery, any>(GetResponsibilityCentersDocument, () => ({ natureOfBusiness: [0, 1, 2, 3, 4], skip: 0, take: 500 }));
 	const empQuery = useAppQuery<GetEmployeesQuery, any>(GetEmployeesDocument, () => ({ skip: 0, take: 500 }));
@@ -122,7 +184,7 @@
         }) ?? []
     );
 	let permissionOptions = $derived(
-        permQuery.data?.permissionSets?.items?.map((i: any) => ({ roleId: i.roleId, name: i.name || i.roleId })) ?? []
+        permQuery.data?.permissionSets?.items?.map((i: any) => ({ roleId: i.roleID, name: i.name || i.roleID })) ?? []
     );
 
     // Draft state for 2-way binding to form inputs
@@ -154,12 +216,12 @@
 		}[]
 	});
 
-	let loading = $derived(userQuery.isPending);
+	let loading = $derived(userQuery.isPending && !isNewUser);
 	let saving = $derived(permsMut.isPending || rcMut.isPending || postingMut.isPending || userMut.isPending);
 	let error = $derived(
-		userQuery.isError
+		!isNewUser && userQuery.isError
 			? userQuery.error.message
-			: userQuery.isSuccess && !userQuery.data?.user
+			: !isNewUser && userQuery.isSuccess && !userQuery.data?.user
 				? 'User not found'
 				: undefined
 	);
@@ -169,26 +231,27 @@
         const foundUser = userQuery.data?.user;
         if (!foundUser) return;
 
-        // GetUser only returns core UserDetail fields; extended admin fields require schema + codegen.
-        user = {
-            ...user,
-            fullName: foundUser.fullName ?? '',
-            userName: userId,
-            userType: user.userType,
-            email: user.email,
-            mobile: user.mobile,
-            status: user.status,
-            lastActive: new Date().toISOString(),
-            canRunErp: user.canRunErp,
-            canRunOldErp: user.canRunOldErp,
-            allowAllMasters: user.allowAllMasters,
-            backupStorageQuotaGb: user.backupStorageQuotaGb,
-            backupAllowedFileTypes: user.backupAllowedFileTypes,
-            backupGDriveFolderId: user.backupGDriveFolderId,
-            respCenterSetup: user.respCenterSetup,
-            postingSetup: user.postingSetup,
-            permissions: user.permissions
-        };
+        untrack(() => {
+            // Only update if we haven't loaded this user's data yet or if it's a different user
+            if (user.userName === userId && user.fullName === foundUser.fullName) return;
+
+            user = {
+                ...user,
+                fullName: foundUser.fullName ?? '',
+                userName: userId,
+                userType: foundUser.userType ?? '',
+                email: foundUser.authenticationEmail ?? '',
+                mobile: foundUser.mobileNo ?? '',
+                status: foundUser.state ?? 0,
+                canRunErp: foundUser.canRunERP ?? 0,
+                canRunOldErp: foundUser.canRunOldERP ?? 0,
+                allowAllMasters: foundUser.allowAllMasters ?? 0,
+                backupStorageQuotaGb: foundUser.backupStorageQuotaGB ?? 0,
+                backupAllowedFileTypes: foundUser.backupAllowedFileTypes ?? '',
+                backupGDriveFolderId: foundUser.backupGDriveFolderID ?? '',
+                lastActive: new Date().toISOString()
+            };
+        });
     });
 
     const REPORT_ROLES: Record<string, string> = {
@@ -298,9 +361,9 @@
                         canRunErp: user.canRunErp ? 1 : 0,
                         canRunOldErp: user.canRunOldErp ? 1 : 0,
                         allowAllMasters: user.allowAllMasters ? 1 : 0,
-                        backupStorageQuotaGb: user.backupStorageQuotaGb,
+                        backupStorageQuotaGB: user.backupStorageQuotaGb,
                         backupAllowedFileTypes: user.backupAllowedFileTypes,
-                        backupGDriveFolderId: user.backupGDriveFolderId
+                        backupGDriveFolderID: user.backupGDriveFolderId
                     }
                 })
             ]);
@@ -344,6 +407,8 @@
           <h1 class="text-xl font-bold tracking-tight">
             {#if loading}
               <Skeleton class="h-8 w-48" />
+            {:else if isNewUser}
+              Add User
             {:else}
               Edit User
             {/if}
@@ -542,7 +607,8 @@
                         >
                         <Input
                           bind:value={user.userName}
-                          readonly
+                          readonly={!isNewUser}
+                          placeholder={isNewUser ? "e.g., JDoe" : ""}
                           class="h-9 bg-background/50"
                         />
                       </div>

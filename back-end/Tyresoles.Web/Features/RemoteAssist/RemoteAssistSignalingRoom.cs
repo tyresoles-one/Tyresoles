@@ -116,27 +116,38 @@ public sealed class RemoteAssistSignalingHub
         public bool TryRegister(bool isHost, WebSocket socket, out string? error)
         {
             error = null;
+            WebSocket? oldSocket = null;
             lock (_lock)
             {
                 if (isHost)
                 {
                     if (_host is not null && _host.State == WebSocketState.Open)
                     {
-                        error = "Host already connected.";
-                        return false;
+                        oldSocket = _host;
                     }
                     _host = socket;
-                    return true;
                 }
-
-                if (_viewer is not null && _viewer.State == WebSocketState.Open)
+                else
                 {
-                    error = "Viewer already connected.";
-                    return false;
+                    if (_viewer is not null && _viewer.State == WebSocketState.Open)
+                    {
+                        oldSocket = _viewer;
+                    }
+                    _viewer = socket;
                 }
-                _viewer = socket;
-                return true;
             }
+            
+            if (oldSocket is not null)
+            {
+                // Forcefully close the old stalled connection in the background so the new one takes over immediately
+                _ = Task.Run(async () =>
+                {
+                    try { await oldSocket.CloseAsync(WebSocketCloseStatus.ProtocolError, "Replaced by new connection", CancellationToken.None); }
+                    catch { /* ignore */ }
+                });
+            }
+            
+            return true;
         }
 
         public void EnqueueForPeer(bool senderIsHost, byte[] payload)

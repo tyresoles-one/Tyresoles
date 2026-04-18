@@ -41,6 +41,8 @@ export interface UsePaginatedListConfig<T> {
 	/** See SmartPagination `paginationMode` / `pageInfoPath`. */
 	paginationMode?: 'offset' | 'cursor';
 	pageInfoPath?: string;
+	/** If true, the composable will not automatically sync search to pagination. Use when merging search into manual filters. */
+	manualSearch?: boolean;
 }
 
 export interface UsePaginatedListReturn<T> {
@@ -100,6 +102,7 @@ export function usePaginatedList<T>(
 	let previousSearchTerm: string | null = null;
 	$effect(() => {
 		const q = searchQuery;
+		if (config.manualSearch) return;
 		if (previousSearchTerm === null) {
 			previousSearchTerm = q;
 			return;

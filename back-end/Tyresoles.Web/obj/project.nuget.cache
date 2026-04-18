@@ -110,5 +110,18 @@
     "C:\\Users\\mades\\.nuget\\packages\\yarp.reverseproxy\\2.0.1\\yarp.reverseproxy.2.0.1.nupkg.sha512",
     "C:\\Users\\mades\\.nuget\\packages\\zxing.net\\0.16.11\\zxing.net.0.16.11.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "NU1904",
+      "level": "Warning",
+      "message": "Package 'HotChocolate.Language' 13.9.0 has a known critical severity vulnerability, https://github.com/advisories/GHSA-qr3m-xw4c-jqw3",
+      "projectPath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Web\\Tyresoles.Web.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Web\\Tyresoles.Web.csproj",
+      "libraryId": "HotChocolate.Language",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }

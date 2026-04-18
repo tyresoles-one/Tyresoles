@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Multi-tenant SQL data access for Business Central / Dynamics NAV style databases.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d9b48db97ecf6c55916a8e5dd9b505a87502abe6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1c49db517948992068d100941943b33458870074")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tyresoles.Sql")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tyresoles.Sql")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

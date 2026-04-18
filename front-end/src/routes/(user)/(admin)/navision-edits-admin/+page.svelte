@@ -354,50 +354,6 @@
     });
     if (res.success && res.data) {
       requests = res.data.navEditAllRequests;
-      const r = requests[0];
-      if (r) {
-        const ca = r.createdAt;
-        const pa = r.processedAt;
-        const dca = new Date(ca);
-        const dpa = pa ? new Date(pa) : null;
-        // #region agent log
-        fetch("http://127.0.0.1:7618/ingest/5d806cd4-86b2-403a-9e2d-75847ea1b6fa", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ab180f" },
-          body: JSON.stringify({
-            sessionId: "ab180f",
-            runId: "pre-fix",
-            hypothesisId: "H2-H3",
-            location: "navision-edits-admin/+page.svelte:fetchRequests",
-            message: "nav edit queue first row datetimes",
-            data: {
-              createdAtRaw: ca,
-              processedAtRaw: pa ?? null,
-              createdEndsWithZ: typeof ca === "string" && ca.endsWith("Z"),
-              parsedCreatedMs: dca.getTime(),
-              parsedProcessedMs: dpa && !Number.isNaN(dpa.getTime()) ? dpa.getTime() : null,
-              nowMs: Date.now(),
-              deltaCreatedMs: Date.now() - dca.getTime(),
-              tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              localeDateStringEnIn: (() => {
-                try {
-                  return new Date(ca).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                } catch {
-                  return "err";
-                }
-              })(),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      }
     }
     requestsLoading = false;
   }

@@ -52,6 +52,16 @@ export async function createAssistSession(
 	return res.json() as Promise<CreateSessionResponse>;
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+	try {
+		const j = (await res.json()) as { error?: string };
+		if (j?.error) return j.error;
+	} catch {
+		/* ignore */
+	}
+	return fallback;
+}
+
 export async function joinAssistSession(
 	token: string,
 	body: { joinCode: string; viewerDisplayName?: string },
@@ -64,7 +74,50 @@ export async function joinAssistSession(
 		},
 		body: JSON.stringify(body),
 	});
-	if (!res.ok) throw new Error(`Join failed: ${res.status}`);
+	if (!res.ok)
+		throw new Error(await readApiError(res, `Join failed: ${res.status}`));
+	return res.json() as Promise<JoinSessionResponse>;
+}
+
+export type ActiveAssistSessionItem = {
+	sessionId: string;
+	joinCode: string;
+	hostUserId: string;
+	hostDisplayName: string | null;
+	status: string;
+	viewerUserId: string | null;
+	expiresAtUtc: string;
+	createdAtUtc: string;
+};
+
+/** Lists non-ended assist sessions. Returns 403 if the caller is not configured as an assist admin. */
+export async function listActiveAssistSessions(
+	token: string,
+): Promise<ActiveAssistSessionItem[]> {
+	const res = await fetch(apiUrl("/api/remote-assist/sessions/active"), {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	if (res.status === 403) throw new Error("FORBIDDEN");
+	if (!res.ok) throw new Error(`List active sessions failed: ${res.status}`);
+	return res.json() as Promise<ActiveAssistSessionItem[]>;
+}
+
+/** Join as viewer by session id (assist admins only; replaces current viewer). */
+export async function adminJoinAssistSession(
+	token: string,
+	sessionId: string,
+	body?: { viewerDisplayName?: string },
+): Promise<JoinSessionResponse> {
+	const res = await fetch(apiUrl(`/api/remote-assist/sessions/${sessionId}/admin-join`), {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(body ?? {}),
+	});
+	if (!res.ok)
+		throw new Error(await readApiError(res, `Admin join failed: ${res.status}`));
 	return res.json() as Promise<JoinSessionResponse>;
 }
 

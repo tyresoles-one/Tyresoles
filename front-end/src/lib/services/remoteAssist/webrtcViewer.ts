@@ -41,6 +41,9 @@ export async function runViewerSession(opts: {
 		}
 	};
 
+	let isRemoteDescriptionSet = false;
+	const pendingCandidates: RTCIceCandidateInit[] = [];
+
 	pc.onconnectionstatechange = () => {
 		callbacks.onConnectionState(pc.connectionState);
 	};
@@ -62,6 +65,10 @@ export async function runViewerSession(opts: {
 		if (msg.type === "offer") {
 			try {
 				await pc.setRemoteDescription({ type: "offer", sdp: msg.sdp });
+				isRemoteDescriptionSet = true;
+				pendingCandidates.forEach((c) => pc.addIceCandidate(c).catch(() => {}));
+				pendingCandidates.length = 0;
+
 				const answer = await pc.createAnswer();
 				await pc.setLocalDescription(answer);
 				if (ws.readyState === WebSocket.OPEN && pc.localDescription) {
@@ -78,10 +85,14 @@ export async function runViewerSession(opts: {
 			return;
 		}
 		if (msg.type === "ice") {
-			try {
-				await pc.addIceCandidate(msg.candidate);
-			} catch {
-				/* ignore */
+			if (isRemoteDescriptionSet) {
+				try {
+					await pc.addIceCandidate(msg.candidate);
+				} catch {
+					/* ignore */
+				}
+			} else {
+				pendingCandidates.push(msg.candidate);
 			}
 		}
 	};

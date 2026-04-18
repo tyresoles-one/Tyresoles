@@ -44,28 +44,40 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $projectRoot = Split-Path -Parent $scriptRoot
 
 if (-not $BuildDir) {
-    $BuildDir = Join-Path $projectRoot "src-tauri\target\release\bundle\nsis"
+    # Switch from NSIS to WIX (MSI) to support correct overwriting/updates on Windows
+    $BuildDir = Join-Path $projectRoot "src-tauri\target\release\bundle\msi"
+    
+    # Check if 'msi' exists, if not try 'wix' (older Tauri v1 name)
+    if (-not (Test-Path $BuildDir)) {
+         $BuildDir = Join-Path $projectRoot "src-tauri\target\release\bundle\wix"
+    }
 }
 
 if (-not (Test-Path $BuildDir)) {
-    Write-Error "Build directory not found: $BuildDir`nRun 'npm run tauri:build' first."
+    Write-Error "Build directory (MSI) not found: $BuildDir`nRun 'npm run tauri:build' first."
     exit 1
 }
 
-# ── Find the NSIS installer (.exe) and signature (.sig) ───────────
-$exeFile = Get-ChildItem -Path $BuildDir -Filter "*-setup.exe" | Select-Object -First 1
-if (-not $exeFile) {
-    Write-Error "No NSIS installer (*-setup.exe) found in $BuildDir"
+# ── Find the MSI installer (.msi) and signature (.sig) ────────────
+$msiFile = Get-ChildItem -Path $BuildDir -Filter "*.msi" | Where-Object { $_.Name -notlike "*_en-US.msi" -or $_.Name -like "*x64_en-US.msi" } | Select-Object -First 1
+if (-not $msiFile) {
+    Write-Error "No MSI installer (*.msi) found in $BuildDir"
     exit 1
 }
 
-$sigFile = Get-Item -Path "$($exeFile.FullName).sig" -ErrorAction SilentlyContinue
+# Tauri signs MSI files by adding .sig extension
+$sigFile = Get-Item -Path "$($msiFile.FullName).sig" -ErrorAction SilentlyContinue
 if (-not $sigFile) {
-    Write-Error "Signature file not found: $($exeFile.FullName).sig`nDid you set TAURI_SIGNING_PRIVATE_KEY before building?"
+    # Check if .msi.sig (common pattern)
+    $sigFile = Get-Item -Path "$($msiFile.FullName).sig" -ErrorAction SilentlyContinue
+}
+
+if (-not $sigFile) {
+    Write-Error "Signature file not found for $($msiFile.Name).`nEnsure you set TAURI_SIGNING_PRIVATE_KEY and that the MSI is signed."
     exit 1
 }
 
-Write-Host "Installer : $($exeFile.Name)" -ForegroundColor Cyan
+Write-Host "Installer : $($msiFile.Name)" -ForegroundColor Cyan
 Write-Host "Signature : $($sigFile.Name)" -ForegroundColor Cyan
 Write-Host "Version   : $Version" -ForegroundColor Cyan
 Write-Host "Target    : $TargetDir" -ForegroundColor Cyan
@@ -79,9 +91,9 @@ if (-not (Test-Path $TargetDir)) {
 }
 
 # ── Copy installer ────────────────────────────────────────────────
-$destExe = Join-Path $TargetDir $exeFile.Name
-Copy-Item -Path $exeFile.FullName -Destination $destExe -Force
-Write-Host "Copied installer -> $destExe" -ForegroundColor Green
+$destMsi = Join-Path $TargetDir $msiFile.Name
+Copy-Item -Path $msiFile.FullName -Destination $destMsi -Force
+Write-Host "Copied installer -> $destMsi" -ForegroundColor Green
 
 # ── Read signature ────────────────────────────────────────────────
 $signature = Get-Content -Path $sigFile.FullName -Raw
@@ -89,7 +101,7 @@ $signature = $signature.Trim()
 
 # ── Build URL ─────────────────────────────────────────────────────
 $baseUrlTrimmed = $BaseUrl.TrimEnd("/")
-$downloadUrl = "$baseUrlTrimmed/$($exeFile.Name)"
+$downloadUrl = "$baseUrlTrimmed/$($msiFile.Name)"
 
 # ── Generate update.json ──────────────────────────────────────────
 if (-not $Notes) {

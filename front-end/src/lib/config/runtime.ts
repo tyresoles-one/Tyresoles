@@ -43,6 +43,10 @@ export const AppConfigSchema = z.object({
     .default(
       "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi",
     ),
+  /** VPN installer URL; overrides API `vpnInstallerConfig.downloadUrl` when non-empty. */
+  downloadVpnUrl: z
+    .union([z.string().url(), z.literal("")])
+    .default(""),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -63,6 +67,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   oldNavConfig: "OldG01",
   downloadUrl:
     "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi",
+  downloadVpnUrl: "",
 };
 
 const CONFIG_FILENAME = "app-config.json";

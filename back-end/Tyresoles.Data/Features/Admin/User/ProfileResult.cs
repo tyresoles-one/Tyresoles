@@ -28,8 +28,17 @@ public sealed class UserEntity
 public sealed class ProfileUpdateInput
 {
     public string? FullName { get; init; }
+    public string? UserType { get; init; }
     public string? MobileNo { get; init; }
     public string? Email { get; init; }
+    public string? AuthenticationEmail { get; init; }
+    public int? State { get; init; }
     public int? Avatar { get; init; }
     public int? SecurityPIN { get; init; }
+    public byte? CanRunErp { get; init; }
+    public byte? CanRunOldErp { get; init; }
+    public byte? AllowAllMasters { get; init; }
+    public decimal? BackupStorageQuotaGB { get; init; }
+    public string? BackupAllowedFileTypes { get; init; }
+    public string? BackupGDriveFolderID { get; init; }
 }

@@ -4,6 +4,7 @@ using Dataverse.NavLive;
 using HotChocolate;
 using HotChocolate.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 using Tyresoles.Data;
 using Tyresoles.Data.Features.Admin.Session;
 using Tyresoles.Data.Features.Admin.User;
@@ -20,7 +21,9 @@ using Tyresoles.Data.Features.Common;
 using Tyresoles.Data.Features.Accounts;
 using Tyresoles.Data.Features.Accounts.Models;
 using Tyresoles.Sql.Abstractions;
+using Tyresoles.Sql.GraphQL;
 using Tyresoles.Web.GraphQL;
+using Tyresoles.Web.Features.VpnInstaller;
 using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
 using Vendor = Dataverse.NavLive.Vendor;
 
@@ -30,6 +33,25 @@ namespace Tyresoles.Web;
 public class Query
 {
     public string Version => "1.0";
+
+    /// <summary>Get Drive Sync user configuration for the specified user or the caller.</summary>
+    [Authorize]
+    [GraphQLName("getDriveSyncConfig")]
+    public async Task<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncUserConfig?> GetDriveSyncConfig(
+        string? targetUserId,
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var callerUserId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        
+        // Admins pass targetUserId, otherwise fetch own config
+        var uid = string.IsNullOrEmpty(targetUserId) ? callerUserId : targetUserId;
+        if (string.IsNullOrEmpty(uid)) return null;
+
+        return await syncService.GetUserConfigAsync(uid, cancellationToken);
+    }
 
     /// <summary>Get profile for a user by userId (UserName or MobileNo). Returns null if not found. Requires authentication.</summary>
     [Authorize]
@@ -273,6 +295,110 @@ public class Query
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return salesService.GetMyVehiclesQuery(scope, entityType, entityCode, department, respCenter);
     }
+
+    /// <summary>
+    /// Admin fetch for all users in the system.
+    /// Hot Chocolate: projection, filtering, sorting, and offset paging.
+    /// </summary>
+    /// <summary>
+    /// Admin fetch for all users in the system.
+    /// Hot Chocolate: projection, filtering, sorting, and offset paging.
+    /// </summary>
+    [Authorize]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 200)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.User> GetUsers(
+        bool? duplicateMobileOnly,
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        var query = scope.Query<Dataverse.NavLive.User>();
+        
+        if (duplicateMobileOnly == true)
+        {
+            // Filter users who share a mobile number with at least one other user.
+            // Using a raw SQL exists condition for performance on non-indexed mobile columns if needed,
+            // but IQuery.WhereRaw is cleaner here.
+            query = query.Where("EXISTS (SELECT 1 FROM " + scope.GetQualifiedTableName("User", isShared: true) + " u2 WHERE u2.[Mobile No_] = t0.[Mobile No_] AND u2.[User Security ID] <> t0.[User Security ID])");
+        }
+        
+        return query.AsQueryable(scope);
+    }
+
+    /// <summary>Fetch a single user profile with extended info.</summary>
+    [Authorize]
+    public async Task<ProfileResult?> GetUserDetail(
+        string userId,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        return await userService.GetProfileAsync(userId, cancellationToken);
+    }
+
+    /// <summary>Paged responsibility centers for lookups.</summary>
+    [Authorize]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 2000)]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.ResponsibilityCenter> GetResponsibilityCenters(
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return scope.Query<Dataverse.NavLive.ResponsibilityCenter>().AsQueryable(scope);
+    }
+
+    /// <summary>Paged permission sets for assignment.</summary>
+    [Authorize]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 2000)]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.PermissionSet> GetPermissionSets(
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return scope.Query<Dataverse.NavLive.PermissionSet>().AsQueryable(scope);
+    }
+
+    /// <summary>Paged employee list for user linking.</summary>
+    [Authorize]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 2000)]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.Employee> GetEmployees(
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return scope.Query<Dataverse.NavLive.Employee>().AsQueryable(scope);
+    }
+
+    /// <summary>Fetch reports by category for permission mapping.</summary>
+    [Authorize]
+    public async Task<List<ReportMeta>> GetReportsByCategory(
+        string category,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesReportService salesReportService,
+        [Service] IProductionReportService productionReportService,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForNavLive();
+        if (category == "sales")
+            return await salesReportService.GetReportMetaAsync(scope, null, cancellationToken);
+        if (category == "production")
+            return await productionReportService.GetReportMetaAsync(scope, null, cancellationToken);
+        
+        return new List<ReportMeta>();
+    }
+
    
     /// <summary>
     /// NAV Post Code master (PIN, city, state, country). Source: <see cref="ICommonDataService.GetPostCodesQuery"/>.
@@ -838,6 +964,23 @@ public class Query
         CancellationToken cancellationToken = default)
     {
         return await commonService.GetGroupDetailsAsync(category, codes, cancellationToken);
+    }
+
+    /// <summary>VPN installer download metadata for the Tauri desktop client (URL from server config). Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("vpnInstallerConfig")]
+    public VpnInstallerConfig GetVpnInstallerConfig(
+        [Service] IOptionsSnapshot<VpnInstallerOptions> options)
+    {
+        var o = options.Value;
+        return new VpnInstallerConfig
+        {
+            DownloadUrl = o.DownloadUrl ?? "",
+            Sha256Hex = o.Sha256Hex,
+            FileName = o.FileName,
+            IsZipArchive = o.IsZipArchive,
+            ZipEntryName = o.ZipEntryName,
+        };
     }
 
     /// <summary>Get user details including RDP password and NAV config name by username. Requires authentication.</summary>

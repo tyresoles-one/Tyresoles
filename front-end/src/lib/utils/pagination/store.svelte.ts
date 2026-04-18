@@ -70,13 +70,13 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
 
   // Internal
   private query: RequestDocument;
-  private baseVariables: TVariables;
+  baseVariables = $state<TVariables>({} as TVariables);
   private strategy: PaginationStrategy;
   private clientModeMaxLimit: number;
   private itemsPath: string;
   private countPath: string;
   private skipCache: boolean;
-  private mapSearchToVariables?: (term: string) => Partial<TVariables>;
+  mapSearchToVariables?: (term: string) => Partial<TVariables>;
   private serverVariableAllowlist?: readonly string[];
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;

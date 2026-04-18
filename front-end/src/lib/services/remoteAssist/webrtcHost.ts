@@ -4,6 +4,7 @@ import {
 	stringifySignalingMessage,
 	type SignalingMessage,
 } from "./signaling";
+import { Capacitor } from '@capacitor/core';
 
 export type HostCallbacks = {
 	onError: (message: string) => void;
@@ -34,6 +35,9 @@ export async function runHostSession(opts: {
 		displayStream?.getTracks().forEach((t) => t.stop());
 		pc.close();
 	};
+
+	let isRemoteDescriptionSet = false;
+	const pendingCandidates: RTCIceCandidateInit[] = [];
 
 	pc.onconnectionstatechange = () => {
 		callbacks.onConnectionState(pc.connectionState);
@@ -71,18 +75,54 @@ export async function runHostSession(opts: {
 	}
 
 	try {
-		displayStream = await navigator.mediaDevices.getDisplayMedia({
-			video: true,
-			audio: true,
-		});
+		if (Capacitor.isNativePlatform()) {
+			// Mobile Native Host - Route completely through specialized WebRTC Plugin
+			const { TyresolesWebRTCHost } = await import('./plugin/TyresolesWebRTCHost');
+			
+			await TyresolesWebRTCHost.addListener('onError', (err) => callbacks.onError(err.message));
+			await TyresolesWebRTCHost.addListener('onConnectionStateChange', (s) => callbacks.onConnectionState(s.state as any));
+			await TyresolesWebRTCHost.addListener('onBroadcastStopped', () => {
+				callbacks.onError("Screen sharing was stopped interactively");
+				cleanup();
+			});
+
+			await TyresolesWebRTCHost.initializeSession({
+				token,
+				sessionId,
+				iceServers: iceServers as { urls: string; username?: string; credential?: string }[]
+			});
+
+			const bResult = await TyresolesWebRTCHost.startBroadcast();
+			if (!bResult.success) {
+				throw new Error(bResult.error ?? "Failed to initialize mobile broadcast");
+			}
+
+			// We bypass standard JS WebSockets because the native C++ WebRTC engine handles signaling internally in Route A architecture
+			return {
+				close: () => {
+					void TyresolesWebRTCHost.stopBroadcast();
+					cleanup();
+				}
+			};
+		} else {
+			// Web / Desktop Host
+			displayStream = await navigator.mediaDevices.getDisplayMedia({
+				video: true,
+				audio: true,
+			});
+
+			displayStream.getTracks().forEach((track) => {
+				pc.addTrack(track, displayStream!);
+				track.onended = () => {
+					callbacks.onError("Screen sharing was stopped interactively");
+					cleanup();
+				};
+			});
+		}
 	} catch (e) {
 		cleanup();
-		throw e instanceof Error ? e : new Error("getDisplayMedia failed");
+		throw e instanceof Error ? e : new Error("Screen capture initialization failed");
 	}
-
-	displayStream.getTracks().forEach((track) => {
-		pc.addTrack(track, displayStream!);
-	});
 
 	const wsUrl = buildRemoteAssistWebSocketUrl(token, sessionId, "host");
 	ws = new WebSocket(wsUrl);
@@ -97,16 +137,23 @@ export async function runHostSession(opts: {
 		if (msg.type === "answer") {
 			try {
 				await pc.setRemoteDescription({ type: "answer", sdp: msg.sdp });
+				isRemoteDescriptionSet = true;
+				pendingCandidates.forEach(c => pc.addIceCandidate(c).catch(() => {}));
+				pendingCandidates.length = 0;
 			} catch (e) {
 				callbacks.onError(e instanceof Error ? e.message : "setRemoteDescription answer");
 			}
 			return;
 		}
 		if (msg.type === "ice") {
-			try {
-				await pc.addIceCandidate(msg.candidate);
-			} catch {
-				/* ignore late candidates */
+			if (isRemoteDescriptionSet) {
+				try {
+					await pc.addIceCandidate(msg.candidate);
+				} catch {
+					/* ignore */
+				}
+			} else {
+				pendingCandidates.push(msg.candidate);
 			}
 			return;
 		}

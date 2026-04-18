@@ -15,6 +15,18 @@ public interface IRemoteAssistService
         string? viewerDisplayName,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Privileged join by session id (overwrites existing viewer if any). Host cannot use this for their own session.
+    /// </summary>
+    Task<JoinRemoteAssistSessionResult?> AdminJoinSessionAsync(
+        Guid sessionId,
+        string adminUserId,
+        string? viewerDisplayName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Non-ended, non-expired assist sessions (for admin dashboard).</summary>
+    Task<IReadOnlyList<ActiveRemoteAssistSessionDto>> ListActiveSessionsAsync(CancellationToken cancellationToken = default);
+
     Task<RemoteAssistSession?> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken = default);
 
     Task<bool> EndSessionAsync(Guid sessionId, string userId, CancellationToken cancellationToken = default);
@@ -38,4 +50,16 @@ public sealed class JoinRemoteAssistSessionResult
     public required Guid SessionId { get; init; }
     public required string HostUserId { get; init; }
     public required DateTime ExpiresAtUtc { get; init; }
+}
+
+public sealed class ActiveRemoteAssistSessionDto
+{
+    public required Guid SessionId { get; init; }
+    public required string JoinCode { get; init; }
+    public required string HostUserId { get; init; }
+    public string? HostDisplayName { get; init; }
+    public string Status { get; init; } = "";
+    public string? ViewerUserId { get; init; }
+    public DateTime ExpiresAtUtc { get; init; }
+    public DateTime CreatedAtUtc { get; init; }
 }

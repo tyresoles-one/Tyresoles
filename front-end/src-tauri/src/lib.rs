@@ -1,7 +1,10 @@
 mod app_config;
+mod forticlient;
+mod vpn_installer;
 mod rdplaunch;
 mod remote_assist;
 mod service_checker;
+mod drive_sync;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +28,9 @@ pub fn run() {
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_notification::init())
+    .plugin(tauri_plugin_sql::Builder::default().build())
+    .manage(std::sync::Arc::new(drive_sync::SyncState::default()))
+    .manage(std::sync::Arc::new(vpn_installer::VpnDownloadControl::default()))
     // 3. Invoke handler for frontend commands
     .invoke_handler(tauri::generate_handler![
       app_config::read_app_config,
@@ -32,11 +38,20 @@ pub fn run() {
       app_config::get_windows_user,
       rdplaunch::launch_rdp,
       rdplaunch::launch_nav,
+      forticlient::forticlient_installation_status,
+      forticlient::uninstall_forticlient_silent,
+      vpn_installer::vpn_installer_disk_status,
+      vpn_installer::vpn_installer_download,
+      vpn_installer::vpn_installer_cancel,
+      vpn_installer::vpn_installer_open_folder,
       service_checker::check_services,
       service_checker::start_service,
       service_checker::stop_service,
       service_checker::restart_service,
       remote_assist::remote_assist_pointer,
+      drive_sync::start_sync,
+      drive_sync::pause_sync,
+      drive_sync::fetch_remote_state,
     ])
     // 4. Setup hook — runs after plugins are initialized.
     //    Eagerly create the config file so it exists before the frontend loads.

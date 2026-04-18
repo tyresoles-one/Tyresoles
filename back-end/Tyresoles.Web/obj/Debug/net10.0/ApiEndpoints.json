@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_12",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_13",
     "RelativePath": "",
     "HttpMethod": "GET",
     "IsController": false,
@@ -112,7 +112,7 @@
   },
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_14",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_15",
     "RelativePath": "api/easebuzz/status",
     "HttpMethod": "GET",
     "IsController": false,
@@ -401,6 +401,35 @@
   },
   {
     "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "AdminJoinSession",
+    "RelativePath": "api/remote-assist/sessions/{sessionId}/admin-join",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "sessionId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      },
+      {
+        "Name": "body",
+        "Type": "Tyresoles.Web.Controllers.AdminJoinSessionRequest",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Tyresoles.Web.Controllers.JoinSessionResponse",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
     "Method": "EndSession",
     "RelativePath": "api/remote-assist/sessions/{sessionId}/end",
     "HttpMethod": "POST",
@@ -438,6 +467,24 @@
   },
   {
     "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
+    "Method": "ListActiveSessions",
+    "RelativePath": "api/remote-assist/sessions/active",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.IReadOnlyList\u00601[[Tyresoles.Web.Controllers.ActiveSessionListItemResponse, Tyresoles.Web, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Tyresoles.Web.Controllers.RemoteAssistController",
     "Method": "JoinSession",
     "RelativePath": "api/remote-assist/sessions/join",
     "HttpMethod": "POST",
@@ -462,7 +509,7 @@
   },
   {
     "ContainingType": "Program\u002B\u003C\u003Ec",
-    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_13",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_14",
     "RelativePath": "api/reports/{reportName}/pdf",
     "HttpMethod": "GET",
     "IsController": false,

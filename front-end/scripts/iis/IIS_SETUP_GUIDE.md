@@ -46,8 +46,9 @@ Copy-Item "d:\Work Desk\Tyresoles\front-end\scripts\iis\web.config" "C:\inetpub\
 
 In IIS Manager, select the site/virtual directory → double-click **MIME Types** → verify:
 - `.json` → `application/json`
-- `.exe` → `application/octet-stream`
+- `.msi` → `application/octet-stream`
 - `.sig` → `application/octet-stream`
+- `.json` → `application/json`
 
 ### 5. Test the Endpoint
 
@@ -67,12 +68,12 @@ After each Tauri build with signing:
 # Set signing key (only needed once per terminal session)
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\tyresoles.key" -Raw
 
-# Build
+# Build (creates both MSI and NSIS, but we use MSI for updates)
 cd "d:\Work Desk\Tyresoles\front-end"
 npm run tauri:build
 
-# Publish
-.\scripts\publish-update.ps1 -Version "0.2.0" -TargetDir "C:\inetpub\tyresoles-updates"
+# Publish (Now correctly uses MSI for stable updates)
+.\scripts\publish-update.ps1 -Version "0.4.0" -TargetDir "C:\inetpub\tyresoles-updates"
 ```
 
 ### Changing Domains Later
@@ -83,7 +84,7 @@ To switch from `http://app.tyresoles.net` to `https://app.tyresoles.in`:
 2. Copy the same `web.config` to the new directory
 3. Publish with the new `-BaseUrl`:
    ```powershell
-   .\scripts\publish-update.ps1 -Version "0.3.0" `
+   .\scripts\publish-update.ps1 -Version "0.5.0" `
        -TargetDir "C:\inetpub\tyresoles-updates-new" `
        -BaseUrl "https://app.tyresoles.in/updates"
    ```
@@ -95,7 +96,7 @@ To switch from `http://app.tyresoles.net` to `https://app.tyresoles.in`:
 C:\inetpub\tyresoles-updates\
 ├── web.config
 ├── update.json
-└── Tyresoles_0.2.0_x64-setup.exe
+└── Tyresoles_0.4.0_x64_en-US.msi
 ```
 
 ## Firewall

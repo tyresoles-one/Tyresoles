@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Tyresoles.Data.Features.RemoteAssist;
 using Tyresoles.Web.Features.RemoteAssist;
 
@@ -18,16 +19,19 @@ namespace Tyresoles.Web.Controllers;
 public sealed class RemoteAssistController : ControllerBase
 {
     private readonly IRemoteAssistService _assistService;
-    private readonly Microsoft.Extensions.Options.IOptions<RemoteAssistIceOptions> _iceOptions;
+    private readonly IOptions<RemoteAssistIceOptions> _iceOptions;
+    private readonly IOptions<RemoteAssistOptions> _assistOptions;
     private readonly ILogger<RemoteAssistController> _logger;
 
     public RemoteAssistController(
         IRemoteAssistService assistService,
-        Microsoft.Extensions.Options.IOptions<RemoteAssistIceOptions> iceOptions,
+        IOptions<RemoteAssistIceOptions> iceOptions,
+        IOptions<RemoteAssistOptions> assistOptions,
         ILogger<RemoteAssistController> logger)
     {
         _assistService = assistService;
         _iceOptions = iceOptions;
+        _assistOptions = assistOptions;
         _logger = logger;
     }
 
@@ -89,6 +93,52 @@ public sealed class RemoteAssistController : ControllerBase
         });
     }
 
+    /// <summary>Active (non-ended, non-expired) assist sessions. Assist admins only (see RemoteAssist:AssistAdmin* config).</summary>
+    [HttpGet("sessions/active")]
+    public async Task<ActionResult<IReadOnlyList<ActiveSessionListItemResponse>>> ListActiveSessions(CancellationToken cancellationToken)
+    {
+        if (!IsAssistAdmin(User))
+            return Forbid();
+        var rows = await _assistService.ListActiveSessionsAsync(cancellationToken).ConfigureAwait(false);
+        var list = rows.Select(r => new ActiveSessionListItemResponse
+        {
+            SessionId = r.SessionId,
+            JoinCode = r.JoinCode,
+            HostUserId = r.HostUserId,
+            HostDisplayName = r.HostDisplayName,
+            Status = r.Status,
+            ViewerUserId = r.ViewerUserId,
+            ExpiresAtUtc = r.ExpiresAtUtc,
+            CreatedAtUtc = r.CreatedAtUtc,
+        }).ToList();
+        return Ok(list);
+    }
+
+    /// <summary>Join as viewer by session id without a join code (replaces existing viewer). Assist admins only.</summary>
+    [HttpPost("sessions/{sessionId:guid}/admin-join")]
+    public async Task<ActionResult<JoinSessionResponse>> AdminJoinSession(
+        Guid sessionId,
+        [FromBody] AdminJoinSessionRequest? body,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAssistAdmin(User))
+            return Forbid();
+        var userId = GetUserId();
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+        var result = await _assistService.AdminJoinSessionAsync(sessionId, userId, body?.ViewerDisplayName, cancellationToken).ConfigureAwait(false);
+        if (result is null)
+            return NotFound(new { error = "Session not found, ended, expired, or you are the host of this session." });
+        _logger.LogInformation("RemoteAssist session {SessionId} joined by assist admin {UserId}", sessionId, userId);
+        return Ok(new JoinSessionResponse
+        {
+            SessionId = result.SessionId,
+            HostUserId = result.HostUserId,
+            ExpiresAtUtc = result.ExpiresAtUtc,
+            WebSocketPath = RemoteAssistWebSocketEndpoint.Path
+        });
+    }
+
     [HttpGet("sessions/{sessionId:guid}")]
     public async Task<ActionResult<SessionStatusResponse>> GetSession(Guid sessionId, CancellationToken cancellationToken)
     {
@@ -100,7 +150,8 @@ public sealed class RemoteAssistController : ControllerBase
         if (session is null)
             return NotFound();
 
-        if (!session.HostUserId.Equals(userId, StringComparison.OrdinalIgnoreCase) &&
+        if (!IsAssistAdmin(User) &&
+            !session.HostUserId.Equals(userId, StringComparison.OrdinalIgnoreCase) &&
             !(session.ViewerUserId?.Equals(userId, StringComparison.OrdinalIgnoreCase) ?? false))
             return Forbid();
 
@@ -150,6 +201,26 @@ public sealed class RemoteAssistController : ControllerBase
     private string? GetUserId() =>
         User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub);
+
+    private bool IsAssistAdmin(ClaimsPrincipal user)
+    {
+        var userId = GetUserId();
+        if (string.IsNullOrEmpty(userId))
+            return false;
+        var opts = _assistOptions.Value;
+        foreach (var id in opts.AssistAdminUserIds)
+        {
+            if (!string.IsNullOrWhiteSpace(id) && id.Equals(userId, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        var userType = user.FindFirstValue("userType") ?? "";
+        foreach (var t in opts.AssistAdminUserTypes)
+        {
+            if (!string.IsNullOrWhiteSpace(t) && t.Equals(userType, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
 }
 
 public sealed class CreateSessionRequest
@@ -195,6 +266,23 @@ public sealed class SessionStatusResponse
 public sealed class RemoteControlRequest
 {
     public bool Enabled { get; set; }
+}
+
+public sealed class AdminJoinSessionRequest
+{
+    public string? ViewerDisplayName { get; set; }
+}
+
+public sealed class ActiveSessionListItemResponse
+{
+    public Guid SessionId { get; set; }
+    public string JoinCode { get; set; } = "";
+    public string HostUserId { get; set; } = "";
+    public string? HostDisplayName { get; set; }
+    public string Status { get; set; } = "";
+    public string? ViewerUserId { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 }
 
 public sealed class IceServersResponse

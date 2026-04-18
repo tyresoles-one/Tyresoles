@@ -1071,9 +1071,68 @@ public sealed class NavEditService : INavEditService
             throw new InvalidOperationException("ReqGLEntry: entry number must be an integer (record key or Entry No_ column).");
 
         var glAccountNo = ResolveConnectorParam(template, changeMap, "glAccountNo", "G_L Account No_", "G/L Account No_", "G_L Account No_")?.Trim();
-        var respCenter = ResolveConnectorParam(template, changeMap, "respCenter", "Responsibility Center", "Resp_ Center")?.Trim();
+        var respCenter = ResolveConnectorParam(template, changeMap, "respCenter", "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code")?.Trim();
         var amountStr = ResolveConnectorParam(template, changeMap, "amount", "Amount");
         var postingStr = ResolveConnectorParam(template, changeMap, "postingDate", "Posting Date");
+
+        var reqType = request.RequestType ?? await _db.RequestTypes.FindAsync([request.RequestTypeId], ct);
+        var keyLookup = request.RecordKey?.Trim() ?? entryKey;
+
+        if (reqType != null && !string.IsNullOrWhiteSpace(keyLookup))
+        {
+            if (string.IsNullOrWhiteSpace(glAccountNo))
+            {
+                var cols = new List<string>();
+                var mapped = GetConnectorMappedColumnName(template, "glAccountNo", "");
+                if (!string.IsNullOrWhiteSpace(mapped)) cols.Add(mapped);
+                foreach (var n in new[] { "G_L Account No_", "G/L Account No_" })
+                    if (!cols.Exists(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) cols.Add(n);
+                foreach (var col in cols)
+                {
+                    var live = (await GetLiveNavColumnValueAsync(reqType, keyLookup, col, ct))?.Trim();
+                    if (!string.IsNullOrWhiteSpace(live)) { glAccountNo = live; break; }
+                }
+            }
+            if (string.IsNullOrWhiteSpace(respCenter))
+            {
+                var cols = new List<string>();
+                var mapped = GetConnectorMappedColumnName(template, "respCenter", "");
+                if (!string.IsNullOrWhiteSpace(mapped)) cols.Add(mapped);
+                foreach (var n in new[] { "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code" })
+                    if (!cols.Exists(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) cols.Add(n);
+                foreach (var col in cols)
+                {
+                    var live = (await GetLiveNavColumnValueAsync(reqType, keyLookup, col, ct))?.Trim();
+                    if (!string.IsNullOrWhiteSpace(live)) { respCenter = live; break; }
+                }
+            }
+            if (string.IsNullOrWhiteSpace(amountStr))
+            {
+                var cols = new List<string>();
+                var mapped = GetConnectorMappedColumnName(template, "amount", "");
+                if (!string.IsNullOrWhiteSpace(mapped)) cols.Add(mapped);
+                foreach (var n in new[] { "Amount" })
+                    if (!cols.Exists(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) cols.Add(n);
+                foreach (var col in cols)
+                {
+                    var live = (await GetLiveNavColumnValueAsync(reqType, keyLookup, col, ct))?.Trim();
+                    if (!string.IsNullOrWhiteSpace(live)) { amountStr = live; break; }
+                }
+            }
+            if (string.IsNullOrWhiteSpace(postingStr))
+            {
+                var cols = new List<string>();
+                var mapped = GetConnectorMappedColumnName(template, "postingDate", "");
+                if (!string.IsNullOrWhiteSpace(mapped)) cols.Add(mapped);
+                foreach (var n in new[] { "Posting Date" })
+                    if (!cols.Exists(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) cols.Add(n);
+                foreach (var col in cols)
+                {
+                    var live = (await GetLiveNavColumnValueAsync(reqType, keyLookup, col, ct))?.Trim();
+                    if (!string.IsNullOrWhiteSpace(live)) { postingStr = live; break; }
+                }
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(glAccountNo))
             throw new InvalidOperationException("ReqGLEntry: missing G/L account (changes or connectorParamColumns.glAccountNo).");

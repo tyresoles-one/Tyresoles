@@ -65,8 +65,6 @@ public sealed class RemoteAssistService : IRemoteAssistService
             return null;
         if (session.Status == RemoteAssistSessionStatus.Ended || session.ExpiresAtUtc < DateTime.UtcNow)
             return null;
-        if (session.HostUserId.Equals(viewerUserId, StringComparison.OrdinalIgnoreCase))
-            return null;
 
         var tracked = await _db.RemoteAssistSessions
             .FirstOrDefaultAsync(s => s.Id == session.Id, cancellationToken)
@@ -95,6 +93,57 @@ public sealed class RemoteAssistService : IRemoteAssistService
             HostUserId = tracked.HostUserId,
             ExpiresAtUtc = tracked.ExpiresAtUtc
         };
+    }
+
+    public async Task<JoinRemoteAssistSessionResult?> AdminJoinSessionAsync(
+        Guid sessionId,
+        string adminUserId,
+        string? viewerDisplayName,
+        CancellationToken cancellationToken = default)
+    {
+        var tracked = await _db.RemoteAssistSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tracked is null)
+            return null;
+        if (tracked.Status == RemoteAssistSessionStatus.Ended || tracked.ExpiresAtUtc < DateTime.UtcNow)
+            return null;
+        if (tracked.HostUserId.Equals(adminUserId, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        tracked.ViewerUserId = adminUserId;
+        tracked.ViewerDisplayName = viewerDisplayName;
+        tracked.Status = RemoteAssistSessionStatus.Active;
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return new JoinRemoteAssistSessionResult
+        {
+            SessionId = tracked.Id,
+            HostUserId = tracked.HostUserId,
+            ExpiresAtUtc = tracked.ExpiresAtUtc
+        };
+    }
+
+    public async Task<IReadOnlyList<ActiveRemoteAssistSessionDto>> ListActiveSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var rows = await _db.RemoteAssistSessions.AsNoTracking()
+            .Where(s => s.Status != RemoteAssistSessionStatus.Ended && s.ExpiresAtUtc >= now)
+            .OrderByDescending(s => s.CreatedAtUtc)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows.Select(s => new ActiveRemoteAssistSessionDto
+        {
+            SessionId = s.Id,
+            JoinCode = s.JoinCode,
+            HostUserId = s.HostUserId,
+            HostDisplayName = s.HostDisplayName,
+            Status = s.Status.ToString(),
+            ViewerUserId = s.ViewerUserId,
+            ExpiresAtUtc = s.ExpiresAtUtc,
+            CreatedAtUtc = s.CreatedAtUtc,
+        }).ToList();
     }
 
     public Task<RemoteAssistSession?> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken = default) =>

@@ -6601,5 +6601,17 @@
         }
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1904",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Package 'HotChocolate.Language' 13.9.0 has a known critical severity vulnerability, https://github.com/advisories/GHSA-qr3m-xw4c-jqw3",
+      "libraryId": "HotChocolate.Language",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }

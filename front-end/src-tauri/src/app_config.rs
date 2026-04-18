@@ -21,7 +21,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const CONFIG_FILENAME: &str = "app-config.json";
-const APP_IDENTIFIER: &str = "com.tyresoles.app";
+pub(crate) const APP_IDENTIFIER: &str = "com.tyresoles.app";
 
 /// Returns the **Installation-specific config file path**.
 /// This is located next to the installed `.exe` (or binary).
@@ -81,6 +81,8 @@ pub struct AppConfig {
     pub old_nav_config: String,
     #[serde(default = "default_download_url")]
     pub download_url: String,
+    #[serde(default = "default_download_vpn_url")]
+    pub download_vpn_url: String,
 }
 
 fn default_backend_base_url() -> String {
@@ -135,6 +137,10 @@ fn default_download_url() -> String {
     "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi".to_string()
 }
 
+fn default_download_vpn_url() -> String {
+    String::new()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -151,6 +157,7 @@ impl Default for AppConfig {
             nav_exe_path: default_nav_exe_path(),
             old_nav_config: default_old_nav_config(),
             download_url: default_download_url(),
+            download_vpn_url: default_download_vpn_url(),
         }
     }
 }

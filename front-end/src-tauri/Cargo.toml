@@ -29,3 +29,14 @@ tauri-plugin-notification = "2"
 dirs = "5"
 display-info = "0.5"
 enigo = "0.2"
+tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+tokio = { version = "1", features = ["time", "fs", "io-util", "macros", "rt-multi-thread", "sync"] }
+reqwest = { version = "0.12", default-features = true, features = ["stream", "json"] }
+futures-util = "0.3"
+sha2 = "0.10"
+hex = "0.4"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+shell-words = "1.1"

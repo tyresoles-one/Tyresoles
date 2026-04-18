@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Security.Claims;
+using Dataverse.NavLive;
 using HotChocolate;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
@@ -27,6 +29,40 @@ public class Mutation
     /// </summary>
     private static GraphQLException ToGqlNavException(Exception ex) =>
         new(NavConnectorErrorFormatting.FormatMessage(ex));
+
+    /// <summary>Save Drive Sync configuration for a user. Requires authentication (typically admin only, unless configuring own).</summary>
+    [Authorize]
+    [GraphQLName("saveDriveSyncConfig")]
+    public async Task<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncUserConfig> SaveDriveSyncConfig(
+        Tyresoles.Data.Features.DriveSync.Entities.DriveSyncUserConfig input,
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var adminUserId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+
+        // Admin saves config for a user
+        return await syncService.SaveUserConfigAsync(input, adminUserId, cancellationToken);
+    }
+
+    /// <summary>Request a short-lived JIT Token for direct Google Drive sync. Called by Tauri Sidecar.</summary>
+    [Authorize]
+    [GraphQLName("requestDriveSyncToken")]
+    public async Task<string> RequestDriveSyncToken(
+        long requestedUploadBytes,
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        
+        if (string.IsNullOrEmpty(userId)) 
+            throw new GraphQLException("Unauthorized");
+
+        return await syncService.RequestJitSyncTokenAsync(userId, requestedUploadBytes, cancellationToken);
+    }
 
     public async Task<LoginResult> Login(
         string username,
@@ -182,6 +218,78 @@ public class Mutation
         catch (Exception ex)
         {
             return new SetProfileResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    public async Task<SetProfileResult> UpdateUserDetails(
+        string userName,
+        ProfileUpdateInput details,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await userService.SetProfileAsync(userName, details, cancellationToken);
+            return new SetProfileResult { Success = result, Message = result ? "User updated." : "User not found." };
+        }
+        catch (Exception ex)
+        {
+            return new SetProfileResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    public async Task<MutationResult> UpdateUserPermissions(
+        string userName,
+        List<UserPermissionInput> permissions,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await userService.UpdatePermissionsAsync(userName, permissions, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Permissions updated." : "Failed to update permissions." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    public async Task<MutationResult> UpdateUserResponsibilityCenters(
+        string userName,
+        List<UserRespCenterInput> assignments,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await userService.UpdateResponsibilityCentersAsync(userName, assignments, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Responsibility centers updated." : "Failed to update assignments." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    public async Task<MutationResult> UpdateUserPostingSetup(
+        string userName,
+        List<UserPostingSetupInput> assignments,
+        [Service] IUserService userService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await userService.UpdatePostingSetupAsync(userName, assignments, cancellationToken);
+            return new MutationResult { Success = result, Message = result ? "Posting setup updated." : "Failed to update posting setup." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
         }
     }
 

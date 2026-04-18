@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using Dataverse.NavLive;
 namespace Tyresoles.Data.Features.Admin.User;
 
 public interface IUserService
@@ -25,4 +28,30 @@ public interface IUserService
 
     /// <summary>Get user details including RDP password and NAV config name by username.</summary>
     Task<UserDetail?> GetUserAsync(string username, CancellationToken cancellationToken = default);
+
+    Task<bool> UpdatePermissionsAsync(string username, List<UserPermissionInput> permissions, CancellationToken cancellationToken = default);
+    Task<bool> UpdateResponsibilityCentersAsync(string username, List<UserRespCenterInput> assignments, CancellationToken cancellationToken = default);
+    Task<bool> UpdatePostingSetupAsync(string username, List<UserPostingSetupInput> assignments, CancellationToken cancellationToken = default);
+}
+
+public class UserPermissionInput
+{
+    public string RoleId { get; set; } = "";
+    public string Values { get; set; } = "";
+    public byte HomePath { get; set; }
+}
+
+public class UserRespCenterInput
+{
+    public string RespCenter { get; set; } = "";
+    public byte Default { get; set; }
+    public RespCenterUserSetupType Type { get; set; }
+    public string Code { get; set; } = "";
+}
+
+public class UserPostingSetupInput
+{
+    public string ResponsibilityCenter { get; set; } = "";
+    public DateTime? AllowPostingFrom { get; set; }
+    public DateTime? AllowPostingTo { get; set; }
 }

@@ -79,5 +79,30 @@
     "C:\\Users\\mades\\.nuget\\packages\\system.servicemodel.security\\4.10.3\\system.servicemodel.security.4.10.3.nupkg.sha512",
     "C:\\Users\\mades\\.nuget\\packages\\zxing.net\\0.16.11\\zxing.net.0.16.11.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Xml' 10.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-37gx-xxp4-5rgx",
+      "projectPath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Data\\Tyresoles.Data.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Data\\Tyresoles.Data.csproj",
+      "libraryId": "System.Security.Cryptography.Xml",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Xml' 10.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-w3x6-4m5h-cxqf",
+      "projectPath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Data\\Tyresoles.Data.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Work Desk\\Tyresoles\\back-end\\Tyresoles.Data\\Tyresoles.Data.csproj",
+      "libraryId": "System.Security.Cryptography.Xml",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }

@@ -38,7 +38,19 @@
     ],
     "resources": [
       "../static/configs"
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "upgradeCode": "E3F976D1-C91A-45C0-99E8-59695679A835",
+        "language": "en-US"
+      },
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": [
+          "English"
+        ]
+      }
+    }
   },
   "plugins": {
     "updater": {
