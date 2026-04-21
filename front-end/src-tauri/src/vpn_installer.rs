@@ -681,3 +681,28 @@ pub fn vpn_installer_open_folder() -> Result<(), String> {
 pub fn vpn_installer_open_folder() -> Result<(), String> {
     Err("Opening a folder is only supported on Windows.".to_string())
 }
+
+/// Opens a downloaded installer (.exe / .msi) with the default shell handler (user completes setup).
+#[cfg(windows)]
+#[tauri::command]
+pub fn vpn_installer_launch_file(path: String) -> Result<(), String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err("Path is empty.".to_string());
+    }
+    let p = Path::new(path);
+    if !p.is_file() {
+        return Err(format!("File not found: {}", path));
+    }
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", path])
+        .spawn()
+        .map_err(|e| format!("Could not start installer: {}", e))?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn vpn_installer_launch_file(_path: String) -> Result<(), String> {
+    Err("VPN installer launch is only supported on Windows.".to_string())
+}

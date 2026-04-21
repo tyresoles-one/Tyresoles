@@ -1,5 +1,6 @@
 mod app_config;
 mod forticlient;
+mod fortivpn;
 mod vpn_installer;
 mod rdplaunch;
 mod remote_assist;
@@ -39,11 +40,21 @@ pub fn run() {
       rdplaunch::launch_rdp,
       rdplaunch::launch_nav,
       forticlient::forticlient_installation_status,
-      forticlient::uninstall_forticlient_silent,
+      forticlient::uninstall_forticlient,
+      forticlient::forticlient_conf_disk_status,
+      forticlient::forticlient_conf_download,
+      forticlient::forticlient_conf_patch,
+      forticlient::forticlient_conf_open_folder,
+      forticlient::forticlient_fcconfig_import_admin,
+      fortivpn::fortivpn_cli_status,
+      fortivpn::fortivpn_cli_list,
+      fortivpn::fortivpn_cli_connect,
+      fortivpn::fortivpn_cli_disconnect,
       vpn_installer::vpn_installer_disk_status,
       vpn_installer::vpn_installer_download,
       vpn_installer::vpn_installer_cancel,
       vpn_installer::vpn_installer_open_folder,
+      vpn_installer::vpn_installer_launch_file,
       service_checker::check_services,
       service_checker::start_service,
       service_checker::stop_service,

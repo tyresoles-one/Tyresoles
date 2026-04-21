@@ -4311,6 +4311,8 @@ public partial class User
     [NavColumn("Security PIN")] public int SecurityPin { get; set; }
     [NavColumn("RDP Password")] public string RDPPassword { get; set; }
     [NavColumn("Nav Config Name")] public string NavConfigName { get; set; }
+    [NavColumn("Vpn UserID")] public string VpnUserID { get; set; }
+    [NavColumn("Vpn Password")] public string VpnPassword { get; set; }
 }
 
 [NavTable("User Personalization", IsShared = true)]

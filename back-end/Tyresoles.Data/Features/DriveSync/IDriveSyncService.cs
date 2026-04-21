@@ -4,6 +4,10 @@ using Tyresoles.Data.Features.DriveSync.Entities;
 
 namespace Tyresoles.Data.Features.DriveSync;
 
+/// <summary>
+/// Reads and updates Drive sync policy on Nav Live <c>User</c> (folder id, quota GB, file types).
+/// Prefer admin <see cref="Tyresoles.Data.Features.Admin.User.IUserService.SetProfileAsync"/> / Users UI for routine edits.
+/// </summary>
 public interface IDriveSyncService
 {
     Task<DriveSyncUserConfig?> GetUserConfigAsync(string userId, CancellationToken ct = default);

@@ -149,9 +149,37 @@
 				backupStorageQuotaGB
 				backupAllowedFileTypes
 				backupGDriveFolderID
+				respCenterSetup {
+					userId
+					respCenter
+					respDefault
+					type
+					code
+				}
+				postingSetup {
+					responsibilityCenter
+					allowPostingFrom
+					allowPostingTo
+				}
+				permissions {
+					roleId
+					roleName
+					companyName
+					assignerName
+					roleExipryDate
+					values
+					homePath
+				}
 			}
 		}
 	`;
+
+	const REPORT_ROLES: Record<string, string> = {
+		'RPT-ACCS': 'accounts',
+		'RPT-PAYRL': 'payroll',
+		'RPT-PROD': 'production',
+		'RPT-SALES': 'sales'
+	};
 
 	// Route param is userName
 	let userId = $derived(decodeURIComponent($page.params.userId ?? '').trim());
@@ -226,14 +254,38 @@
 				: undefined
 	);
 
-    // Sync remote data into local state when fetched
+    // Sync remote data into local state when the query result updates (avoid reading `user` here so typing in the form does not retrigger and reset).
     $effect(() => {
         const foundUser = userQuery.data?.user;
-        if (!foundUser) return;
+        if (!foundUser || !userId || isNewUser) return;
 
         untrack(() => {
-            // Only update if we haven't loaded this user's data yet or if it's a different user
-            if (user.userName === userId && user.fullName === foundUser.fullName) return;
+            const from = (s: string | null | undefined) => (s ? String(s).slice(0, 10) : '');
+            const permRows = (foundUser.permissions ?? []).map((p: any) => {
+                const roleId = p.roleId ?? '';
+                const values = p.values ?? '';
+                let _vals: (string | number)[] = [];
+                if (REPORT_ROLES[roleId] && values) {
+                    _vals = values
+                        .split(',')
+                        .map((x: string) => x.trim())
+                        .filter(Boolean)
+                        .map((x: string) => {
+                            const n = Number(x);
+                            return Number.isFinite(n) ? n : x;
+                        });
+                }
+                return {
+                    roleId,
+                    roleName: p.roleName ?? '',
+                    companyName: p.companyName ?? '',
+                    assignerName: p.assignerName ?? '',
+                    roleExipryDate: p.roleExipryDate ?? '',
+                    values,
+                    _values: _vals,
+                    homePath: p.homePath ?? 0
+                };
+            });
 
             user = {
                 ...user,
@@ -249,17 +301,24 @@
                 backupStorageQuotaGb: foundUser.backupStorageQuotaGB ?? 0,
                 backupAllowedFileTypes: foundUser.backupAllowedFileTypes ?? '',
                 backupGDriveFolderId: foundUser.backupGDriveFolderID ?? '',
-                lastActive: new Date().toISOString()
+                lastActive: new Date().toISOString(),
+                respCenterSetup: (foundUser.respCenterSetup ?? []).map((r: any) => ({
+                    userId: userId,
+                    respCenter: r.respCenter ?? '',
+                    default: r.respDefault ?? 0,
+                    type: r.type ?? 0,
+                    code: r.code ?? ''
+                })),
+                postingSetup: (foundUser.postingSetup ?? []).map((p: any) => ({
+                    userId: userId,
+                    responsibilityCenter: p.responsibilityCenter ?? '',
+                    allowPostingFrom: from(p.allowPostingFrom),
+                    allowPostingTo: from(p.allowPostingTo)
+                })),
+                permissions: permRows
             };
         });
     });
-
-    const REPORT_ROLES: Record<string, string> = {
-        'RPT-ACCS': 'accounts',
-        'RPT-PAYRL': 'payroll',
-        'RPT-PROD': 'production',
-        'RPT-SALES': 'sales'
-    };
 
     let reportsCache = $state<Record<string, { id: number; name: string }[]>>({});
 
@@ -703,11 +762,16 @@
 
                     <Separator class="my-4 opacity-50" />
 
-                    <!-- Google Drive Settings -->
+                    <!-- Google Drive Settings (Nav Live User: Backup Storage Quota, Allowed File Types, G Drive Folder ID) -->
                     <div class="space-y-4">
-                      <h3 class="text-sm font-semibold text-foreground">
-                        Google Drive Settings
-                      </h3>
+                      <div>
+                        <h3 class="text-sm font-semibold text-foreground">
+                          Google Drive backup / sync
+                        </h3>
+                        <p class="text-xs text-muted-foreground mt-1">
+                          Stored on the Nav <code class="text-[10px]">User</code> record. Used by the desktop sync client and <code class="text-[10px]">getDriveSyncConfig</code>.
+                        </p>
+                      </div>
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="space-y-1.5">
                           <span

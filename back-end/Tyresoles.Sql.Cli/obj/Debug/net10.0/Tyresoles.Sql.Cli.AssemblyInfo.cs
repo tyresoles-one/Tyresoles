@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Tyresoles.Sql.Cli")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d9b48db97ecf6c55916a8e5dd9b505a87502abe6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6b8fd0c6751467a00b52e66542853032f4458df")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tyresoles.Sql.Cli")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tyresoles.Sql.Cli")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

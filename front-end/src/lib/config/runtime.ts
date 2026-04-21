@@ -41,20 +41,26 @@ export const AppConfigSchema = z.object({
     .string()
     .url()
     .default(
-      "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi",
+      "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64_en-US.msi",
     ),
-  /** VPN installer URL; overrides API `vpnInstallerConfig.downloadUrl` when non-empty. */
+  /** VPN installer download URL (used by ERP apps VPN UI / Tauri download). */
   downloadVpnUrl: z
     .union([z.string().url(), z.literal("")])
-    .default(""),
+    .default("https://app.tyresoles.in/downloads/FortiClient.msi"),
+  /** FortiClient SSL VPN tunnel name for `FortiVPN.exe --cli` (e.g. Tyresoles). */
+  fortivpnTunnel: z.string().default("Tyresoles"),
+  /** Optional SSL-VPN username when it differs from ERP login (e.g. ABHIRAJ.D). */
+  fortivpnUsername: z.string().default(""),
+  /** SSL-VPN password for FortiVPN CLI connect (not RDP). */
+  fortivpnPassword: z.string().default(""),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  backendBaseUrl: "http://api.tyresoles.net",
+  backendBaseUrl: "https://api.tyresoles.in",
   frontendUrl: "http://localhost:5173",
-  updateUrl: "http://app.tyresoles.net/updates/update.json",
+  updateUrl: "https://app.tyresoles.in/updates/update.json",
   version: "1.0",
   mode: "User",
   theme: "light",
@@ -66,8 +72,11 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   webErpUrl: "http://20.207.200.140:8080/DynamicsNAV71/WebClient/",
   oldNavConfig: "OldG01",
   downloadUrl:
-    "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi",
-  downloadVpnUrl: "",
+    "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64_en-US.msi",
+  downloadVpnUrl: "https://app.tyresoles.in/downloads/FortiClient.msi",
+  fortivpnTunnel: "Tyresoles",
+  fortivpnUsername: "",
+  fortivpnPassword: "",
 };
 
 const CONFIG_FILENAME = "app-config.json";
@@ -83,8 +92,7 @@ function getTauriInvoke(): TauriInvoke | undefined {
 }
 
 function parseAndValidate(raw: unknown): AppConfig {
-  const normalized =
-    raw === null || raw === undefined ? {} : raw;
+  const normalized = raw === null || raw === undefined ? {} : raw;
   if (typeof normalized !== "object" || Array.isArray(normalized)) {
     console.warn(
       "[config] Invalid app-config (expected a JSON object), using default.",

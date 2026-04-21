@@ -548,7 +548,7 @@ GROUP BY {particularILEGroup}";
 WITH LatestSettlement AS (
   SELECT 
     {particularClaims}
-    Settlement.Decision,
+    Settlement.Decision, Settlement.[Sanction Type] as SanctionType,
     ROW_NUMBER() OVER (
       PARTITION BY Posted.[No_]
       ORDER BY ISNULL(Settlement.Date, '1900-01-01') DESC, Settlement.[Document No_]
@@ -569,7 +569,8 @@ SELECT
     COUNT(*) as Claims,
     SUM(CASE WHEN Decision IN (3,5) THEN 1 ELSE 0 END) as Reject,
     SUM(CASE WHEN Decision IN (1,2,4,6,7) THEN 1 ELSE 0 END) as Pass,
-    SUM(CASE WHEN Decision is null then 1 else 0 end) as Unsettled
+    SUM(CASE WHEN Decision is null then 1 else 0 end) as Unsettled,
+    SUM(CASE WHEN SanctionType in (2) then 1 else 0 end) as SpecialCase
 FROM LatestSettlement
 WHERE rn = 1 AND Particular IS NOT NULL
 GROUP BY {particularClaimsGroup}";
@@ -634,6 +635,7 @@ WHERE Header.[Posting Date] >= @from AND Header.[Posting Date] <= @to
                     r.Pass = stat.Pass;
                     r.Reject = stat.Reject;
                     r.Unsettled = stat.Unsettled;
+                    r.SpecialCase = stat.SpecialCase;
                     r.ClaimPercent = r.Sold > 0 ? Math.Round((decimal)stat.Claims * 100m / r.Sold, 2) : 0;
                     r.PassPercent = stat.Claims > 0 ? Math.Round((decimal)stat.Pass * 100m / stat.Claims, 2) : 0;
                 }

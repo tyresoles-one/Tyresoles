@@ -1,11 +1,11 @@
 {
+  "version": "0.4.0",
+  "pub_date": "2026-04-20T05:46:44Z",
+  "notes": "Major improvements",
   "platforms": {
     "windows-x86_64": {
-      "url": "http://app.tyresoles.net/updates/Tyresoles_0.4.0_x64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNFFkNXZSZ2lKV01oQzZqRmZaUWhMZWZGdVFnbWs3NEJ1SEE4ejRwMUNJMytEMjJUWVNTVU4yZE5Nc3lzNkk2eCtqaXZRVUxlNEs5SXR1RWRNeWYzWmQrRTF5R2d5c1FBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NDk0MjEzCWZpbGU6VHlyZXNvbGVzXzAuNC4wX3g2NC1zZXR1cC5leGUKbVlJK2tCMzFwMFZrMlhvbHI4Q2VWNnVSWHNZSHU0YUhyZTFOUWtrMzBMUDJXTnd4SzNOdjhybXVRR3VVRWhYMXFSMmVnNnVQcExMTTh4T1crcFRmREE9PQo="
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNFFkNXZSZ2lKV0dYWnZSekQyRE9oajBhMkd2bWtDNWVPM0IrVSt0NXVxMHdLcVpEQWNTeENWbzNzeVhuOVhDR2RTZko5dWxTd2Z5ZjZmUzRBK0FhYmF1UStDeVpWMWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc2NjY0MDA0CWZpbGU6VHlyZXNvbGVzXzAuNC4wX3g2NC1zZXR1cC5leGUKUnhtaytiQnNnb3ZDdlFiSEVHb0UraXNrQlJTTWt2R2UyUyt2OFFyR0VjOEdmTDkwbnVkYW5MNGVvWDhTcW42WHpGbTd2YThZdWVyeGhLMlJLTlA1QWc9PQo=",
+      "url": "http://app.tyresoles.net/updates/Tyresoles_0.4.0_x64-setup.exe"
     }
-  },
-  "pub_date": "2026-04-18T06:36:53Z",
-  "version": "0.4.0",
-  "notes": "Major improvements"
+  }
 }

@@ -169,16 +169,7 @@ builder.Services.AddDbContext<Tyresoles.Data.Features.NavisionEdits.NavEditDbCon
 });
 builder.Services.AddScoped<Tyresoles.Data.Features.NavisionEdits.INavEditService, Tyresoles.Data.Features.NavisionEdits.NavEditService>();
 
-// DriveSync module: separate DbContext on Db_Extra database (conceptually)
-builder.Services.AddDbContext<DriveSyncDbContext>(options =>
-{
-    var conn = builder.Configuration.GetConnectionString("Calendar")
-        ?? "Server=(localdb)\\mssqllocaldb;Database=TyresolesCalendar;Trusted_Connection=True;TrustServerCertificate=True";
-    options.UseSqlServer(conn, sqlOptions =>
-    {
-        sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-    });
-});
+// DriveSync: policy lives on Nav Live User (Backup G Drive Folder ID, quota GB, file types); see IUserService / admin Users screen.
 builder.Services.AddScoped<IDriveSyncService, DriveSyncService>();
 
 // JWT: expiry options for UserService (Data layer); token generation in Web.
@@ -533,41 +524,6 @@ catch (Exception ex)
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
     logger.LogWarning(ex, "Could not initialize RemoteAssist tables. Remote assist may be unavailable.");
 }
-
-// Ensure DriveSync tables exist
-try
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        var driveSyncDb = scope.ServiceProvider.GetRequiredService<DriveSyncDbContext>();
-        await driveSyncDb.Database.ExecuteSqlRawAsync(@"
-            IF OBJECT_ID('dbo.UserConfigs', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.[UserConfigs] (
-                    [Id] uniqueidentifier NOT NULL,
-                    [UserId] nvarchar(128) NOT NULL,
-                    [TargetFolderId] nvarchar(256) NOT NULL,
-                    [QuotaBytes] bigint NOT NULL,
-                    [UsedBytes] bigint NOT NULL,
-                    [AllowedExtensionsJson] nvarchar(max) NULL,
-                    [DeniedExtensionsJson] nvarchar(max) NULL,
-                    [IsActive] bit NOT NULL,
-                    [CreatedAt] datetime2 NOT NULL,
-                    [UpdatedAt] datetime2 NOT NULL,
-                    CONSTRAINT [PK_UserConfigs] PRIMARY KEY ([Id])
-                );
-                CREATE UNIQUE INDEX [IX_UserConfigs_UserId] ON dbo.[UserConfigs] ([UserId]);
-            END
-        ");
-    }
-}
-catch (Exception ex)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogWarning(ex, "Could not initialize DriveSync tables. Sync module may be unavailable.");
-}
-
-
 
 app.UseCors();
 app.UseAuthentication();

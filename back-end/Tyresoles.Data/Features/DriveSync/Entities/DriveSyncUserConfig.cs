@@ -2,12 +2,16 @@ using System;
 
 namespace Tyresoles.Data.Features.DriveSync.Entities;
 
+/// <summary>
+/// API shape for Drive sync policy. Persisted on Nav Live User table columns
+/// <c>Backup G Drive Folder ID</c>, <c>Backup Storage Quota (GB)</c>, <c>Backup Allowed File Types</c>.
+/// </summary>
 public sealed class DriveSyncUserConfig
 {
     public Guid Id { get; set; }
     
     /// <summary>
-    /// User ID mapping to the central user table.
+    /// Nav <c>User Name</c> (same as admin Users screen / JWT user id).
     /// </summary>
     public string UserId { get; set; } = string.Empty;
 

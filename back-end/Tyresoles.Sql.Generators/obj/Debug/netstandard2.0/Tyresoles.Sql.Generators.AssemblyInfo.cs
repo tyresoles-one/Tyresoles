@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Tyresoles.Sql.Generators")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1c49db517948992068d100941943b33458870074")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6b8fd0c6751467a00b52e66542853032f4458df")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tyresoles.Sql.Generators")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tyresoles.Sql.Generators")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

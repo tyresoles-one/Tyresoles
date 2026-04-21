@@ -59,6 +59,9 @@
         <Field Name="Unsettled">
           <DataField>Unsettled</DataField>
         </Field>
+        <Field Name="SpecialCase">
+          <DataField>SpecialCase</DataField>
+        </Field>
         <Field Name="ClaimPercent">
           <DataField>ClaimPercent</DataField>
         </Field>

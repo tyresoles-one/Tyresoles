@@ -423,3 +423,4 @@ D:\Work Desk\Tyresoles\back-end\Tyresoles.Web\bin\Debug\net10.0\Reports\TDSYearl
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Web\bin\Debug\net10.0\Reports\ProductMixEcomile.rdlc
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Web\bin\Debug\net10.0\Reports\ClaimAnalysis.rdlc
 D:\Work Desk\Tyresoles\back-end\Tyresoles.Web\bin\Debug\net10.0\Reports\ClaimRatios.rdlc
+D:\Work Desk\Tyresoles\back-end\Tyresoles.Web\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt

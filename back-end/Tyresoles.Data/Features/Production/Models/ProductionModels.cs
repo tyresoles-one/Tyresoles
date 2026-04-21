@@ -166,6 +166,7 @@ public class ClaimRatio
     public int Pass { get; set; } = 0;
     public int Reject { get; set; } = 0;
     public int Unsettled { get; set; } = 0;
+    public int SpecialCase { get; set; } = 0;
     public decimal ClaimPercent { get; set; } = 0;
     public decimal PassPercent { get; set; } = 0;
     public decimal SaleValue { get; set;  } = 0;

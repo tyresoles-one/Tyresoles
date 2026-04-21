@@ -908,9 +908,89 @@ public sealed class UserService : IUserService
         if (user == null)
             return null;
 
+        var uname = user.UserName ?? string.Empty;
+        var sid = user.UserSecurityID;
+
+        var respRows = await scope.Query<RespCenterUserSetup>()
+            .Where(r => r.UserID == uname)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var postingRows = await scope.Query<UserSetup>()
+            .Where(u => u.UserID == uname)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var accessRows = await scope.Query<AccessControl>()
+            .Where(ac => ac.UserSecurityID == sid)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        Dictionary<string, string> nameByRole = new(StringComparer.OrdinalIgnoreCase);
+        if (accessRows.Length > 0)
+        {
+            var roleIds = accessRows.Select(a => a.RoleID).Where(id => id.HasValue()).Distinct().ToArray();
+            if (roleIds.Length > 0)
+            {
+                // Tyresoles.Sql cannot translate array.Contains(column) (invokes unsupported runtime methods).
+                // Same pattern as ProteanDataService.WhereResponsibilityCenterCodesIn.
+                var inParams = new Dictionary<string, object>(roleIds.Length);
+                var placeholders = new List<string>(roleIds.Length);
+                for (var i = 0; i < roleIds.Length; i++)
+                {
+                    var pname = $"@rid{i}";
+                    inParams[pname] = roleIds[i]!;
+                    placeholders.Add(pname);
+                }
+
+                var sets = await scope.Query<PermissionSet>()
+                    .Where($"[Role ID] IN ({string.Join(", ", placeholders)})", inParams)
+                    .ToArrayAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                foreach (var p in sets)
+                    nameByRole[p.RoleID] = p.Name.HasValue() ? p.Name! : (p.DisplayName.HasValue() ? p.DisplayName! : p.RoleID);
+            }
+        }
+
+        static string NavDateToUi(DateTime? d) =>
+            d is { } x ? x.ToString("yyyy-MM-dd") : string.Empty;
+
+        var respSetup = respRows
+            .Select(r => new UserDetailRespCenterRow
+            {
+                UserId = r.UserID ?? string.Empty,
+                RespCenter = r.RespCenter ?? string.Empty,
+                RespDefault = r.Default,
+                Type = (int)r.Type,
+                Code = r.Code ?? string.Empty
+            })
+            .ToList();
+
+        var postSetup = postingRows
+            .Select(p => new UserDetailPostingRow
+            {
+                ResponsibilityCenter = p.ResponsibilityCenter ?? string.Empty,
+                AllowPostingFrom = NavDateToUi(p.AllowPostingFrom),
+                AllowPostingTo = NavDateToUi(p.AllowPostingTo)
+            })
+            .ToList();
+
+        var perms = accessRows
+            .Select(ac => new UserDetailPermissionRow
+            {
+                RoleId = ac.RoleID ?? string.Empty,
+                RoleName = nameByRole.TryGetValue(ac.RoleID ?? string.Empty, out var rn) ? rn : string.Empty,
+                CompanyName = ac.CompanyName ?? string.Empty,
+                AssignerName = ac.AssignerName ?? string.Empty,
+                RoleExipryDate = NavDateToUi(ac.RoleExipryDate),
+                Values = ac.Values ?? string.Empty,
+                HomePath = ac.HomePath
+            })
+            .ToList();
+
         return new UserDetail
         {
-            UserId = user.UserName ?? string.Empty,
+            UserId = uname,
             FullName = user.FullName ?? string.Empty,
             UserType = user.UserType ?? string.Empty,
             MobileNo = user.MobileNo ?? string.Empty,
@@ -923,7 +1003,12 @@ public sealed class UserService : IUserService
             BackupAllowedFileTypes = user.BackupAllowedFileTypes ?? string.Empty,
             BackupGDriveFolderID = user.BackupGDriveFolderID ?? string.Empty,
             RDPPassword = user.RDPPassword,
-            NavConfigName = user.NavConfigName
+            NavConfigName = user.NavConfigName,
+            VpnUserId = user.VpnUserID,
+            VpnPassword = user.VpnPassword,
+            RespCenterSetup = respSetup,
+            PostingSetup = postSetup,
+            Permissions = perms
         };
     }
 

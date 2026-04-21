@@ -83,6 +83,15 @@ pub struct AppConfig {
     pub download_url: String,
     #[serde(default = "default_download_vpn_url")]
     pub download_vpn_url: String,
+    /// SSL VPN tunnel name for `FortiVPN.exe --cli` (e.g. Tyresoles).
+    #[serde(default = "default_fortivpn_tunnel")]
+    pub fortivpn_tunnel: String,
+    /// Optional SSL-VPN logon override when it differs from ERP userId / email (e.g. `ABHIRAJ.D`).
+    #[serde(default)]
+    pub fortivpn_username: String,
+    /// SSL-VPN password for `FortiVPN.exe --cli --connect` (not used for RDP).
+    #[serde(default)]
+    pub fortivpn_password: String,
 }
 
 fn default_backend_base_url() -> String {
@@ -141,6 +150,10 @@ fn default_download_vpn_url() -> String {
     String::new()
 }
 
+fn default_fortivpn_tunnel() -> String {
+    "Tyresoles".to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -158,6 +171,9 @@ impl Default for AppConfig {
             old_nav_config: default_old_nav_config(),
             download_url: default_download_url(),
             download_vpn_url: default_download_vpn_url(),
+            fortivpn_tunnel: default_fortivpn_tunnel(),
+            fortivpn_username: String::new(),
+            fortivpn_password: String::new(),
         }
     }
 }
