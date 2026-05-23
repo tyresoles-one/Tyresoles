@@ -67,6 +67,17 @@
     { value: "isnotnull", label: "Is not null (isnotnull)" },
   ];
 
+  const AUTH_PROPERTY_OPTIONS = [
+    { value: "username", label: "Username" },
+    { value: "user.userId", label: "User ID (Nav)" },
+    { value: "user.fullName", label: "Full Name" },
+    { value: "user.respCenter", label: "Resp Center" },
+    { value: "user.department", label: "Department" },
+    { value: "user.entityCode", label: "Entity Code" },
+    { value: "user.entityType", label: "Entity Type" },
+    { value: "locations", label: "Assigned Locations (Codes)" },
+  ];
+
   function splitIds(s: string): string[] {
     return s
       .split(/[,;\n]+/)
@@ -226,7 +237,7 @@
     patchModel((m) => {
       m.lookupFilters = [
         ...m.lookupFilters,
-        { column: "", op: "eq", value: "", values: [] } satisfies NavEditLookupFilterCondition,
+        { column: "", op: "eq", value: "", values: [], valueSource: "static" } satisfies NavEditLookupFilterCondition,
       ];
     });
   }
@@ -234,6 +245,19 @@
   function removeLookupFilter(i: number) {
     patchModel((m) => {
       m.lookupFilters = m.lookupFilters.filter((_, j) => j !== i);
+    });
+  }
+
+  function onAuthPropertySelect(fi: number, item: unknown) {
+    const val = typeof item === "string" ? item : String((item as any)?.value ?? "");
+    patchModel((m) => {
+      const f = m.lookupFilters[fi];
+      if (!f) return;
+      f.authProperty = val;
+      // If choosing a list property, default to 'in' operator if current op is scalar
+      if (val === "locations" && !["in", "nin"].includes(f.op || "")) {
+        f.op = "in";
+      }
     });
   }
 
@@ -530,7 +554,8 @@
       <div class="ndt-filter-grid ndt-filter-head">
         <span>Column</span>
         <span>Operator</span>
-        <span>Value</span>
+        <span>Source</span>
+        <span>Value / Mapping</span>
         <span></span>
       </div>
       {#each model.lookupFilters as fil, fi (fi)}
@@ -550,18 +575,38 @@
               <option value={o.value}>{o.label}</option>
             {/each}
           </select>
-          {#if fil.op === "in" || fil.op === "nin"}
-            <input
-              class="ndt-input ndt-input-grow"
-              type="text"
-              value={lookupFilterValuesText(fil)}
-              oninput={(e) => setLookupFilterValues(fi, e.currentTarget.value)}
-              placeholder="Values, comma-separated"
-            />
-          {:else if fil.op === "isnull" || fil.op === "isnotnull"}
-            <span class="ndt-filter-no-value">—</span>
+          <select class="ndt-select ndt-select--source" bind:value={model.lookupFilters[fi].valueSource}>
+            <option value="static">Static</option>
+            <option value="auth">Auth Store</option>
+          </select>
+          {#if fil.valueSource === 'auth'}
+            <div class="ndt-select-ven ndt-select-ven--auth-prop">
+              <Select
+                options={AUTH_PROPERTY_OPTIONS}
+                valueKey="value"
+                labelKey="label"
+                value={model.lookupFilters[fi].authProperty}
+                onSelect={(item) => onAuthPropertySelect(fi, item)}
+                placeholder="Auth property…"
+                clearable
+                searchPlaceholder="Search properties…"
+                emptyText="No matching properties"
+              />
+            </div>
           {:else}
-            <input class="ndt-input ndt-input-grow" type="text" bind:value={model.lookupFilters[fi].value} placeholder="Value" />
+            {#if fil.op === "in" || fil.op === "nin"}
+              <input
+                class="ndt-input ndt-input-grow"
+                type="text"
+                value={lookupFilterValuesText(fil)}
+                oninput={(e) => setLookupFilterValues(fi, e.currentTarget.value)}
+                placeholder="Values, comma-separated"
+              />
+            {:else if fil.op === "isnull" || fil.op === "isnotnull"}
+              <span class="ndt-filter-no-value">—</span>
+            {:else}
+              <input class="ndt-input ndt-input-grow" type="text" bind:value={model.lookupFilters[fi].value} placeholder="Value" />
+            {/if}
           {/if}
           <button type="button" class="ndt-icon-btn" onclick={() => removeLookupFilter(fi)} title="Remove">
             <Icon name="trash-2" class="w-4 h-4" />
@@ -764,6 +809,14 @@
   .ndt-select:focus {
     border-color: var(--primary);
   }
+  .ndt-select--source {
+    flex: 0 0 100px;
+    min-width: 100px;
+  }
+  .ndt-select--filter-op {
+    flex: 0 0 140px;
+    min-width: 140px;
+  }
   .ndt-input-grow {
     flex: 1;
     min-width: 0;
@@ -805,7 +858,7 @@
   }
   .ndt-filter-grid {
     display: grid;
-    grid-template-columns: minmax(7rem, 1.15fr) minmax(7rem, 1fr) minmax(8rem, 1.2fr) auto;
+    grid-template-columns: minmax(7rem, 1.15fr) 140px 100px minmax(8rem, 1.2fr) auto;
     gap: 0.4rem;
     align-items: center;
   }

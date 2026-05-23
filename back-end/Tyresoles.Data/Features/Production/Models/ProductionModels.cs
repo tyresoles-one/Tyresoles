@@ -1,7 +1,20 @@
+using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace Tyresoles.Data.Features.Production.Models;
+
+/// <summary>Row from NAV table <c>Procurement Configs</c> (<see cref="Dataverse.NavLive.ProcurementConfigs"/>).</summary>
+public class ProcurementConfigDto
+{
+    public int Type { get; set; }
+    public string ItemNo { get; set; } = "";
+    public string Market { get; set; } = "";
+    public int Qty { get; set; }
+    public DateTime FromDate { get; set; }
+    public DateTime ToDate { get; set; }
+}
 
 public class FetchParams
 {
@@ -172,4 +185,48 @@ public class ClaimRatio
     public decimal SaleValue { get; set;  } = 0;
     public decimal CreditNoteValue { get; set; } = 0;
     public decimal CreditNotePercent {  get; set; } = 0;
+}
+public class ClaimRatioDashboard
+{
+    public string View { get; set; } = "";
+    public string RespCenter { get; set; } = "";
+    public string Level01 { get; set; } = "";
+    public string Level02 { get; set; } = "";
+    public string Level03 { get; set; } = "";
+    public string Level04 { get; set; } = ""; 
+    public int Purchase {  get; set; } = 0;
+    public int Sold { get; set; } = 0;
+    public int Claims { get; set; } = 0;
+    public int Pass { get; set; } = 0;
+    public int Reject { get; set; } = 0;
+    public int Unsettled { get; set; } = 0;
+    public int SpecialCase { get; set; } = 0;
+    public decimal ClaimPercent { get; set; } = 0;
+    public decimal PassPercent { get; set; } = 0;
+    public decimal SaleValue { get; set; } = 0;
+    public decimal CreditNoteValue { get; set; } = 0;
+    public decimal SaleClaimRatio { get; set; } = 0;
+
+    public override string ToString()
+    {
+        return JsonSerializer.Serialize(this);
+    }
+}
+
+public class ClaimRatioDashboardValue
+{
+    public string RespCenter { get; set; }
+    public decimal Value {  get; set; } = 0;
+}
+
+public class ProcurementDashboard
+{
+    public string Size { get; set; } = string.Empty;
+    public string Market { get; set; } = string.Empty;    
+    public int Target { get; set; } = 0;
+    public int Purchased { get; set; } = 0;
+    public int PurchasedLastMonth { get; set; } = 0;
+    public decimal AvgCost { get; set;  } = 0;
+    public decimal AvgCostLastMonth { get; set; } = 0;
+    public decimal Freight { get; set; } = 0;
 }

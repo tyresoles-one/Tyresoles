@@ -338,7 +338,7 @@
             class="cd-header-icon w-8 h-8 rounded-lg bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors flex-shrink-0"
           >
             <Icon
-              name="layout-dashboard"
+              name="panels-left-bottom"
               class="cd-icon-lg group-hover:text-primary transition-colors"
             />
           </div>

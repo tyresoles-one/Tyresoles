@@ -4313,6 +4313,7 @@ public partial class User
     [NavColumn("Nav Config Name")] public string NavConfigName { get; set; }
     [NavColumn("Vpn UserID")] public string VpnUserID { get; set; }
     [NavColumn("Vpn Password")] public string VpnPassword { get; set; }
+    [NavColumn("Dashboards")] public string Dashboards { get; set; }
 }
 
 [NavTable("User Personalization", IsShared = true)]
@@ -4572,4 +4573,13 @@ public partial class Vehicles
     }
 }
 
-
+[NavTable("Procurement Configs", IsShared = false)]
+public partial class ProcurementConfigs
+{
+    [NavColumn("Type")] public int Type { get; set; } = 0;
+    [NavColumn("Item No")] public string ItemNo { get; set; } = string.Empty;
+    [NavColumn("Market")] public string Market { get; set; } = string.Empty;
+    [NavColumn("Qty")] public int Qty { get; set; } = 0;
+    [NavColumn("From Date")] public DateTime FromDate { get; set; }
+    [NavColumn("To Date")] public DateTime ToDate { get; set; }
+}

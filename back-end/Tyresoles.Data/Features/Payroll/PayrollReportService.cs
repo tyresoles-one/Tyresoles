@@ -360,7 +360,14 @@ public sealed partial class PayrollReportService : IPayrollReportService
         if (rec.CA != 0) list.Add(("C.A.", rec.CA));
         if (rec.Incentive != 0) list.Add(("Incentive", rec.Incentive));
         if (rec.ProdInc != 0) list.Add(("Prod. Incentive", rec.ProdInc));
-        if (rec.SalaryAdv != 0) list.Add(("Salary Advance", rec.SalaryAdv));
+        if (rec.AttBonus != 0) list.Add(("Att. Bonus", rec.AttBonus));
+        if (rec.ChildEdAllowance != 0) list.Add(("Child. Ed. Alln", rec.ChildEdAllowance));
+        if (rec.PetrolAllowance != 0) list.Add(("Petrol Alln", rec.PetrolAllowance));
+        if (rec.TelAllowance != 0) list.Add(("Telephone Alln", rec.TelAllowance));
+        if (rec.DeputAllowance != 0) list.Add(("Deputn. Alln", rec.DeputAllowance));
+        if (rec.TravAllowance != 0) list.Add(("Travel Alln", rec.TravAllowance));
+        if (rec.SpecialAllowance != 0) list.Add(("Special Alln", rec.SpecialAllowance));
+        
         return list;
     }
 
@@ -376,6 +383,7 @@ public sealed partial class PayrollReportService : IPayrollReportService
         if (rec.StaffLoan != 0) list.Add(("Staff Loan", rec.StaffLoan));
         if (rec.TDS != 0) list.Add(("T.D.S.", rec.TDS));
         if (rec.LWF != 0) list.Add(("Labour W. Fund", rec.LWF));
+        if (rec.SalaryAdv != 0) list.Add(("Salary Advance", rec.SalaryAdv));
         return list;
     }
 

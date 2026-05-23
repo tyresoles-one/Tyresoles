@@ -59,4 +59,10 @@ public interface IProductionService
     Task<int> DeleteProcurementOrderAsync(ITenantScope scope, OrderInfo order, CancellationToken ct = default);
     Task<List<Tile>> GetEcomileProcurementTilesAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
     Task<List<ShipmentInfo>> GetShipmentOrderForMergerAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
+
+    /// <summary>CRUD for NAV <c>Procurement Configs</c> (<see cref="Dataverse.NavLive.ProcurementConfigs"/>).</summary>
+    Task<List<ProcurementConfigDto>> GetProcurementConfigsAsync(ITenantScope scope, CancellationToken ct = default);
+    Task InsertProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto row, CancellationToken ct = default);
+    Task UpdateProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto original, ProcurementConfigDto updated, CancellationToken ct = default);
+    Task DeleteProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto key, CancellationToken ct = default);
 }

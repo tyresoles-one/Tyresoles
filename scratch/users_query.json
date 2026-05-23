@@ -1,0 +1,4 @@
+{
+  "query": "query GetUsers($skip: Int, $take: Int) { users(skip: $skip, take: $take) { items { userName } totalCount } }",
+  "variables": { "skip": 0, "take": 1 }
+}

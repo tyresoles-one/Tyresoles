@@ -21,6 +21,11 @@ node_modules/
 # Build artifacts
 build/
 dist/
+back-end/_build_verify_web/
+
+# Google Cloud service account keys (do not commit)
+**/tyresolesone*.json
+
 *.zip
 
 # Logs

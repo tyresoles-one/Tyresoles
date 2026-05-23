@@ -1,3 +1,4 @@
+using Tyresoles.Data.Features.Production.Models;
 using Tyresoles.Data.Features.Sales.Reports;
 using Tyresoles.Sql.Abstractions;
 
@@ -38,5 +39,23 @@ public interface IProductionReportService
     Task<List<ReportMeta>> GetReportMetaAsync(
         ITenantScope scope,
         string? userId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns Claim Ratios rows (same data as the Claim Ratios RDLC report) for interactive dashboards.
+    /// </summary>
+    Task<List<ClaimRatio>> GetClaimRatiosDataAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ClaimRatioDashboard>> GetClaimRatioDashboardsAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ProcurementDashboard>> GetProcurementDashboardAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
         CancellationToken cancellationToken = default);
 }

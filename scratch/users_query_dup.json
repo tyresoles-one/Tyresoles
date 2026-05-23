@@ -1,0 +1,4 @@
+{
+  "query": "query GetUsers($skip: Int, $take: Int, $duplicateMobileOnly: Boolean) { users(skip: $skip, take: $take, duplicateMobileOnly: $duplicateMobileOnly) { items { userName } totalCount } }",
+  "variables": { "skip": 0, "take": 1, "duplicateMobileOnly": true }
+}

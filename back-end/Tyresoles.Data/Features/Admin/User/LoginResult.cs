@@ -31,6 +31,7 @@ public sealed class LoginUser
     public string UserSpecialToken {  get; set; } = string.Empty;
     public DateTime WorkDate { get; set; }
     public int Avatar { get; set; } = 0;
+    public string Dashboards { get; set;  } = string.Empty;
 }
 
 /// <summary>Top-level menu: one per distinct ParentMenu (PermissionSet.Parent Menu).</summary>

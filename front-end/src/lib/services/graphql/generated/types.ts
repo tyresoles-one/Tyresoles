@@ -1793,6 +1793,7 @@ export type LoginUser = {
   userSpecialToken: Scalars['String']['output'];
   userType: Scalars['String']['output'];
   workDate: Scalars['DateTime']['output'];
+  dashboards: Scalars['String']['output'];
 };
 
 export type Menu = {
@@ -6691,7 +6692,7 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename: 'Mutation', login: { __typename: 'LoginResult', success: boolean, message: string | null, token: string | null, requirePasswordChange: boolean, requirePasswordChangeReason: string | null, user: { __typename: 'LoginUser', userId: string, userSecurityId: unknown, fullName: string, userType: string, title: string, entityType: string, entityCode: string, department: string, respCenter: string, workDate: string, avatar: number, userSpecialToken: string } | null, locations: Array<{ __typename: 'UserLocation', code: string, name: string, sale: unknown, purchase: unknown, production: unknown, payroll: unknown }> | null, menus: Array<{ __typename: 'Menu', label: string, icon: string, subMenus: Array<{ __typename: 'SubMenu', label: string, icon: string, items: Array<{ __typename: 'MenuItem', code: string, label: string, icon: string, action: string, order: number, options: string }> }> }> | null } };
+export type LoginMutation = { __typename: 'Mutation', login: { __typename: 'LoginResult', success: boolean, message: string | null, token: string | null, requirePasswordChange: boolean, requirePasswordChangeReason: string | null, user: { __typename: 'LoginUser', userId: string, userSecurityId: unknown, fullName: string, userType: string, title: string, entityType: string, entityCode: string, department: string, respCenter: string, workDate: string, avatar: number, userSpecialToken: string, dashboards: string } | null, locations: Array<{ __typename: 'UserLocation', code: string, name: string, sale: unknown, purchase: unknown, production: unknown, payroll: unknown }> | null, menus: Array<{ __typename: 'Menu', label: string, icon: string, subMenus: Array<{ __typename: 'SubMenu', label: string, icon: string, items: Array<{ __typename: 'MenuItem', code: string, label: string, icon: string, action: string, order: number, options: string }> }> }> | null } };
 
 export type CreateCalendarEventMutationVariables = Exact<{
   input: CreateEventInput;
@@ -7551,6 +7552,7 @@ export const LoginDocument = gql`
       workDate
       avatar
       userSpecialToken
+      dashboards
     }
     locations {
       code

@@ -891,6 +891,7 @@
                                   <Value>=Fields!SpecialCase.Value</Value>
                                   <Style>
                                     <FontFamily>cambria</FontFamily>
+                                    <Format>#,0;(#,0);'-'</Format>
                                   </Style>
                                 </TextRun>
                               </TextRuns>

@@ -53,6 +53,28 @@ public class Query
         return await syncService.GetUserConfigAsync(uid, cancellationToken);
     }
 
+    /// <summary>Files in the caller backup tree for restore (metadata only). Downloads go through <c>/api/drive-sync/download/</c>.</summary>
+    [Authorize]
+    [GraphQLName("getDriveSyncBackupFiles")]
+    public async Task<IReadOnlyList<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncBackupFileInfo>> GetDriveSyncBackupFiles(
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        if (string.IsNullOrEmpty(userId))
+            throw new GraphQLException("Unauthorized");
+        try
+        {
+            return await syncService.GetBackupFilesForRestoreAsync(userId, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GraphQLException(ex.Message);
+        }
+    }
+
     /// <summary>Get profile for a user by userId (UserName or MobileNo). Returns null if not found. Requires authentication.</summary>
     [Authorize]
     public async Task<ProfileResult?> GetProfile(
@@ -327,6 +349,133 @@ public class Query
         }
         
         return query.AsQueryable(scope);
+    }
+
+    /// <summary>
+    /// Admin DriveSync health/status for a set of users (for Users page bulk checks).
+    /// </summary>
+    [Authorize]
+    [GraphQLName("getDriveSyncAdminStatuses")]
+    public async Task<IReadOnlyList<DriveSyncAdminStatus>> GetDriveSyncAdminStatuses(
+        List<string> userIds,
+        bool includeFolderValidation,
+        bool includeUsage,
+        bool includeLatestBackup,
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService driveSyncService,
+        [Service] Tyresoles.Data.Features.Admin.User.IUserService userService,
+        [Service] Tyresoles.Data.Features.DriveSync.IGoogleDriveBackupGateway driveGateway,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AdminAuthorization.IsAdministrator(httpContextAccessor.HttpContext?.User))
+            throw new GraphQLException("Only administrators can query Drive sync admin statuses.");
+
+        if (userIds == null || userIds.Count == 0)
+            return Array.Empty<DriveSyncAdminStatus>();
+
+        var now = DateTime.UtcNow;
+        var normalized = userIds
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(200)
+            .ToArray();
+
+        var output = new List<DriveSyncAdminStatus>(normalized.Length);
+        foreach (var uid in normalized)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var row = new DriveSyncAdminStatus
+            {
+                UserId = uid,
+                LastCheckedUtc = now
+            };
+
+            var user = await userService.GetUserAsync(uid, cancellationToken).ConfigureAwait(false);
+            if (user == null)
+            {
+                row.IsUserFound = false;
+                output.Add(row);
+                continue;
+            }
+
+            row.IsUserFound = true;
+            var cfg = await driveSyncService.GetUserConfigAsync(uid, cancellationToken).ConfigureAwait(false);
+            row.IsActive = cfg?.IsActive == true;
+            row.TargetFolderId = cfg?.TargetFolderId ?? user.BackupGDriveFolderID ?? "";
+            row.QuotaBytes = cfg?.QuotaBytes ?? 0;
+
+            if (!row.IsActive || string.IsNullOrWhiteSpace(row.TargetFolderId))
+            {
+                row.FolderValidated = false;
+                row.FolderValidationError = "Drive backup is inactive or folder id is missing.";
+                output.Add(row);
+                continue;
+            }
+
+            if (includeFolderValidation)
+            {
+                try
+                {
+                    await driveGateway.ValidateUserBackupFolderAsync(row.TargetFolderId, cancellationToken).ConfigureAwait(false);
+                    row.FolderValidated = true;
+                    row.FolderValidationError = null;
+                }
+                catch (Exception ex)
+                {
+                    row.FolderValidated = false;
+                    row.FolderValidationError = ex.Message;
+                }
+            }
+
+            if (includeUsage)
+            {
+                try
+                {
+                    row.UsedBytes = await driveGateway.GetFolderTreeUsageBytesAsync(row.TargetFolderId, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    row.UsageError = ex.Message;
+                }
+            }
+
+            if (includeLatestBackup)
+            {
+                try
+                {
+                    var files = await driveGateway.ListBackupFilesAsync(row.TargetFolderId, cancellationToken).ConfigureAwait(false);
+                    row.LatestBackupUtc = files
+                        .Where(f => f.ModifiedTimeUtc.HasValue)
+                        .Select(f => f.ModifiedTimeUtc!.Value)
+                        .DefaultIfEmpty()
+                        .Max();
+                    if (row.LatestBackupUtc == default)
+                        row.LatestBackupUtc = null;
+                }
+                catch (Exception ex)
+                {
+                    row.LatestBackupError = ex.Message;
+                }
+            }
+
+            output.Add(row);
+        }
+
+        return output;
+    }
+
+    [Authorize]
+    [GraphQLName("getDriveSyncOAuthStatus")]
+    public async Task<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncOAuthStatus> GetDriveSyncOAuthStatus(
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncOAuthService oauthService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AdminAuthorization.IsAdministrator(httpContextAccessor.HttpContext?.User))
+            throw new GraphQLException("Only administrators can query DriveSync OAuth status.");
+        return await oauthService.GetStatusAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Fetch a single user profile with extended info.</summary>
@@ -1226,6 +1375,21 @@ public class Query
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return await productionService.GetShipmentOrderForMergerAsync(scope, param, cancellationToken);
     }
+
+    /// <summary>List rows from NAV table <c>Procurement Configs</c>.</summary>
+    [Authorize]
+    [GraphQLName("productionProcurementConfigs")]
+    public async Task<List<ProcurementConfigDto>> GetProductionProcurementConfigs(
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await productionService.GetProcurementConfigsAsync(scope, cancellationToken);
+    }
+
     [Authorize]
     [UsePaging(IncludeTotalCount = true)]
     [UseProjection]
@@ -1305,10 +1469,12 @@ public class Query
         int requestTypeId,
         string? search,
         int? take,
+        List<Tyresoles.Data.Features.NavisionEdits.NavEditAuthValue>? authValues,
         [Service] Tyresoles.Data.Features.NavisionEdits.INavEditService navEditService,
         CancellationToken cancellationToken = default)
     {
-        var rows = await navEditService.LookupRecordsAsync(requestTypeId, search, take ?? 20, cancellationToken);
+        var dict = authValues?.ToDictionary(kv => kv.Key, kv => kv.Value ?? "");
+        var rows = await navEditService.LookupRecordsAsync(requestTypeId, search, take ?? 20, dict, cancellationToken);
         return rows.Select(r => r.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value?.ToString() }).ToList()).ToList();
     }
 
@@ -1396,5 +1562,21 @@ public class Query
     {
         return await navEditService.GetNavLiveColumnNamesForTableAsync(tableName, cancellationToken);
     }
+}
+
+public sealed class DriveSyncAdminStatus
+{
+    public string UserId { get; init; } = "";
+    public bool IsUserFound { get; set; }
+    public bool IsActive { get; set; }
+    public string TargetFolderId { get; set; } = "";
+    public bool? FolderValidated { get; set; }
+    public string? FolderValidationError { get; set; }
+    public long QuotaBytes { get; set; }
+    public long UsedBytes { get; set; }
+    public string? UsageError { get; set; }
+    public DateTime? LatestBackupUtc { get; set; }
+    public string? LatestBackupError { get; set; }
+    public DateTime LastCheckedUtc { get; set; }
 }
 

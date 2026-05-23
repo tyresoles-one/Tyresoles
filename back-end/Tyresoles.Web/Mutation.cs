@@ -46,10 +46,45 @@ public class Mutation
         return await syncService.SaveUserConfigAsync(input, adminUserId, cancellationToken);
     }
 
-    /// <summary>Request a short-lived JIT Token for direct Google Drive sync. Called by Tauri Sidecar.</summary>
+    /// <summary>
+    /// Create a Google Drive subfolder under <c>DriveSync:UserBackupFoldersParentId</c> and assign its id to the Nav user.
+    /// Caller must be an administrator (<c>userType</c> claim).
+    /// </summary>
     [Authorize]
-    [GraphQLName("requestDriveSyncToken")]
-    public async Task<string> RequestDriveSyncToken(
+    [GraphQLName("provisionDriveSyncBackupFolder")]
+    public async Task<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncUserConfig> ProvisionDriveSyncBackupFolder(
+        string targetUserId,
+        string? folderName,
+        bool replaceExisting,
+        [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AdminAuthorization.IsAdministrator(httpContextAccessor.HttpContext?.User))
+            throw new GraphQLException("Only administrators can provision Google Drive backup folders.");
+
+        if (string.IsNullOrWhiteSpace(targetUserId))
+            throw new GraphQLException("targetUserId is required.");
+
+        try
+        {
+            return await syncService.ProvisionAndAssignBackupFolderAsync(
+                    targetUserId.Trim(),
+                    folderName,
+                    replaceExisting,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GraphQLException(ex.Message);
+        }
+    }
+
+    /// <summary>Short-lived OAuth access token (service account) for direct upload to the user backup folder. Hybrid sync path.</summary>
+    [Authorize]
+    [GraphQLName("requestDriveSyncUploadCredentials")]
+    public async Task<Tyresoles.Data.Features.DriveSync.Entities.DriveSyncUploadCredentials> RequestDriveSyncUploadCredentials(
         long requestedUploadBytes,
         [Service] Tyresoles.Data.Features.DriveSync.IDriveSyncService syncService,
         [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
@@ -57,11 +92,18 @@ public class Mutation
     {
         var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
             ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
-        
-        if (string.IsNullOrEmpty(userId)) 
+
+        if (string.IsNullOrEmpty(userId))
             throw new GraphQLException("Unauthorized");
 
-        return await syncService.RequestJitSyncTokenAsync(userId, requestedUploadBytes, cancellationToken);
+        try
+        {
+            return await syncService.RequestUploadCredentialsAsync(userId, requestedUploadBytes, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new GraphQLException(ex.Message);
+        }
     }
 
     public async Task<LoginResult> Login(
@@ -966,6 +1008,82 @@ public class Mutation
         {
             logger.LogError(ex, "DeleteProductionProcurementOrder failed OrderNo={OrderNo}", order.OrderNo);
             throw ToGqlNavException(ex);
+        }
+    }
+
+    /// <summary>Insert a row into NAV <c>Procurement Configs</c>.</summary>
+    [Authorize]
+    [GraphQLName("insertProductionProcurementConfig")]
+    public async Task<MutationResult> InsertProductionProcurementConfig(
+        ProcurementConfigDto row,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var scope = dataService.ForTenant("NavLive");
+            httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+            await productionService.InsertProcurementConfigAsync(scope, row, cancellationToken);
+            return new MutationResult { Success = true, Message = "Procurement configuration saved." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "InsertProductionProcurementConfig failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Update a NAV <c>Procurement Configs</c> row (match on <paramref name="original"/> key columns).</summary>
+    [Authorize]
+    [GraphQLName("updateProductionProcurementConfig")]
+    public async Task<MutationResult> UpdateProductionProcurementConfig(
+        ProcurementConfigDto original,
+        ProcurementConfigDto updated,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var scope = dataService.ForTenant("NavLive");
+            httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+            await productionService.UpdateProcurementConfigAsync(scope, original, updated, cancellationToken);
+            return new MutationResult { Success = true, Message = "Procurement configuration updated." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "UpdateProductionProcurementConfig failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>Delete a row from NAV <c>Procurement Configs</c>.</summary>
+    [Authorize]
+    [GraphQLName("deleteProductionProcurementConfig")]
+    public async Task<MutationResult> DeleteProductionProcurementConfig(
+        ProcurementConfigDto key,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var scope = dataService.ForTenant("NavLive");
+            httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+            await productionService.DeleteProcurementConfigAsync(scope, key, cancellationToken);
+            return new MutationResult { Success = true, Message = "Procurement configuration deleted." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "DeleteProductionProcurementConfig failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
         }
     }
 

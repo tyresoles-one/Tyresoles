@@ -143,7 +143,7 @@ fn default_old_nav_config() -> String {
 }
 
 fn default_download_url() -> String {
-    "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64_en-US.msi".to_string()
+    "http://app.tyresoles.net/downloads/Tyresoles_Latest_x64-setup.exe".to_string()
 }
 
 fn default_download_vpn_url() -> String {

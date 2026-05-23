@@ -27,7 +27,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "app",
+      "dmg",
+      "appimage",
+      "deb",
+      "rpm"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
@@ -40,10 +47,6 @@
       "../static/configs"
     ],
     "windows": {
-      "wix": {
-        "upgradeCode": "E3F976D1-C91A-45C0-99E8-59695679A835",
-        "language": "en-US"
-      },
       "nsis": {
         "installMode": "perMachine",
         "languages": [

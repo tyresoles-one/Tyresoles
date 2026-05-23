@@ -80,6 +80,9 @@
 	}: Props = $props();
 
 	const user = $derived(authStore.get().user);
+	const locationCodes = $derived(
+		(authStore.get().locations ?? []).map((l) => l.code).filter(Boolean) as string[]
+	);
 	const entityContext = $derived({
 		entityType: user?.entityType ?? null,
 		entityCode: user?.entityCode ?? null,
@@ -90,7 +93,8 @@
 	/** GraphQL `respCenters` on myDealers / myAreas / myRegions — union filter; omits when null. */
 	function resolveRespCentersForMasters(
 		override: string | string[] | undefined,
-		fallback: string | null | undefined
+		fallback: string | null | undefined,
+		locations: string[] = []
 	): string[] | null {
 		if (override !== undefined && override !== null) {
 			if (Array.isArray(override)) {
@@ -100,6 +104,7 @@
 			const s = String(override).trim();
 			return s ? [s] : null;
 		}
+		if (locations.length > 0) return locations;
 		const f = fallback != null ? String(fallback).trim() : '';
 		return f ? [f] : null;
 	}
@@ -346,9 +351,11 @@
 								? Array.isArray(respCenterOverride)
 									? respCenterOverride
 									: [String(respCenterOverride)]
-								: entityContext.respCenter
-									? [entityContext.respCenter]
-									: [],
+								: locationCodes.length > 0
+									? locationCodes
+									: entityContext.respCenter
+										? [entityContext.respCenter]
+										: [],
 							/** Schema requires `nos`; empty list = no employee-number filter (see ReportFetchParam.Nos). */
 							nos: [],
 							...(String(payrollDepartment ?? '').trim()
@@ -366,7 +373,8 @@
 						department: entityContext.department,
 						respCenters: resolveRespCentersForMasters(
 							respCenterOverride ?? undefined,
-							entityContext.respCenter
+							entityContext.respCenter,
+							locationCodes
 						),
 						first: PAGE_SIZE,
 						after: append ? endCursor : undefined,
@@ -386,10 +394,14 @@
 			masterType !== 'payrollEmployees' &&
 			masterType !== 'dealers' &&
 			masterType !== 'areas' &&
-			masterType !== 'regions' &&
-			respCenterOverride !== undefined
+			masterType !== 'regions'
 		) {
-			variables.respCenter = Array.isArray(respCenterOverride) ? respCenterOverride[0] : respCenterOverride;
+			if (respCenterOverride !== undefined) {
+				variables.respCenter = Array.isArray(respCenterOverride) ? respCenterOverride[0] : respCenterOverride;
+			} else if (locationCodes.length > 0) {
+				// Singular respCenter prop expects a String. We join with comma if multiple exist.
+				variables.respCenter = locationCodes.join(',');
+			}
 		}
 		if (masterType === 'respCenters') {
 			variables.type = respCenterType;

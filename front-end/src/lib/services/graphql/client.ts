@@ -56,9 +56,10 @@ class RequestCache {
     }
     this.accessOrder.push(key);
 
+    const ttlMs = ttl ?? this.TTL;
     this.cache.set(key, {
       data,
-      timestamp: Date.now() + (ttl || this.TTL),
+      timestamp: Date.now() + ttlMs,
     });
   }
 

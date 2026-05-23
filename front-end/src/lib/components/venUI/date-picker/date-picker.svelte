@@ -205,6 +205,33 @@
               // But keeping old value is safer than crashing.
             }
           }
+        } else if (valueType === "date") {
+          const tz = getLocalTimeZone();
+          const toCal = (v: unknown): DateValue | undefined => {
+            if (v == null) return undefined;
+            if (v instanceof Date && !Number.isNaN(v.getTime())) {
+              return fromDate(v, tz);
+            }
+            if (typeof v === "string" && v.trim() !== "") {
+              const d = new Date(v);
+              if (!Number.isNaN(d.getTime())) return fromDate(d, tz);
+              return undefined;
+            }
+            if (
+              typeof v === "object" &&
+              v !== null &&
+              "day" in v &&
+              typeof (v as { day: unknown }).day === "number"
+            ) {
+              return v as DateValue;
+            }
+            return undefined;
+          };
+
+          calendarValue = {
+            start: toCal(value.start),
+            end: toCal(value.end),
+          };
         } else {
           calendarValue = value;
         }
@@ -342,6 +369,17 @@
 
   // --- Actions ---
 
+  /** Same local calendar day — avoids controlled RangeCalendar re-emit creating new Dates and looping $effect → emitValue. */
+  function sameJsDateCalendar(a: unknown, b: unknown): boolean {
+    if (!(a instanceof Date) || !(b instanceof Date)) return false;
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
   function emitValue(newVal: any) {
     if (!newVal) {
       value = undefined;
@@ -386,6 +424,33 @@
       output = { start: convert(finalVal.start), end: convert(finalVal.end) };
     } else {
       output = convert(finalVal);
+    }
+
+    if (valueType === "date") {
+      if (
+        mode === "range" &&
+        value &&
+        typeof value === "object" &&
+        "start" in value &&
+        "end" in value &&
+        output &&
+        typeof output === "object" &&
+        "start" in output &&
+        "end" in output
+      ) {
+        if (
+          sameJsDateCalendar(value.start, output.start) &&
+          sameJsDateCalendar(value.end, output.end)
+        ) {
+          return;
+        }
+      } else if (
+        mode === "single" &&
+        value instanceof Date &&
+        output instanceof Date
+      ) {
+        if (sameJsDateCalendar(value, output)) return;
+      }
     }
 
     value = output;

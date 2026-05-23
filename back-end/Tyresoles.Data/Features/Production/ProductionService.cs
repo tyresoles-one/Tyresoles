@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Tyresoles.Data.Features.Production.Models;
 using Tyresoles.Sql.Abstractions;
+using Dataverse.NavLive;
 using SoapVendor = Tyresoles.Data.Features.Common.Vendor;
 using SoapOrderInfo = Procurement.OrderInfo;
 using SoapOrderLine = Procurement.OrderLine;
@@ -828,6 +829,164 @@ FROM {lineT}
 WHERE [Dispatch Order No_] = @shipNo AND ([Dispatch Vehicle No_] <> @vehicleNo OR [Dispatch Mobile No] <> @mobileNo OR [Dispatch Transporter] <> @transport)";
         var count = await scope.ExecuteScalarAsync<int>(sql, new { shipNo, vehicleNo, mobileNo, transport }, ct);
         return count > 0;
+    }
+
+    #endregion
+
+    #region Procurement configs (NAV Procurement Configs table)
+
+    private static readonly TimeZoneInfo IndiaTimeZone =
+        ResolveTimeZonePrefer("India Standard Time", "Asia/Kolkata");
+
+    private static TimeZoneInfo ResolveTimeZonePrefer(params string[] ids)
+    {
+        foreach (var id in ids)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        return TimeZoneInfo.Utc;
+    }
+
+    private static DateTime ToNavProcurementMidnight(DateTime value)
+    {
+        if (value.Kind == DateTimeKind.Unspecified)
+            return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, 0, DateTimeKind.Unspecified);
+
+        var utc = value.Kind == DateTimeKind.Local ? value.ToUniversalTime() : value;
+        var tzLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), IndiaTimeZone);
+        return new DateTime(tzLocal.Year, tzLocal.Month, tzLocal.Day, 0, 0, 0, 0, DateTimeKind.Unspecified);
+    }
+
+    private static ProcurementConfigDto NormalizeProcurementConfigDto(ProcurementConfigDto row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return new ProcurementConfigDto
+        {
+            Type = row.Type,
+            ItemNo = row.ItemNo ?? "",
+            Market = row.Market ?? "",
+            Qty = row.Qty,
+            FromDate = ToNavProcurementMidnight(row.FromDate),
+            ToDate = ToNavProcurementMidnight(row.ToDate),
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ProcurementConfigDto>> GetProcurementConfigsAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        // Explicit projection: SELECT * yields extra NAV columns ($systemId, timestamp, ...) before mapped
+        // fields; Materializer stops at the first unmatched column and would return default values only.
+        var rows = await scope.Query<ProcurementConfigs>()
+            .Select(r => new ProcurementConfigs
+            {
+                Type = r.Type,
+                ItemNo = r.ItemNo,
+                Market = r.Market,
+                Qty = r.Qty,
+                FromDate = r.FromDate,
+                ToDate = r.ToDate,
+            })
+            .OrderByDescending(r => r.FromDate)
+            .ThenBy(r => r.ItemNo)
+            .ThenBy(r => r.Market)
+            .ToArrayAsync(ct);
+        return rows.Select(ToProcurementConfigDto).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task InsertProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto row, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        await scope.InsertAsync(ToProcurementConfigEntity(row), ct);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto original, ProcurementConfigDto updated, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(updated);
+        var origNorm = NormalizeProcurementConfigDto(original);
+        var updNorm = NormalizeProcurementConfigDto(updated);
+        var t = scope.GetQualifiedTableName("Procurement Configs", false);
+        var sql = $@"
+UPDATE {t}
+SET [Type]=@newType, [Item No]=@newItemNo, [Market]=@newMarket, [Qty]=@newQty,
+    [From Date]=@newFromDate, [To Date]=@newToDate
+WHERE [Type]=@origType AND [Item No]=@origItemNo AND [Market]=@origMarket
+  AND [From Date]=@origFromDate AND [To Date]=@origToDate";
+        var n = await scope.ExecuteNonQueryAsync(sql, new
+        {
+            newType = updNorm.Type,
+            newItemNo = updNorm.ItemNo,
+            newMarket = updNorm.Market,
+            newQty = updNorm.Qty,
+            newFromDate = updNorm.FromDate,
+            newToDate = updNorm.ToDate,
+            origType = origNorm.Type,
+            origItemNo = origNorm.ItemNo,
+            origMarket = origNorm.Market,
+            origFromDate = origNorm.FromDate,
+            origToDate = origNorm.ToDate,
+        }, ct);
+        if (n == 0)
+            throw new InvalidOperationException("No row was updated — the record may have been changed or removed.");
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteProcurementConfigAsync(ITenantScope scope, ProcurementConfigDto key, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var t = scope.GetQualifiedTableName("Procurement Configs", false);
+        var sql = $@"
+DELETE FROM {t}
+WHERE [Type]=@type AND [Item No]=@itemNo AND [Market]=@market
+  AND [From Date]=@fromDate AND [To Date]=@toDate";
+        var keyNorm = NormalizeProcurementConfigDto(key);
+        var n = await scope.ExecuteNonQueryAsync(sql, new
+        {
+            type = keyNorm.Type,
+            itemNo = keyNorm.ItemNo,
+            market = keyNorm.Market,
+            fromDate = keyNorm.FromDate,
+            toDate = keyNorm.ToDate,
+        }, ct);
+        if (n == 0)
+            throw new InvalidOperationException("No row was deleted — the record may already have been removed.");
+    }
+
+    private static ProcurementConfigDto ToProcurementConfigDto(ProcurementConfigs r) =>
+        NormalizeProcurementConfigDto(new ProcurementConfigDto
+        {
+            Type = r.Type,
+            ItemNo = r.ItemNo ?? "",
+            Market = r.Market ?? "",
+            Qty = r.Qty,
+            FromDate = r.FromDate,
+            ToDate = r.ToDate,
+        });
+
+    private static ProcurementConfigs ToProcurementConfigEntity(ProcurementConfigDto d)
+    {
+        var normalized = NormalizeProcurementConfigDto(d);
+        return new ProcurementConfigs
+        {
+            Type = normalized.Type,
+            ItemNo = normalized.ItemNo ?? "",
+            Market = normalized.Market ?? "",
+            Qty = normalized.Qty,
+            FromDate = normalized.FromDate,
+            ToDate = normalized.ToDate,
+        };
     }
 
     #endregion

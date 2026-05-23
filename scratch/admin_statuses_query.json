@@ -1,0 +1,4 @@
+{
+  "query": "query GetDriveSyncAdminStatuses($userIds: [String!]!) { getDriveSyncAdminStatuses(userIds: $userIds) { userId } }",
+  "variables": { "userIds": ["ACCOUNTS"] }
+}

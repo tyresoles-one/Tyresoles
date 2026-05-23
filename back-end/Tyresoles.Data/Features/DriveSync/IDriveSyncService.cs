@@ -14,9 +14,26 @@ public interface IDriveSyncService
     Task<DriveSyncUserConfig> SaveUserConfigAsync(DriveSyncUserConfig input, string adminUserId, CancellationToken ct = default);
     
     /// <summary>
-    /// Generates a short-lived JIT Access token using the backend's Google Service Account,
-    /// so the Tauri app can upload directly to the mapped TargetFolderId securely.
-    /// It enforces quota limits before issuing the token.
+    /// Short-lived OAuth access token (service account) so the desktop client can upload directly to <see cref="DriveSyncUserConfig.TargetFolderId"/>.
+    /// Quota is enforced using cached folder tree usage.
     /// </summary>
-    Task<string> RequestJitSyncTokenAsync(string userId, long requestedUploadBytes, CancellationToken ct = default);
+    Task<DriveSyncUploadCredentials> RequestUploadCredentialsAsync(string userId, long requestedUploadBytes, CancellationToken ct = default);
+    Task<DriveSyncPreparedUploadSession> PrepareUploadSessionAsync(
+        string userId,
+        string relativePath,
+        string fileName,
+        long fileSizeBytes,
+        string? mimeType,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<DriveSyncBackupFileInfo>> GetBackupFilesForRestoreAsync(string userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Admin: create a Google Drive folder under configured <see cref="DriveSyncGoogleOptions.UserBackupFoldersParentId"/> and set <c>BackupGDriveFolderID</c> on the Nav user.
+    /// </summary>
+    Task<DriveSyncUserConfig> ProvisionAndAssignBackupFolderAsync(
+        string targetUserId,
+        string? folderDisplayName,
+        bool replaceExisting,
+        CancellationToken ct = default);
 }

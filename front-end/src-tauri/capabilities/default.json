@@ -10,6 +10,40 @@
     "log:default",
     "updater:default",
     "process:default",
-    "notification:default"
+    "notification:default",
+    "dialog:default",
+    "fs:default",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-close",
+    "fs:read-all",
+    "fs:allow-stat",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:read-all",
+      "allow": ["**/*", "**"]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": ["**/*", "**"]
+    },
+    {
+      "identifier": "fs:allow-stat",
+      "allow": ["**/*", "**"]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": ["**/*", "**"]
+    },
+    {
+      "identifier": "fs:allow-copy-file",
+      "allow": ["**/*", "**"]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": ["**/*", "**"]
+    }
   ]
 }

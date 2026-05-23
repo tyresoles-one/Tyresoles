@@ -1,71 +1,53 @@
-use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use serde::Serialize;
+use std::process::Command;
 
-pub struct SyncState {
-    pub is_paused: AtomicBool,
-}
-
-impl Default for SyncState {
-    fn default() -> Self {
-        Self {
-            is_paused: AtomicBool::new(false),
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct SyncProgress {
-    pub total_bytes: u64,
-    pub transferred_bytes: u64,
-    pub current_file: String,
-    pub percent: f64,
+#[derive(Debug, Serialize)]
+pub struct RcloneExecResult {
+    pub code: i32,
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
 }
 
 #[tauri::command]
-pub async fn start_sync(app: AppHandle, state: tauri::State<'_, Arc<SyncState>>) -> Result<(), String> {
-    log::info!("Starting background Drive Sync engine...");
-    state.is_paused.store(false, Ordering::Relaxed);
-    
-    let state_clone = Arc::clone(&state);
-    
-    // Asynchronously spawn the engine so the UI thread is not locked! (Solves Pitfall 5)
-    tauri::async_runtime::spawn(async move {
-        // Here we would use tokio::process::Command to launch Rclone/Kopia sidecar.
-        // We simulate the 4-times-per-second throttling to prevent UI white-screens.
-        for i in 1..=10 {
-            if state_clone.is_paused.load(Ordering::Relaxed) {
-                log::info!("Sync gracefully paused.");
-                break;
-            }
-            
-            let progress = SyncProgress {
-                total_bytes: 1_000_000,
-                transferred_bytes: i * 100_000,
-                current_file: format!("C:\\Users\\Mock\\Documents\\heavy_archive_{}.pst", i),
-                percent: (i as f64) * 10.0,
-            };
-            
-            let _ = app.emit("sync-progress", &progress);
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-        }
-        log::info!("Sync complete or halted.");
-    });
-    
-    Ok(())
-}
+pub async fn run_rclone_copyto(
+    binary_path: Option<String>,
+    source_path: String,
+    remote_path: String,
+    drive_token_json: String,
+) -> Result<RcloneExecResult, String> {
+    let binary = binary_path
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("rclone")
+        .to_string();
 
-#[tauri::command]
-pub fn pause_sync(state: tauri::State<'_, Arc<SyncState>>) -> Result<(), String> {
-    log::warn!("Sync pause requested by user.");
-    state.is_paused.store(true, Ordering::Relaxed);
-    Ok(())
-}
+    let output = tauri::async_runtime::spawn_blocking(move || {
+        Command::new(binary)
+            .arg("copyto")
+            .arg(&source_path)
+            .arg(&remote_path)
+            .arg("--drive-token")
+            .arg(&drive_token_json)
+            .arg("--retries")
+            .arg("2")
+            .arg("--low-level-retries")
+            .arg("2")
+            .arg("--checkers")
+            .arg("4")
+            .arg("--transfers")
+            .arg("2")
+            .output()
+    })
+    .await
+    .map_err(|e| format!("failed to join rclone task: {e}"))?
+    .map_err(|e| format!("failed to execute rclone: {e}"))?;
 
-#[tauri::command]
-pub async fn fetch_remote_state() -> Result<String, String> {
-    log::info!("Fetching remote directory state from Google Drive...");
-    // Future: Call rclone lsjson to reconstruct the local DB
-    Ok("[]".to_string())
+    let code = output.status.code().unwrap_or(-1);
+    Ok(RcloneExecResult {
+        code,
+        success: output.status.success(),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    })
 }

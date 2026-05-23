@@ -41,7 +41,7 @@ export const AppConfigSchema = z.object({
     .string()
     .url()
     .default(
-      "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64_en-US.msi",
+      "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64-setup.exe",
     ),
   /** VPN installer download URL (used by ERP apps VPN UI / Tauri download). */
   downloadVpnUrl: z
@@ -58,7 +58,7 @@ export const AppConfigSchema = z.object({
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  backendBaseUrl: "https://api.tyresoles.in",
+  backendBaseUrl: "https://localhost:5002",
   frontendUrl: "http://localhost:5173",
   updateUrl: "https://app.tyresoles.in/updates/update.json",
   version: "1.0",
@@ -72,7 +72,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   webErpUrl: "http://20.207.200.140:8080/DynamicsNAV71/WebClient/",
   oldNavConfig: "OldG01",
   downloadUrl:
-    "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64_en-US.msi",
+    "https://app.tyresoles.in/downloads/Tyresoles_Latest_x64-setup.exe",
   downloadVpnUrl: "https://app.tyresoles.in/downloads/FortiClient.msi",
   fortivpnTunnel: "Tyresoles",
   fortivpnUsername: "",

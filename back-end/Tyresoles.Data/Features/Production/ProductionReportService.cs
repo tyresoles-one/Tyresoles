@@ -1,4 +1,6 @@
+using Dataverse.NavLive;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -8,12 +10,12 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Dataverse.NavLive;
 using Tyresoles.Data.Features.Production.Models;
 using Tyresoles.Data.Features.Sales.Reports;
 using Tyresoles.Data.Features.Sales.Reports.Models;
 using Tyresoles.Reporting.Abstractions;
 using Tyresoles.Sql.Abstractions;
+using ZXing;
 
 namespace Tyresoles.Data.Features.Production;
 
@@ -158,6 +160,34 @@ public sealed class ProductionReportService : IProductionReportService
         return ms.ToArray();
     }
 
+    /// <inheritdoc />
+    public Task<List<ClaimRatio>> GetClaimRatiosDataAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return BuildClaimRatiosListAsync(scope, parameters, cancellationToken);
+    }
+    public Task<List<ClaimRatioDashboard>> GetClaimRatioDashboardsAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return BuildClaimRatiosDashboardListAsync(scope, parameters, cancellationToken);
+    }
+
+    public Task<List<ProcurementDashboard>> GetProcurementDashboardAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return BuildProcurementDashboardListAsync(scope, parameters, cancellationToken);
+    }
+
+
     private static Dictionary<string, object?>? BuildDefaultParameters(SalesReportParams p)
     {
         var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
@@ -189,7 +219,7 @@ public sealed class ProductionReportService : IProductionReportService
             "Ecomile Inv. Sales Stat." => ("EcomileInvSalesStatistics", await GetEcomileInvSalesStatisticsAsync(scope, p, ct).ConfigureAwait(false), null),
             "Claim Analysis" => ("ClaimAnalysis", await GetClaimAnalysisAsync(scope, p, ct).ConfigureAwait(false), null),
             "Casing Average Cost" => ("PostedDispatchAverageCost", await GetPostedDispatchAverageCostAsync(scope, p, ct).ConfigureAwait(false), null),
-            "Claim Ratios" => ("ClaimRatios", await GetClaimRatiosAsync(scope, p, ct).ConfigureAwait(false), null),
+            "Claim Ratios" => ("ClaimRatios", await BuildClaimRatiosListAsync(scope, p, ct).ConfigureAwait(false), null),
             _ => ("", null, null)
         };
     }
@@ -389,7 +419,7 @@ WHERE E.[On Exchange] = 1 {respCentersIn}";
         return ToDataTable(new[] { row });
     }
 
-    private async Task<object?> GetClaimRatiosAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    private async Task<List<ClaimRatio>> BuildClaimRatiosListAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
     {
         var ileT = scope.GetQualifiedTableName("Item Ledger Entry", false);
         var custT = scope.GetQualifiedTableName("Customer", false);
@@ -505,9 +535,21 @@ WHERE E.[On Exchange] = 1 {respCentersIn}";
                     particularILE = "ISNULL(Vendor.[Group Details],'') as Particular, ILE.[Product Group Code] as [Group]";
                     particularILEGroup = "Vendor.[Group Details], ILE.[Product Group Code]";
                     particularLbl = "Proc. Market";
-                    joinILE = "left join [Tyresoles (India) Pvt_ Ltd_$Ecomile Items_] as EcoItem on EcoItem.[New Serial No_] = ILE.[Serial No] --and EcoItem.[Responsibility Center] =  ILE.[Responsibility Center]\r\nleft join [Tyresoles (India) Pvt_ Ltd_$Vendor] as Vendor on Vendor.No_ = EcoItem.[Buy-from Vendor No_]";
-                    particularClaims = "Item.[Product Group Code] as [Group], ISNULL(Salesperson.Name,'') as Particular,";
-                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n  LEFT JOIN (select * from [Tyresoles (India) Pvt_ Ltd_$Team Salesperson] where [Type] = 0) as Salesperson on Salesperson.[Team Code] = Customer.[Area Code]";
+                    joinILE = "left join [Tyresoles (India) Pvt_ Ltd_$Ecomile Items_] as EcoItem on EcoItem.[New Serial No_] = ILE.[Serial No] and EcoItem.[Responsibility Center] =  ILE.[Responsibility Center]\r\nleft join [Tyresoles (India) Pvt_ Ltd_$Vendor] as Vendor on Vendor.No_ = EcoItem.[Buy-from Vendor No_]";
+                    particularClaims = "Item.[Product Group Code] as [Group], ISNULL(Vendor.[Group Details],'') as Particular,";
+                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n\t   left join [Tyresoles (India) Pvt_ Ltd_$Ecomile Items_] as EcoItem on EcoItem.[New Serial No_] = Posted.[Serial No_] and EcoItem.[Responsibility Center] =  Posted.[Responsibility Center]\r\n       left join [Tyresoles (India) Pvt_ Ltd_$Vendor] as Vendor on Vendor.No_ = EcoItem.[Buy-from Vendor No_]\r\n      \r\n";
+                    particularClaims2 = "Particular, [Group],";
+                    particularClaimsGroup = "Particular, [Group]";
+                    break;
+                }
+            case "Defect wise":
+                {
+                    particularILE = "ISNULL(ILE.[Product Group Code],'') as Particular, ILE.[Product Group Code] as [Group]";
+                    particularILEGroup = "ILE.[Product Group Code]";
+                    particularLbl = "Defect";
+                    joinILE = "";
+                    particularClaims = "Item.[Product Group Code] as [Group], ISNULL(Settlement.[Fault Description],'') as Particular,";
+                    joinClaims = "Left join [Tyresoles (India) Pvt_ Ltd_$Customer] as Customer on Customer.No_ = Posted.[Customer No_]\r\n\t   left join [Tyresoles (India) Pvt_ Ltd_$Ecomile Items_] as EcoItem on EcoItem.[New Serial No_] = Posted.[Serial No_] and EcoItem.[Responsibility Center] =  Posted.[Responsibility Center]\r\n       left join [Tyresoles (India) Pvt_ Ltd_$Vendor] as Vendor on Vendor.No_ = EcoItem.[Buy-from Vendor No_]\r\n      \r\n";
                     particularClaims2 = "Particular, [Group],";
                     particularClaimsGroup = "Particular, [Group]";
                     break;
@@ -577,7 +619,13 @@ GROUP BY {particularClaimsGroup}";
 
         var claimStats = await scope.RawQueryToArrayAsync<ClaimRatio>(claimsSql, parameters, ct).ConfigureAwait(false);
 
-        var saleValueSql = $@"
+        var glSaleValueTotal = 0m;
+        var crValueTotal = 0m;
+
+        if (p.View == "Product wise")
+        {
+
+            var saleValueSql = $@"
 SELECT
     CAST(SUM(-GLEntry.[Amount]) AS DECIMAL(18, 2)) AS SaleValue
 FROM {glT} AS GLEntry
@@ -587,25 +635,23 @@ WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
     {glRespCentersIn}
     AND Customer.[Gen_ Bus_ Posting Group] = 'SALES'";
 
-        var creditNoteSql = $@"
-SELECT    
-    CAST(SUM(Lines.[Amount To Customer]) AS DECIMAL(18, 2)) AS CreditNoteValue
-FROM {crHeaderT} AS Header
-INNER JOIN {crLineT} AS Lines ON Lines.[Document No_] = Header.[No_]
-INNER JOIN {postedT} AS Posted ON Posted.[No_] = Header.[External Document No_]
-LEFT JOIN {itemT} AS Item ON Item.[No_] = Posted.[Item No_]
-WHERE Header.[Posting Date] >= @from AND Header.[Posting Date] <= @to
-    {headerRespCentersIn}
-    AND Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
-    AND Item.[Item Category Code] = 'ECOMILE'
-    AND Posted.Type = 0
-    {postedRespCentersIn}";
 
-        var saleValueRows = await scope.RawQueryToArrayAsync<ClaimRatio>(saleValueSql, parameters, ct).ConfigureAwait(false);
-        var creditNoteRows = await scope.RawQueryToArrayAsync<ClaimRatio>(creditNoteSql, parameters, ct).ConfigureAwait(false);
+            var creditNoteSql = $@"
+        select cast(sum(Sett.[Compensation Amount]) as DECIMAL(18,2)) as CreditNoteValue from [Tyresoles (India) Pvt_ Ltd_$Claim & Failure Settlement] as Sett
+        left join (select * from [Tyresoles (India) Pvt_ Ltd_$Claim & Failure Posted]) as Posted
+        on Posted.No_ = Sett.[Document No_]
+        left join (select * from [Tyresoles (India) Pvt_ Ltd_$Item]) as Item
+        on Item.No_ = Posted.[Item No_]
+        where Posted.[Posting Date] between @from and @to {postedRespCentersIn}
+        and Item.[Item Category Code] = 'ECOMILE' and Sett.Decision in (4)";
 
-        var glSaleValueTotal = saleValueRows is { Length: > 0 } ? saleValueRows[0].SaleValue : 0m;
-        var crValueTotal = creditNoteRows is { Length: > 0 } ? creditNoteRows[0].CreditNoteValue : 0m;
+            var saleValueRows = await scope.RawQueryToArrayAsync<ClaimRatio>(saleValueSql, parameters, ct).ConfigureAwait(false);
+            var creditNoteRows = await scope.RawQueryToArrayAsync<ClaimRatio>(creditNoteSql, parameters, ct).ConfigureAwait(false);
+
+            glSaleValueTotal = saleValueRows is { Length: > 0 } ? saleValueRows[0].SaleValue : 0m;
+            crValueTotal = creditNoteRows is { Length: > 0 } ? creditNoteRows[0].CreditNoteValue : 0m;
+
+        }
 
         static bool ProductMatch(string? a, string? b) =>
             string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
@@ -676,6 +722,460 @@ WHERE Header.[Posting Date] >= @from AND Header.[Posting Date] <= @to
                         : 0,
                 });
             }
+        }
+
+        return list;
+    }
+
+    private async Task<List<ClaimRatioDashboard>> BuildClaimRatiosDashboardListAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    {
+        List<ClaimRatioDashboard> list = new List<ClaimRatioDashboard>();
+
+        string soldGroupSql = "GROUP BY ILE.[Product Group Code], Item.[Alternative Item No_], ILE.[Sub Make], ILE.[Responsibility Center], ILE.Make";
+        string soldSelectSql = ", ILE.[Product Group Code] as [Level01], Item.[Alternative Item No_] as [Level02], ILE.Make as [Level03], ILE.[Sub Make] as [Level04] ";
+        string soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_]";
+        string claimSelectSql = "Item.[Product Group Code] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.Make as [Level03], Posted.[Sub Make] as [Level04],";
+        string claimJoinSql = "";
+
+        switch (p.View)
+        {
+            case "Pattern":
+                {
+                    soldGroupSql = "GROUP BY ILE.[Make], Item.[Alternative Item No_], IV.Pattern, ILE.[Responsibility Center]";
+                    soldSelectSql = ", ILE.[Make] as [Level03], Item.[Alternative Item No_] as [Level02], IV.Pattern as [Level01] ";
+                    soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_] LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item Variant] as IV ON ILE.[Item No_] = IV.[Item No_] and ILE.[Variant Code] = IV.Code ";
+                    claimSelectSql = "Posted.[Make] as [Level03], Item.[Alternative Item No_] as [Level02], InvLines.Pattern as [Level01],'' as [Level04], ";
+                    claimJoinSql = "LEFT JOIN [Tyresoles (India) Pvt_ Ltd_$Sales Invoice Line] as InvLines on InvLines.[Document No_] = Posted.[Invoice No_] and InvLines.[Line No_] = Posted.[Line No_] ";
+                    break;
+                }
+            case "Make":
+                {
+                    soldGroupSql = "GROUP BY ILE.[Make], Item.[Alternative Item No_], ILE.[Sub Make], ILE.[Responsibility Center]";
+                    soldSelectSql = ", ILE.[Make] as [Level01], Item.[Alternative Item No_] as [Level02], ILE.[Sub Make] as [Level03] ";
+                    soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_] LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item Variant] as IV ON ILE.[Item No_] = IV.[Item No_] and ILE.[Variant Code] = IV.Code ";
+                    claimSelectSql = "Posted.[Make] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.[Sub Make] as [Level03],'' as [Level04], ";
+                    claimJoinSql = "LEFT JOIN [Tyresoles (India) Pvt_ Ltd_$Sales Invoice Line] as InvLines on InvLines.[Document No_] = Posted.[Invoice No_] and InvLines.[Line No_] = Posted.[Line No_] ";
+                    break;
+                }
+            case "Defect":
+                {
+                    soldGroupSql = "GROUP BY Item.[Alternative Item No_], ILE.[Sub Make], ILE.[Responsibility Center], ILE.Make";
+                    soldSelectSql = ", '' as [Level01], Item.[Alternative Item No_] as [Level02], ILE.Make as [Level03], ILE.[Sub Make] as [Level04] ";
+                    soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_]";
+                    claimSelectSql = "Settlement.[Fault Description] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.Make as [Level03], Posted.[Sub Make] as [Level04],";
+                    break;
+                }
+            case "Procurement":
+                {
+                    //soldGroupSql = "GROUP BY Item.[Alternative Item No_], Vend.[Group Details], ILE.[Responsibility Center], ILE.Make";
+                    //soldSelectSql = ", '' as [Level01], Item.[Alternative Item No_] as [Level03], Vend.[Group Details] as [Level02], ILE.[Make] as [Level04] ";
+                    //soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_] left join [dbo].[Tyresoles (India) Pvt_ Ltd_$Vendor] as Vend on Vend.No_ = ILE.[Vendor No_] ";
+                    claimSelectSql = "Settlement.[Fault Description] as [Level04], Vend.[Group Details] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.Make as [Level03],";
+                    claimJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Vendor] as Vend on Vend.No_ = Posted.[Vendor No_] ";
+                    break;
+                }
+
+        }
+
+        var dr = ResolveCasingPurchaseSqlAndDisplayRange(p);
+
+        static bool ProductMatch(string? a, string? b) =>
+            string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["from"] = dr.FromSql,
+            ["to"] = dr.ToSql
+        };
+
+        var saleSql = $@"
+  SELECT
+          CAST(SUM(-GLEntry.[Amount]) AS DECIMAL(18, 2)) AS Value, GLEntry.[Responsibility Center] as [RespCenter]
+      FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$G_L Entry] AS GLEntry
+      INNER JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Customer] AS Customer ON Customer.[No_] = GLEntry.[Source No_]
+      WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
+          AND GLEntry.[Posting Date] >= @from AND GLEntry.[Posting Date] <= @to
+           AND GLEntry.[Responsibility Center] IN ('AHM','BEL','JBP')
+          AND Customer.[Gen_ Bus_ Posting Group] = 'SALES'
+		  group by GLEntry.[Responsibility Center]
+";
+        var creditNoteSql = $@"
+ select cast(sum(Sett.[Compensation Amount]) as DECIMAL(18,2)) as Value, Posted.[Responsibility Center] as [RespCenter] from [Tyresoles (India) Pvt_ Ltd_$Claim & Failure Settlement] as Sett
+              left join (select * from [Tyresoles (India) Pvt_ Ltd_$Claim & Failure Posted]) as Posted
+              on Posted.No_ = Sett.[Document No_]
+              left join (select * from [Tyresoles (India) Pvt_ Ltd_$Item]) as Item
+              on Item.No_ = Posted.[Item No_]
+              where Posted.[Posting Date] between @from and @to  AND Posted.[Responsibility Center] IN ('AHM','BEL','JBP')
+              and Item.[Item Category Code] = 'ECOMILE' and Sett.Decision in (4)
+			  group by Posted.[Responsibility Center]
+";
+
+        var soldSql = $@" SELECT
+          CAST(SUM(-ILE.[Quantity]) AS INT) as Sold, ILE.[Responsibility Center] as [RespCenter]
+          {soldSelectSql}
+      FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Item Ledger Entry] AS ILE
+      LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Customer] AS Cust ON Cust.[No_] = ILE.[Source No_]
+	  {soldJoinSql}
+      INNER JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Location] AS Loc ON Loc.[Code] = ILE.[Location Code]  AND Loc.[Responsibility Center] IN ('AHM','BEL','JBP')
+      WHERE ILE.[Posting Date] >= @from AND ILE.[Posting Date] <= @to
+          AND ILE.[Entry Type] = 1
+          AND Loc.[Type] IN (0, 1, 3)
+          AND ILE.[Item Category Code] = 'ECOMILE'
+          AND Cust.[Gen_ Bus_ Posting Group] = 'SALES'
+      {soldGroupSql} ";
+
+        var claimSql = $@"
+        WITH LatestSettlement AS (
+        SELECT Posted.[Responsibility Center] as [RespCenter],
+          {claimSelectSql}
+          Settlement.Decision, Settlement.[Sanction Type] as SanctionType,
+          ROW_NUMBER() OVER (
+            PARTITION BY Posted.[No_]
+            ORDER BY ISNULL(Settlement.Date, '1900-01-01') DESC, Settlement.[Document No_]
+          ) AS rn
+        FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Claim & Failure Posted] AS Posted
+        LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] AS Item
+        ON Item.No_ = Posted.[Item No_]
+        {claimJoinSql}
+        LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Claim & Failure Settlement] AS Settlement
+        ON Settlement.[Document No_] = Posted.No_        
+        WHERE Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
+          AND Item.[Item Category Code] = 'ECOMILE'
+          AND Posted.Type = 0
+          AND Posted.[Responsibility Center] IN ('AHM','BEL','JBP')
+      )
+      SELECT
+          [Level01], [Level02], [Level03], [Level04], [RespCenter],
+          COUNT(*) as Claims,
+          SUM(CASE WHEN Decision IN (3,5) THEN 1 ELSE 0 END) as Reject,
+          SUM(CASE WHEN Decision IN (1,2,4,6,7) THEN 1 ELSE 0 END) as Pass,
+          SUM(CASE WHEN Decision is null then 1 else 0 end) as Unsettled,
+          SUM(CASE WHEN SanctionType in (2) then 1 else 0 end) as SpecialCase
+      FROM LatestSettlement
+      WHERE rn = 1 AND Level01 IS NOT NULL
+      GROUP BY Level01, Level02, Level03, Level04, RespCenter";
+
+        var purchaseSql = $@"
+select Vend.[Group Details] as [Level01], Lines.[No_] as [Level02], Lines.Make as [Level03], Lines.[Responsibility Center] as [RespCenter], sum(Lines.Quantity) as Purchase from [Tyresoles (India) Pvt_ Ltd_$Purchase Line] as Lines
+left join (select * from [Tyresoles (India) Pvt_ Ltd_$Purchase Header]) as Header
+on Header.No_ = Lines.[Document No_]
+left join (select * from [Tyresoles (India) Pvt_ Ltd_$Vendor]) as Vend
+on Vend.No_ = Header.[Buy-from Vendor No_]
+where Header.[Posting Date] between @from and @to 
+and Lines.[Order Status] in (4) and Lines.[Document Type] in (6)
+and Lines.[Responsibility Center] IN ('AHM','BEL','JBP')
+group by Vend.[Group Details], Lines.No_, Lines.Make, Lines.[Responsibility Center]";
+
+        ClaimRatioDashboard[] resultsArray = Array.Empty<ClaimRatioDashboard>();
+        if (p.View == "Procurement")
+        {
+            resultsArray = await scope.RawQueryToArrayAsync<ClaimRatioDashboard>(purchaseSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ClaimRatioDashboard>();
+        }
+        else if (p.View != "Defect")
+        {
+            resultsArray = await scope.RawQueryToArrayAsync<ClaimRatioDashboard>(soldSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ClaimRatioDashboard>();
+        }
+        var results = resultsArray.Length == 0 ? Array.Empty<ClaimRatioDashboard>() : resultsArray
+            .GroupBy(x => (
+                (x.Level01 ?? "").Trim().ToUpperInvariant(),
+                (x.Level02 ?? "").Trim().ToUpperInvariant(),
+                (x.Level03 ?? "").Trim().ToUpperInvariant(),
+                (x.Level04 ?? "").Trim().ToUpperInvariant(),
+                (x.RespCenter ?? "").Trim().ToUpperInvariant()
+            ))
+            .Select(g =>
+            {
+                var first = g.First();
+                return new ClaimRatioDashboard
+                {
+                    Level01 = first.Level01 ?? "",
+                    Level02 = first.Level02 ?? "",
+                    Level03 = first.Level03 ?? "",
+                    Level04 = first.Level04 ?? "",
+                    RespCenter = first.RespCenter ?? "",
+                    Sold = g.Sum(x => x.Sold),
+                    Purchase = g.Sum(x => x.Purchase)
+                };
+            }).ToArray();
+
+        var claimStatsArray = await scope.RawQueryToArrayAsync<ClaimRatioDashboard>(claimSql, parameters, ct).ConfigureAwait(false);
+        var claimStats = claimStatsArray == null ? Array.Empty<ClaimRatioDashboard>() : claimStatsArray;
+
+        var saleStats = await scope.RawQueryToArrayAsync<ClaimRatioDashboardValue>(saleSql, parameters, ct).ConfigureAwait(false);
+        var creditNoteStats = await scope.RawQueryToArrayAsync<ClaimRatioDashboardValue>(creditNoteSql, parameters, ct).ConfigureAwait(false);
+
+        //System.Console.WriteLine($"results {results.Length}, claimStats {claimStats.Length}, saleStats {saleStats.Length} creditStats {creditNoteStats.Length}");
+        
+        if(p.View == "Defect" || p.View == "Procurement")
+        {
+            var newList = new List<ClaimRatioDashboard>();
+
+            string Normalize(string? s) => (s ?? "").Trim().ToUpperInvariant();
+            bool isProc = p.View == "Procurement";
+
+            // Map sales by Product key
+            var salesMap = results.ToDictionary(
+                s => isProc ? (Normalize(s.Level01), Normalize(s.Level02), Normalize(s.Level03), Normalize(s.RespCenter)) 
+                            : (Normalize(s.Level02), Normalize(s.Level03), Normalize(s.Level04), Normalize(s.RespCenter)),
+                s => s
+            );
+
+            // Group claims by Product key
+            var claimsByProduct = claimStats.GroupBy(
+                c => isProc ? (Normalize(c.Level01), Normalize(c.Level02), Normalize(c.Level03), Normalize(c.RespCenter))
+                            : (Normalize(c.Level02), Normalize(c.Level03), Normalize(c.Level04), Normalize(c.RespCenter))
+            ).ToDictionary(g => g.Key, g => g.ToList());
+
+            // 1. Process all sales records to ensure total sold is preserved
+            foreach (var sale in results)
+            {
+                var key = isProc ? (Normalize(sale.Level01), Normalize(sale.Level02), Normalize(sale.Level03), Normalize(sale.RespCenter))
+                                 : (Normalize(sale.Level02), Normalize(sale.Level03), Normalize(sale.Level04), Normalize(sale.RespCenter));
+                var saleStat = saleStats.FirstOrDefault(s => ProductMatch(s.RespCenter, sale.RespCenter));
+                var creditNoteStat = creditNoteStats.FirstOrDefault(s => ProductMatch(s.RespCenter, sale.RespCenter));
+
+                if (claimsByProduct.TryGetValue(key, out var productClaims) && productClaims.Count > 0)
+                {
+                    // Distribute totalUnits among claims to match grand total exactly
+                    int totalUnits = isProc ? sale.Purchase : sale.Sold;
+                    int count = productClaims.Count;
+                    int baseUnits = totalUnits / count;
+                    int remainder = totalUnits % count;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        var c = productClaims[i];
+                        if (isProc) c.Purchase = baseUnits + (i < remainder ? 1 : 0);
+                        else c.Sold = baseUnits + (i < remainder ? 1 : 0);
+                        
+                        c.SaleValue = saleStat?.Value ?? 0;
+                        c.CreditNoteValue = creditNoteStat?.Value ?? 0;
+                        newList.Add(c);
+                    }
+                }
+                else if (sale != null)
+                {
+                    newList.Add(new ClaimRatioDashboard
+                    {
+                        Level01 = isProc ? sale.Level01 : "No Claim",
+                        Level02 = sale.Level02,
+                        Level03 = sale.Level03,
+                        Level04 = sale.Level04,
+                        RespCenter = sale.RespCenter,
+                        Sold = sale.Sold,
+                        Purchase = sale.Purchase,
+                        SaleValue = saleStat?.Value ?? 0,
+                        CreditNoteValue = creditNoteStat?.Value ?? 0
+                    });
+                }
+            }
+
+            // 2. Add claims that have NO matching sales in current period
+            foreach (var claimGroup in claimsByProduct)
+            {
+                if (!salesMap.ContainsKey(claimGroup.Key))
+                {
+                    var saleStat = saleStats.FirstOrDefault(s => ProductMatch(s.RespCenter, claimGroup.Value[0].RespCenter));
+                    var creditNoteStat = creditNoteStats.FirstOrDefault(s => ProductMatch(s.RespCenter, claimGroup.Value[0].RespCenter));
+
+                    foreach (var claim in claimGroup.Value)
+                    {
+                        if (isProc) claim.Purchase = 0;
+                        else claim.Sold = 0;
+                        
+                        claim.SaleValue = saleStat?.Value ?? 0;
+                        claim.CreditNoteValue = creditNoteStat?.Value ?? 0;
+                        newList.Add(claim);
+                    }
+                }
+            }
+
+            list = newList;
+        }else
+        {
+            foreach (var r in results)
+            {
+                if (claimStats != null)
+                {
+                    var stat = claimStats.FirstOrDefault(c => ProductMatch(c.Level01, r.Level01)
+                    && ProductMatch(c.Level02, r.Level02)
+                    && ProductMatch(c.Level03, r.Level03)
+                    && ProductMatch(c.Level04, r.Level04)
+                    && ProductMatch(c.RespCenter, r.RespCenter));
+
+                    var saleStat = saleStats.FirstOrDefault(c => ProductMatch(c.RespCenter, r.RespCenter));
+                    var creditNoteStat = creditNoteStats.FirstOrDefault(c => ProductMatch(c.RespCenter, r.RespCenter));
+
+                    if (stat != null)
+                    {
+                        r.Claims = stat.Claims;
+                        r.Pass = stat.Pass;
+                        r.Reject = stat.Reject;
+                        r.Unsettled = stat.Unsettled;
+                        r.SpecialCase = stat.SpecialCase;
+                    }
+
+                    if (saleStat != null)
+                        r.SaleValue = saleStat.Value;
+
+                    if (creditNoteStat != null)
+                        r.CreditNoteValue = creditNoteStat.Value;
+                }
+            }
+
+            list = results.ToList();
+
+            if (claimStats != null)
+            {
+                foreach (var stat in claimStats)
+                {
+                    var matchedBySale = results.Any(r =>
+                        ProductMatch(r.Level01, stat.Level01)
+                        && ProductMatch(r.Level02, stat.Level02)
+                        && ProductMatch(r.Level03, stat.Level03)
+                        && ProductMatch(r.Level04, stat.Level04)
+                        && ProductMatch(r.RespCenter, stat.RespCenter));
+
+                    if (matchedBySale)
+                        continue;
+
+                    var saleStat = saleStats.FirstOrDefault(c => ProductMatch(c.RespCenter, stat.RespCenter));
+                    var creditNoteStat = creditNoteStats.FirstOrDefault(c => ProductMatch(c.RespCenter, stat.RespCenter));
+
+                    list.Add(new ClaimRatioDashboard
+                    {
+                        SaleValue = saleStat?.Value ?? 0,
+                        CreditNoteValue = creditNoteStat?.Value ?? 0,
+                        //View = p.View ?? "",                   
+                        Sold = 0,
+                        Level01 = stat.Level01,
+                        Level02 = stat.Level02,
+                        Level03 = stat.Level03,
+                        Level04 = stat.Level04,
+                        RespCenter = stat.RespCenter,
+                        SpecialCase = stat.SpecialCase,
+                        Claims = stat.Claims,
+                        Pass = stat.Pass,
+                        Reject = stat.Reject,
+                        Unsettled = stat.Unsettled,
+                        ClaimPercent = 0,
+                    });
+                }
+            }
+
+        }
+
+        return list;
+    }
+
+    private async Task<List<ProcurementDashboard>> BuildProcurementDashboardListAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    {
+        List<ProcurementDashboard> list = new List<ProcurementDashboard>();
+        var dr = ResolveCasingPurchaseSqlAndDisplayRange(p);
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["from"] = dr.FromSql,
+            ["to"] = dr.ToSql
+        };
+
+        var fromDate = DateTime.ParseExact(dr.FromSql, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var toDate = DateTime.ParseExact(dr.ToSql, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        var lastMonthFrom = fromDate.AddMonths(-1);
+        var lastMonthTo = toDate.AddMonths(-1);
+
+        var lastMonthFromSql = lastMonthFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var lastMonthToSql = lastMonthTo.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        var lastMonthParameters = new Dictionary<string, object?>
+        {
+            ["from"] = lastMonthFromSql,
+            ["to"] = lastMonthToSql
+        };
+
+        var purchaseLineT = scope.GetQualifiedTableName("Purchase Line", false);
+        var purchaseHeaderT = scope.GetQualifiedTableName("Purchase Header", false);
+        var vendorT = scope.GetQualifiedTableName("Vendor", false);
+        var configT = scope.GetQualifiedTableName("Procurement Configs", false);
+
+        var targetSql = $@"
+        select [Item No] as Size, Market, CAST(Qty AS INT) as [Target]
+        from {configT} where [From Date] >= @from and [To Date] <= @to";
+
+        var purchasedSql = $@"select Lines.No_ as [Size], Vend.[Group Details] as [Market], CAST(SUM(Lines.Quantity) AS INT) as Purchased, ISNULL(AVG(Lines.[Direct Unit Cost]), 0) as AvgCost, ISNULL(AVG(Lines.[Casing Freight]), 0) as Freight 
+from {purchaseLineT} as Lines
+left join (select * from {purchaseHeaderT}) as Header
+on Header.No_ = Lines.[Document No_]
+left join (select * from {vendorT}) as Vend
+on Vend.No_ = Lines.[Buy-from Vendor No_]
+where Lines.[Order Status] in (4) and Lines.[Document Type] in (6)
+and Header.[Posting Date] between @from and @to
+group by Lines.No_, Vend.[Group Details]";
+
+        var targets = await scope.RawQueryToArrayAsync<ProcurementDashboard>(targetSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
+        var currentPurchased = await scope.RawQueryToArrayAsync<ProcurementDashboard>(purchasedSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
+        var lastMonthPurchased = await scope.RawQueryToArrayAsync<ProcurementDashboard>(purchasedSql, lastMonthParameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
+
+        string Normalize(string? s) => (s ?? "").Trim().ToUpperInvariant();
+
+        var allKeys = new HashSet<(string Size, string Market)>();
+        var originalKeys = new Dictionary<(string Size, string Market), (string Size, string Market)>();
+
+        void RegisterOriginalKey(string size, string market)
+        {
+            var norm = (Normalize(size), Normalize(market));
+            allKeys.Add(norm);
+            if (!originalKeys.ContainsKey(norm))
+            {
+                originalKeys[norm] = ((size ?? "").Trim(), (market ?? "").Trim());
+            }
+        }
+
+        foreach (var t in targets) RegisterOriginalKey(t.Size, t.Market);
+        foreach (var cp in currentPurchased) RegisterOriginalKey(cp.Size, cp.Market);
+        foreach (var lp in lastMonthPurchased) RegisterOriginalKey(lp.Size, lp.Market);
+
+        var targetLookup = targets
+            .GroupBy(t => (Normalize(t.Size), Normalize(t.Market)))
+            .ToDictionary(g => g.Key, g => g.First().Target);
+
+        var currentLookup = currentPurchased
+            .GroupBy(p => (Normalize(p.Size), Normalize(p.Market)))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var lastMonthLookup = lastMonthPurchased
+            .GroupBy(lp => (Normalize(lp.Size), Normalize(lp.Market)))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var key in allKeys)
+        {
+            var orig = originalKeys[key];
+            var item = new ProcurementDashboard
+            {
+                Size = orig.Size,
+                Market = orig.Market
+            };
+
+            if (targetLookup.TryGetValue(key, out var targetQty))
+            {
+                item.Target = targetQty;
+            }
+
+            if (currentLookup.TryGetValue(key, out var currentData))
+            {
+                item.Purchased = currentData.Purchased;
+                item.AvgCost = currentData.AvgCost;
+                item.Freight = currentData.Freight;
+            }
+
+            if (lastMonthLookup.TryGetValue(key, out var lastMonthData))
+            {
+                item.PurchasedLastMonth = lastMonthData.Purchased;
+                item.AvgCostLastMonth = lastMonthData.AvgCost;
+            }
+
+            list.Add(item);
         }
 
         return list;
@@ -800,7 +1300,6 @@ WHERE Lines.[Document Type] = 6 AND {fieldToFilter} IN {nosIn}";
         var results = await scope.RawQueryToArrayAsync<PostedProcOrderRow>(sql, parameters, ct).ConfigureAwait(false);
         return ToDataTable(results);
     }
-
     private async Task<object?> GetVendorBillAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
     {
         var lineT = scope.GetQualifiedTableName("Purchase Line", false);

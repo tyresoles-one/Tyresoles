@@ -8,6 +8,21 @@ export default defineConfig(({ mode }) => {
 	/** Vite 7 SSR can hit "transport invoke timed out after 60000ms" if file watchers are flaky (common on Windows). Set VITE_DEV_WATCH_POLLING=1 to use polling. */
 	const watchPolling = env.VITE_DEV_WATCH_POLLING === '1';
 
+	/**
+	 * Ignore Capacitor / Gradle / Xcode output so native builds do not trigger Vite reloads
+	 * and starve SSR `fetchModule` (e.g. churn under `android/build/reports/**`).
+	 */
+	const capNativeWatchIgnores = [
+		'**/android/build/**',
+		'**/android/.gradle/**',
+		'**/android/app/build/**',
+		'**/android/**/intermediates/**',
+		'**/android/app/src/main/assets/public/**',
+		'**/ios/App/build/**',
+		'**/ios/Pods/**',
+		'**/ios/DerivedData/**',
+	];
+
 	return {
 		plugins: [tailwindcss(), sveltekit()],
 		optimizeDeps: {
@@ -19,6 +34,9 @@ export default defineConfig(({ mode }) => {
 			dedupe: ['pdfjs-dist']
 		},
 		server: {
+			// Align HMR websocket host with the URL you open (avoids flaky full reloads where
+			// the client requests stale ?t= route chunks → "Failed to fetch dynamically imported module").
+			hmr: { host: 'localhost' },
 			proxy: {
 				'/graphql': {
 					target: env.VITE_PUBLIC_API_URL || 'https://localhost:5002',
@@ -26,9 +44,10 @@ export default defineConfig(({ mode }) => {
 					secure: false // Useful if using self-signed certs for local backend dev
 				}
 			},
-			...(win && watchPolling
-				? { watch: { usePolling: true, interval: 300 } }
-				: {})
+			watch: {
+				ignored: capNativeWatchIgnores,
+				...(win && watchPolling ? { usePolling: true, interval: 300 } : {}),
+			},
 		}
 	};
 });

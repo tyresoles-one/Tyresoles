@@ -11,7 +11,7 @@ public interface INavEditService
     Task<bool> DeleteRequestTypeAsync(int id, CancellationToken ct = default);
 
     // ── Record Lookup (dynamic) ─────────────────────────────────
-    Task<List<Dictionary<string, object?>>> LookupRecordsAsync(int requestTypeId, string? search, int take = 20, CancellationToken ct = default);
+    Task<List<Dictionary<string, object?>>> LookupRecordsAsync(int requestTypeId, string? search, int take = 20, System.Collections.Generic.IDictionary<string, string>? authValues = null, CancellationToken ct = default);
     Task<Dictionary<string, object?>?> GetRecordByKeyAsync(int requestTypeId, string recordKey, CancellationToken ct = default);
 
     /// <summary>Nav Live base table names (INFORMATION_SCHEMA), for template designer.</summary>

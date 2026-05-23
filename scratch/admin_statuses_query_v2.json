@@ -1,0 +1,4 @@
+{
+  "query": "query GetDriveSyncAdminStatuses($userIds: [String!]!) { getDriveSyncAdminStatuses(userIds: $userIds, includeFolderValidation: true, includeUsage: true, includeLatestBackup: true) { userId } }",
+  "variables": { "userIds": ["ACCOUNTS"] }
+}

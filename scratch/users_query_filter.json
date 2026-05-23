@@ -1,0 +1,4 @@
+{
+  "query": "query GetUsers($where: UserFilterInput) { users(where: $where) { totalCount } }",
+  "variables": { "where": { "fullName": { "contains": "admin" } } }
+}

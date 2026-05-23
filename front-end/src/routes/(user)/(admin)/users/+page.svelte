@@ -19,9 +19,14 @@
   import { Dropdown } from "$lib/components/venUI/dropdowns";
   import { TableCell, TableHead } from "$lib/components/ui/table";
   import MasterList from "$lib/components/venUI/masterList/MasterList.svelte";
+  import { toast } from "$lib/components/venUI/toast";
 
   // GraphQL & utils
   import { gql } from "graphql-request";
+  import { getGraphQLClient } from "$lib/services/graphql/client";
+  import { getBackendBaseUrl } from "$lib/config/system";
+  import { authStore } from "$lib/stores/auth";
+  import { get } from "svelte/store";
   
   const GetUsersDocument: any = gql`
     query GetUsers($skip: Int, $take: Int, $where: UserFilterInput, $order: [UserSortInput!], $duplicateMobileOnly: Boolean) {
@@ -41,6 +46,35 @@
     }
   `;
 
+  const GetDriveSyncAdminStatusesDocument: any = gql`
+    query GetDriveSyncAdminStatuses(
+      $userIds: [String!]!
+      $includeFolderValidation: Boolean!
+      $includeUsage: Boolean!
+      $includeLatestBackup: Boolean!
+    ) {
+      getDriveSyncAdminStatuses(
+        userIds: $userIds
+        includeFolderValidation: $includeFolderValidation
+        includeUsage: $includeUsage
+        includeLatestBackup: $includeLatestBackup
+      ) {
+        userId
+        isUserFound
+        isActive
+        targetFolderId
+        folderValidated
+        folderValidationError
+        quotaBytes
+        usedBytes
+        usageError
+        latestBackupUtc
+        latestBackupError
+        lastCheckedUtc
+      }
+    }
+  `;
+
   type GetUsersQuery = {
     users: {
       items: Array<{
@@ -55,6 +89,30 @@
       }>;
       totalCount: number;
     };
+  };
+  type DriveSyncAdminStatus = {
+    userId: string;
+    isUserFound: boolean;
+    isActive: boolean;
+    targetFolderId: string;
+    folderValidated?: boolean | null;
+    folderValidationError?: string | null;
+    quotaBytes: number | string;
+    usedBytes: number | string;
+    usageError?: string | null;
+    latestBackupUtc?: string | null;
+    latestBackupError?: string | null;
+    lastCheckedUtc: string;
+  };
+  type DriveSyncOAuthStatus = {
+    isConfigured: boolean;
+    hasRefreshToken: boolean;
+    hasAccessToken: boolean;
+    accessTokenExpiryUtc?: string | null;
+    isAccessTokenExpired: boolean;
+    googleAccountEmail?: string | null;
+    updatedAtUtc?: string | null;
+    updatedByUserId?: string | null;
   };
 
   import { cn, getInitials } from "$lib/utils";
@@ -79,6 +137,12 @@
   let statusFilter = $state<"All" | "Active" | "Inactive">("All");
   let userTypeFilter = $state<string>("");
   let showDuplicateMobileOnly = $state(false);
+  let driveSyncStatusByUser = $state<Record<string, DriveSyncAdminStatus>>({});
+  let driveSyncStatusLoading = $state(false);
+  let driveSyncStatusLoaded = $state(false);
+  let driveSyncStatusError = $state<string | null>(null);
+  let oauthStatus = $state<DriveSyncOAuthStatus | null>(null);
+  let oauthLoading = $state(false);
 
   const list = usePaginatedList<User>({
     query: GetUsersDocument,
@@ -151,6 +215,110 @@
   function userTypeName(code: string): string {
     return USER_TYPES.find((t) => t.code === code)?.name ?? code;
   }
+
+  function toBytes(v: number | string | null | undefined): number {
+    if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+    if (typeof v === "string") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  }
+
+  function formatBytes(bytes: number | string | null | undefined): string {
+    const n = toBytes(bytes);
+    if (!n) return "0 B";
+    const k = 1024;
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.min(Math.floor(Math.log(n) / Math.log(k)), units.length - 1);
+    return `${(n / Math.pow(k, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+  }
+
+  function getDriveSyncStatus(userName: string): DriveSyncAdminStatus | undefined {
+    return driveSyncStatusByUser[userName];
+  }
+
+  async function loadDriveSyncStatuses() {
+    const userIds = list.items.map((u) => u.userName).filter(Boolean);
+    if (!userIds.length) return;
+
+    driveSyncStatusLoading = true;
+    driveSyncStatusError = null;
+    try {
+      const client = await getGraphQLClient();
+      const res = await client.request<{
+        getDriveSyncAdminStatuses: DriveSyncAdminStatus[];
+      }>(GetDriveSyncAdminStatusesDocument, {
+        userIds,
+        includeFolderValidation: true,
+        includeUsage: true,
+        includeLatestBackup: true,
+      });
+      const next: Record<string, DriveSyncAdminStatus> = {};
+      for (const r of res.getDriveSyncAdminStatuses ?? []) {
+        if (r?.userId) next[r.userId] = r;
+      }
+      driveSyncStatusByUser = next;
+      driveSyncStatusLoaded = true;
+      toast.success(`DriveSync health checked for ${Object.keys(next).length} user(s).`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      driveSyncStatusError = msg;
+      toast.error(msg);
+    } finally {
+      driveSyncStatusLoading = false;
+    }
+  }
+
+  function authHeader(): HeadersInit {
+    const token = get(authStore).token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function refreshDriveSyncOAuthStatus() {
+    oauthLoading = true;
+    try {
+      const res = await fetch(`${getBackendBaseUrl()}/api/drive-sync/oauth/status`, {
+        headers: authHeader(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.error ?? `OAuth status failed (${res.status})`);
+      }
+      oauthStatus = body as DriveSyncOAuthStatus;
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      oauthLoading = false;
+    }
+  }
+
+  async function connectDriveSyncOAuth() {
+    oauthLoading = true;
+    try {
+      const res = await fetch(`${getBackendBaseUrl()}/api/drive-sync/oauth/start`, {
+        headers: authHeader(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.error ?? `OAuth start failed (${res.status})`);
+      }
+      const url = body?.authorizationUrl as string | undefined;
+      if (!url) throw new Error("OAuth authorization URL missing from response.");
+      window.open(url, "_blank", "noopener,noreferrer,width=640,height=760");
+      toast.success("Google OAuth window opened. Complete consent, then click Refresh OAuth.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      oauthLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (list.items.length >= 0) {
+      void refreshDriveSyncOAuthStatus();
+    }
+  });
 </script>
 
 <MasterList
@@ -259,6 +427,51 @@
   {/snippet}
 
   {#snippet actions()}
+    <Dropdown
+      align="end"
+      items={[
+        { type: "label", label: "Drive Sync Management" },
+        { type: "separator" },
+        {
+          type: "item",
+          label: driveSyncStatusLoading ? "Checking…" : "Check Health",
+          icon: "hard-drive",
+          disabled:
+            driveSyncStatusLoading || list.loading || list.items.length === 0,
+          onClick: loadDriveSyncStatuses,
+        },
+        { type: "separator" },
+        {
+          type: "item",
+          label: "Refresh OAuth",
+          icon: "shield-check",
+          disabled: oauthLoading,
+          onClick: refreshDriveSyncOAuthStatus,
+        },
+        {
+          type: "item",
+          label: oauthStatus?.isConfigured
+            ? "Reconnect Google"
+            : "Connect Google",
+          icon: "link",
+          disabled: oauthLoading,
+          onClick: connectDriveSyncOAuth,
+        },
+      ]}
+    >
+      {#snippet children({ props })}
+        <Button
+          variant="outline"
+          size="sm"
+          class="gap-2 shrink-0"
+          {...props}
+        >
+          <Icon name="cloud" class="size-3.5" />
+          <span class="hidden sm:inline">Drive Sync</span>
+          <Icon name="chevron-down" class="size-3.5 opacity-60" />
+        </Button>
+      {/snippet}
+    </Dropdown>
     <Button
       size="sm"
       class="gap-2 shrink-0 bg-primary/90 hover:bg-primary shadow-sm hover:shadow-md transition-all"
@@ -269,6 +482,7 @@
       <span class="sm:hidden">Add</span>
     </Button>
   {/snippet}
+
 
   {#snippet gridItem(user: User)}
     <Card
@@ -352,6 +566,30 @@
             </div>
 
             <!-- Additional Info -->
+            {#if driveSyncStatusLoaded}
+              {@const ds = getDriveSyncStatus(user.userName)}
+              <div class="mt-3 pt-2 border-t border-border/30 space-y-1">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-muted-foreground">DriveSync</span>
+                  {#if ds}
+                    {#if ds.isActive && ds.folderValidated !== false}
+                      <Badge variant="secondary" class="h-4 px-1.5 text-[10px]">Healthy</Badge>
+                    {:else if ds.isActive && ds.folderValidated === false}
+                      <Badge variant="destructive" class="h-4 px-1.5 text-[10px]">Folder issue</Badge>
+                    {:else}
+                      <Badge variant="outline" class="h-4 px-1.5 text-[10px]">Inactive</Badge>
+                    {/if}
+                  {:else}
+                    <span class="text-muted-foreground/70">—</span>
+                  {/if}
+                </div>
+                {#if ds?.isActive}
+                  <div class="text-[10px] text-muted-foreground font-mono truncate">
+                    {formatBytes(ds.usedBytes)} / {formatBytes(ds.quotaBytes)}
+                  </div>
+                {/if}
+              </div>
+            {/if}
           </div>
         </div>
       </CardContent>
@@ -425,6 +663,7 @@
         {/if}
       </div>
     </TableHead>
+    <TableHead class="hidden xl:table-cell">DriveSync</TableHead>
     <TableHead class="text-right">Actions</TableHead>
   {/snippet}
 
@@ -483,6 +722,41 @@
         context="ACTIVE_DISABLED"
         class="text-xs font-normal"
       />
+    </TableCell>
+    <TableCell class="hidden xl:table-cell">
+      {#if driveSyncStatusLoaded}
+        {@const ds = getDriveSyncStatus(user.userName)}
+        {#if ds}
+          <div class="flex flex-col gap-1 text-xs">
+            <div class="flex items-center gap-2">
+              {#if ds.isActive && ds.folderValidated !== false}
+                <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                <span>Healthy</span>
+              {:else if ds.isActive && ds.folderValidated === false}
+                <span class="size-1.5 rounded-full bg-amber-500"></span>
+                <span>Folder issue</span>
+              {:else}
+                <span class="size-1.5 rounded-full bg-muted-foreground"></span>
+                <span>Inactive</span>
+              {/if}
+            </div>
+            {#if ds.isActive}
+              <div class="text-muted-foreground font-mono">
+                {formatBytes(ds.usedBytes)} / {formatBytes(ds.quotaBytes)}
+              </div>
+            {/if}
+            {#if ds.folderValidationError}
+              <div class="text-amber-600 dark:text-amber-500 truncate max-w-[220px]" title={ds.folderValidationError}>
+                {ds.folderValidationError}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <span class="text-muted-foreground/60">—</span>
+        {/if}
+      {:else}
+        <span class="text-muted-foreground/60">Run check</span>
+      {/if}
     </TableCell>
     <TableCell class="text-right">
       <TableActions

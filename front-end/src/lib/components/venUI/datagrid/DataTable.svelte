@@ -142,8 +142,17 @@
 			<tbody class="divide-y relative">
 				{#each items as original, rowIndex}
 					<tr 
-						class="group hover:bg-muted/40 transition-colors bg-background {onRowClick ? 'cursor-pointer' : ''}"
+						class="group hover:bg-muted/40 transition-colors bg-background outline-none focus-visible:bg-muted {onRowClick ? 'cursor-pointer' : ''}"
+						role={onRowClick ? 'button' : undefined}
+						tabindex={onRowClick ? 0 : undefined}
 						onclick={() => onRowClick?.(original)}
+						onkeydown={(e) => {
+							if (!onRowClick) return;
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onRowClick(original);
+							}
+						}}
 					>
 						{#each table.getVisibleLeafColumns() as col}
 							<td class={bodyCellClass(col)}>

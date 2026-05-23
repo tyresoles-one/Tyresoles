@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.69.0.3769" />
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Data" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Subscriptions.Redis" Version="13.9.0" />
@@ -24,6 +26,12 @@
     <ProjectReference Include="..\Tyresoles.Easebuzz\Tyresoles.Easebuzz.csproj" />
     <ProjectReference Include="..\Tyresoles.Reporting\Tyresoles.Reporting.csproj" />
     <ProjectReference Include="..\Tyresoles.Sql\Tyresoles.Sql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="tyresolesone-2f067-2f5a1d3cc046.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

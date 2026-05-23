@@ -30,8 +30,13 @@ query NavEditRequestTypeById($id: Int!) {
   }
 }
 
-query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int) {
-  navEditLookupRecords(requestTypeId: $requestTypeId, search: $search, take: $take) {
+query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int, $authValues: [NavEditAuthValueInput!]) {
+  navEditLookupRecords(
+    requestTypeId: $requestTypeId
+    search: $search
+    take: $take
+    authValues: $authValues
+  ) {
     key
     value
   }

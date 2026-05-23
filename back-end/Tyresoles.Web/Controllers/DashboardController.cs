@@ -2,6 +2,7 @@ using System.Net.Mime;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Tyresoles.Data;
+using Tyresoles.Data.Features.Production;
 using Tyresoles.Data.Features.Sales.Dashboard;
 using Tyresoles.Data.Features.Sales.Reports;
 
@@ -14,13 +15,35 @@ namespace Tyresoles.Web.Controllers;
 public sealed class DashboardController : ControllerBase
 {
     private const string TenantKey = "NavLive";
+
+    /// <summary>Views accepted by <see cref="ProductionReportService"/> Claim Ratios SQL switch.</summary>
+    private static readonly string[] ClaimRatiosViews =
+    {
+        "Product wise",
+        "Pattern wise",
+        "Make wise",
+        "Submake wise",
+        "Dealer wise",
+        "Salesperson wise",
+        "Defect wise",
+        "Proc. Market wise",
+    };
+
+    private static readonly HashSet<string> ClaimRatiosViewSet =
+        new(ClaimRatiosViews, StringComparer.Ordinal);
+
     private readonly IDataverseDataService _dataService;
     private readonly ISalesDashboardService _dashboardService;
+    private readonly IProductionReportService _productionReportService;
 
-    public DashboardController(IDataverseDataService dataService, ISalesDashboardService dashboardService)
+    public DashboardController(
+        IDataverseDataService dataService,
+        ISalesDashboardService dashboardService,
+        IProductionReportService productionReportService)
     {
         _dataService = dataService;
         _dashboardService = dashboardService;
+        _productionReportService = productionReportService;
     }
 
     [HttpPost("{type}")]
@@ -52,6 +75,26 @@ public sealed class DashboardController : ControllerBase
             case "summary":
                 var summary = await _dashboardService.GetDashboardSummaryAsync(scope, p, cancellationToken);
                 return Ok(summary);
+            case "claimratios":                
+                try
+                {
+                    var claimRows = await _productionReportService.GetClaimRatioDashboardsAsync(scope, p, cancellationToken).ConfigureAwait(false);
+                    return Ok(claimRows);
+                }
+                catch (ArgumentException ex)
+                {
+                    return BadRequest(new { error = ex.Message, code = "VALIDATION_ERROR" });
+                }
+            case "procurement":
+                try
+                {
+                    var procurementRows = await _productionReportService.GetProcurementDashboardAsync(scope, p, cancellationToken).ConfigureAwait(false);
+                    return Ok(procurementRows);
+                }
+                catch (ArgumentException ex)
+                {
+                    return BadRequest(new { error = ex.Message, code = "VALIDATION_ERROR" });
+                }
             default:
                 return BadRequest(new { error = "Unknown dashboard type." });
         }

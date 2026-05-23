@@ -17,9 +17,46 @@
 
   onMount(() => {
     initIdleTimer();
+    const w = window as Window & { __tsDebugAnimateWrapped?: boolean; __tsDebugAnimateOrig?: typeof Element.prototype.animate };
+    if (typeof Element !== "undefined" && !w.__tsDebugAnimateWrapped) {
+      w.__tsDebugAnimateWrapped = true;
+      w.__tsDebugAnimateOrig = Element.prototype.animate;
+      Element.prototype.animate = function (
+        keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+        options?: number | KeyframeAnimationOptions,
+      ): Animation {
+        let safeKeyframes = keyframes;
+        try {
+          const sanitize = (v: unknown): unknown =>
+            typeof v === "string" && v.includes("NaN") ? "0px" : v;
+          if (Array.isArray(keyframes)) {
+            const arr = keyframes.map((kf) => {
+              const clone = { ...(kf as Record<string, unknown>) };
+              if ("height" in clone) clone.height = sanitize(clone.height);
+              if ("width" in clone) clone.width = sanitize(clone.width);
+              return clone;
+            });
+            safeKeyframes = arr as Keyframe[];
+          } else if (keyframes && typeof keyframes === "object") {
+            const kf = { ...(keyframes as Record<string, unknown>) };
+            if ("height" in kf) kf.height = sanitize(kf.height);
+            if ("width" in kf) kf.width = sanitize(kf.width);
+            safeKeyframes = kf as PropertyIndexedKeyframes;
+          }
+        } catch {
+          // ignore debug wrapper failures
+        }
+        return w.__tsDebugAnimateOrig!.call(this, safeKeyframes as any, options as any);
+      };
+    }
   });
 
   onDestroy(() => {
+    const w = window as Window & { __tsDebugAnimateWrapped?: boolean; __tsDebugAnimateOrig?: typeof Element.prototype.animate };
+    if (w.__tsDebugAnimateWrapped && w.__tsDebugAnimateOrig) {
+      Element.prototype.animate = w.__tsDebugAnimateOrig;
+      w.__tsDebugAnimateWrapped = false;
+    }
     cleanupIdleTimer();
   });
 

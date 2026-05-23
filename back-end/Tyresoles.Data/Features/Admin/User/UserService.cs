@@ -369,7 +369,8 @@ public sealed class UserService : IUserService
                 Department = resolvedDepartment,
                 RespCenter = secondaryRespCenter?.Code ?? defRespCenterCode ?? defLocation.RespCenter ?? string.Empty,
                 WorkDate = workDate,
-                Avatar = user.Avatar
+                Avatar = user.Avatar,
+                Dashboards = user.Dashboards ?? string.Empty
             },
             Menus = menus,
             Token = token,
@@ -508,7 +509,8 @@ public sealed class UserService : IUserService
                 Department = resolvedDepartment,
                 RespCenter = userGraph.SecondaryCenter?.Code ?? userGraph.DefCenter?.Code ?? defLocation.RespCenter ?? string.Empty,
                 WorkDate = workDate,
-                Avatar = user.Avatar
+                Avatar = user.Avatar,
+                Dashboards = user.Dashboards ?? string.Empty
             },
             Menus = menus,
             Token = newAccessToken,
@@ -738,7 +740,7 @@ public sealed class UserService : IUserService
                 PasswordChangedDate = node.Left.Left.Left.PasswordChangedDate,
                 Avatar = node.Left.Left.Left.Avatar,
                 SecurityPin= node.Left.Left.Left.SecurityPin,
-
+                Dashboards = node.Left.Left.Left.Dashboards
             },
             Setup = new RespCenterUserSetup
             {

@@ -40,6 +40,13 @@ public sealed class PayRecordRow
     public decimal LWF { get; set; }
     public decimal TotalDeduct { get; set; }
     public decimal NetPay { get; set; }
+    public decimal AttBonus { get; set; }
+    public decimal ChildEdAllowance { get; set; }
+    public decimal TravAllowance { get; set; }
+    public decimal TelAllowance { get; set; }
+    public decimal DeputAllowance { get; set; }
+    public decimal PetrolAllowance { get; set; }
+    public decimal SpecialAllowance { get; set; }
     public bool IsHold { get; set; }
     public string BankCode { get; set; } = "";
     public string BankAccNo { get; set; } = "";

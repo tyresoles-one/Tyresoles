@@ -108,7 +108,12 @@ public sealed class NavEditService : INavEditService
             ?? throw new InvalidOperationException("NavLive connection string not configured.");
     }
 
-    public async Task<List<Dictionary<string, object?>>> LookupRecordsAsync(int requestTypeId, string? search, int take = 20, CancellationToken ct = default)
+    public async Task<List<Dictionary<string, object?>>> LookupRecordsAsync(
+        int requestTypeId,
+        string? search,
+        int take = 20,
+        IDictionary<string, string>? authValues = null,
+        CancellationToken ct = default)
     {
         var reqType = await _db.RequestTypes.FindAsync([requestTypeId], ct)
             ?? throw new InvalidOperationException($"Request type {requestTypeId} not found.");
@@ -172,7 +177,7 @@ public sealed class NavEditService : INavEditService
             parameters.Add(new SqlParameter("@search", $"%{escapedSearch}%"));
         }
 
-        AppendLookupFilterPredicates(whereParts, parameters, template, ref lfParam);
+        AppendLookupFilterPredicates(whereParts, parameters, template, authValues, ref lfParam);
 
         if (whereParts.Count > 0)
             sql += " WHERE " + string.Join(" AND ", whereParts);
@@ -193,6 +198,7 @@ public sealed class NavEditService : INavEditService
         List<string> whereParts,
         List<SqlParameter> parameters,
         FieldsTemplate template,
+        IDictionary<string, string>? authValues,
         ref int paramIndex)
     {
         if (template.LookupFilters == null) return;
@@ -205,27 +211,55 @@ public sealed class NavEditService : INavEditService
             var op = (f.Op ?? "eq").Trim().ToLowerInvariant();
             var castExpr = $"CAST([{col}] AS NVARCHAR(4000)) COLLATE Latin1_General_CI_AS";
 
+            var source = (f.ValueSource ?? "static").Trim().ToLowerInvariant();
+            var val = f.Value ?? "";
+            var listVals = f.Values ?? new List<string>();
+
+            if (source == "auth" && !string.IsNullOrEmpty(f.AuthProperty))
+            {
+                if (authValues != null && authValues.TryGetValue(f.AuthProperty, out var authVal) && !string.IsNullOrEmpty(authVal))
+                {
+                    if (op == "in" || op == "nin")
+                    {
+                        listVals = authVal.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                    }
+                    else
+                    {
+                        val = authVal;
+                    }
+                }
+                else
+                {
+                    // Auth property missing or empty -> usually we want this filter to "fail" or be ignored?
+                    // To be safe, if it's mandatory and missing, we might want to return no records.
+                    // For now, we'll just skip it if it's not provided, but that might be insecure.
+                    // Better: if ValueSource is auth and it's missing, add a condition that never matches.
+                    whereParts.Add("1=0 /* Auth property missing */");
+                    continue;
+                }
+            }
+
             switch (op)
             {
                 case "eq":
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"{castExpr} = {pn} COLLATE Latin1_General_CI_AS");
-                    parameters.Add(new SqlParameter(pn, f.Value ?? ""));
+                    parameters.Add(new SqlParameter(pn, val));
                     break;
                 }
                 case "neq":
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"{castExpr} <> {pn} COLLATE Latin1_General_CI_AS");
-                    parameters.Add(new SqlParameter(pn, f.Value ?? ""));
+                    parameters.Add(new SqlParameter(pn, val));
                     break;
                 }
                 case "contains":
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"{castExpr} LIKE {pn} COLLATE Latin1_General_CI_AS");
-                    var pat = "%" + EscapeSqlServerLikeWildcard(f.Value ?? "") + "%";
+                    var pat = "%" + EscapeSqlServerLikeWildcard(val) + "%";
                     parameters.Add(new SqlParameter(pn, pat));
                     break;
                 }
@@ -233,7 +267,7 @@ public sealed class NavEditService : INavEditService
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"NOT ({castExpr} LIKE {pn} COLLATE Latin1_General_CI_AS)");
-                    var pat = "%" + EscapeSqlServerLikeWildcard(f.Value ?? "") + "%";
+                    var pat = "%" + EscapeSqlServerLikeWildcard(val) + "%";
                     parameters.Add(new SqlParameter(pn, pat));
                     break;
                 }
@@ -241,19 +275,19 @@ public sealed class NavEditService : INavEditService
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"{castExpr} LIKE {pn} COLLATE Latin1_General_CI_AS");
-                    parameters.Add(new SqlParameter(pn, EscapeSqlServerLikeWildcard(f.Value ?? "") + "%"));
+                    parameters.Add(new SqlParameter(pn, EscapeSqlServerLikeWildcard(val) + "%"));
                     break;
                 }
                 case "ends":
                 {
                     var pn = $"@lf{paramIndex++}";
                     whereParts.Add($"{castExpr} LIKE {pn} COLLATE Latin1_General_CI_AS");
-                    parameters.Add(new SqlParameter(pn, "%" + EscapeSqlServerLikeWildcard(f.Value ?? "")));
+                    parameters.Add(new SqlParameter(pn, "%" + EscapeSqlServerLikeWildcard(val)));
                     break;
                 }
                 case "in":
                 {
-                    var vals = (f.Values ?? new List<string>())
+                    var vals = listVals
                         .Select(v => v?.Trim())
                         .Where(s => !string.IsNullOrEmpty(s))
                         .ToList();
@@ -270,7 +304,7 @@ public sealed class NavEditService : INavEditService
                 }
                 case "nin":
                 {
-                    var vals = (f.Values ?? new List<string>())
+                    var vals = listVals
                         .Select(v => v?.Trim())
                         .Where(s => !string.IsNullOrEmpty(s))
                         .ToList();
@@ -1726,6 +1760,18 @@ internal sealed class LookupFilterSpec
     public string? Op { get; set; }
     public string? Value { get; set; }
     public List<string>? Values { get; set; }
+
+    [JsonPropertyName("valueSource")]
+    public string? ValueSource { get; set; }
+
+    [JsonPropertyName("authProperty")]
+    public string? AuthProperty { get; set; }
+}
+
+public class NavEditAuthValue
+{
+    public string Key { get; set; } = "";
+    public string? Value { get; set; }
 }
 
 /// <summary>Values for <see cref="FieldsTemplate.ConnectorProcess"/> (template JSON <c>connectorProcess</c>).</summary>

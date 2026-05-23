@@ -293,9 +293,12 @@ public class TenantScope : ITenantScope
                 dt.Rows.Add(row);
             }
             
+            // DestinationTableName must be a valid multipart identifier. ResolveTableName / dialect
+            // already returns bracketed parts (e.g. [dbo].[Company$Table]); do not wrap again or SqlBulkCopy
+            // sees "[[dbo].[...]]" and fails (incorrect usage of quotes).
             using var bulkCopy = new Microsoft.Data.SqlClient.SqlBulkCopy(sqlConn, Microsoft.Data.SqlClient.SqlBulkCopyOptions.Default, _transaction as Microsoft.Data.SqlClient.SqlTransaction)
             {
-                DestinationTableName = $"[{tableName}]",
+                DestinationTableName = tableName,
                 BatchSize = 5000,
                 BulkCopyTimeout = 60
             };

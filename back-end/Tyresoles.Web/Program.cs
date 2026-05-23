@@ -34,7 +34,9 @@ using Tyresoles.Data.Features.RemoteAssist;
 using Tyresoles.Sql.Abstractions;
 using Tyresoles.Web.Features.RemoteAssist;
 using Tyresoles.Web.Features.VpnInstaller;
+using Tyresoles.Web.Features.DriveSync;
 using StackExchange.Redis;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -169,7 +171,10 @@ builder.Services.AddDbContext<Tyresoles.Data.Features.NavisionEdits.NavEditDbCon
 });
 builder.Services.AddScoped<Tyresoles.Data.Features.NavisionEdits.INavEditService, Tyresoles.Data.Features.NavisionEdits.NavEditService>();
 
-// DriveSync: policy lives on Nav Live User (Backup G Drive Folder ID, quota GB, file types); see IUserService / admin Users screen.
+// DriveSync: Nav Live User fields + Google service account (hybrid: client upload token, server-proxied restore).
+builder.Services.Configure<DriveSyncGoogleOptions>(builder.Configuration.GetSection(DriveSyncGoogleOptions.SectionName));
+builder.Services.AddScoped<IDriveSyncOAuthService, DriveSyncOAuthService>();
+builder.Services.AddScoped<IGoogleDriveBackupGateway, GoogleDriveBackupGateway>();
 builder.Services.AddScoped<IDriveSyncService, DriveSyncService>();
 
 // JWT: expiry options for UserService (Data layer); token generation in Web.
@@ -254,6 +259,7 @@ builder.Services.PostConfigure<Tyresoles.Reporting.Configuration.ReportingOption
 });
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 // Single GraphQL server: subscriptions + schema (avoid registering two default executors).
 var gqlExecutor = builder.Services.AddGraphQLServer();
@@ -525,6 +531,37 @@ catch (Exception ex)
     logger.LogWarning(ex, "Could not initialize RemoteAssist tables. Remote assist may be unavailable.");
 }
 
+try
+{
+    var calendarConn = app.Configuration.GetConnectionString("Calendar");
+    if (!string.IsNullOrWhiteSpace(calendarConn))
+    {
+        await using var conn = new SqlConnection(calendarConn);
+        await conn.OpenAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            IF OBJECT_ID('dbo.DriveSyncOAuthTokens', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[DriveSyncOAuthTokens] (
+                    [Id] int NOT NULL PRIMARY KEY,
+                    [RefreshTokenEnc] nvarchar(max) NULL,
+                    [AccessTokenEnc] nvarchar(max) NULL,
+                    [AccessTokenExpiryUtc] datetime2 NULL,
+                    [GoogleAccountEmail] nvarchar(256) NULL,
+                    [UpdatedByUserId] nvarchar(128) NULL,
+                    [UpdatedAtUtc] datetime2 NULL
+                );
+            END
+        ";
+        await cmd.ExecuteNonQueryAsync();
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Could not initialize DriveSync OAuth token table.");
+}
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -582,6 +619,7 @@ app.MapGet("/api/easebuzz/status", (IEasebuzzPaymentService paymentService) =>
 .WithTags("Easebuzz");
 
 app.MapGraphQL();
+app.MapDriveSyncEndpoints();
 app.MapControllers();
 app.MapRemoteAssistWebSocket();
 

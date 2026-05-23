@@ -110,6 +110,25 @@
 	` as any;
 	type UpdateUserDetailsMutation = any;
 
+	const ProvisionDriveSyncBackupFolderDocument = gql`
+		mutation ProvisionDriveSyncBackupFolder(
+			$targetUserId: String!
+			$folderName: String
+			$replaceExisting: Boolean!
+		) {
+			provisionDriveSyncBackupFolder(
+				targetUserId: $targetUserId
+				folderName: $folderName
+				replaceExisting: $replaceExisting
+			) {
+				userId
+				targetFolderId
+				isActive
+			}
+		}
+	` as any;
+	type ProvisionDriveSyncBackupFolderMutation = any;
+
 	const GetReportsDocument = gql`
 		query GetReports($category: String!) {
 			reports: reportsByCategory(category: $category) {
@@ -181,6 +200,26 @@
 		'RPT-SALES': 'sales'
 	};
 
+	const TYRESOLES_PREFIX = 'TYRESOLES\\';
+	/** Mirrors API folder naming: strip TYRESOLES\\, remove whole-word Backup (any case). */
+	function previewGDriveBackupFolderName(navUserName: string, override: string): string {
+		const o = override.trim();
+		const source = o || navUserName || '';
+		let s = source.trim();
+		if (
+			s.length >= TYRESOLES_PREFIX.length &&
+			s.slice(0, TYRESOLES_PREFIX.length).toLowerCase() === TYRESOLES_PREFIX.toLowerCase()
+		) {
+			s = s.slice(TYRESOLES_PREFIX.length).trim();
+		}
+		let prev = '';
+		while (s !== prev) {
+			prev = s;
+			s = s.replace(/\bBackup\b/gi, ' ').replace(/\s+/g, ' ').trim();
+		}
+		return s || '(server default)';
+	}
+
 	// Route param is userName
 	let userId = $derived(decodeURIComponent($page.params.userId ?? '').trim());
 	let isNewUser = $derived(userId === 'new-user');
@@ -200,6 +239,14 @@
     const rcMut = useAppMutation<UpdateUserResponsibilityCentersMutation, any>(UpdateUserResponsibilityCentersDocument, { silent: true });
     const postingMut = useAppMutation<UpdateUserPostingSetupMutation, any>(UpdateUserPostingSetupDocument, { silent: true });
     const userMut = useAppMutation<UpdateUserDetailsMutation, any>(UpdateUserDetailsDocument, { silent: true });
+    const provisionDriveMut = useAppMutation<ProvisionDriveSyncBackupFolderMutation, any>(
+		ProvisionDriveSyncBackupFolderDocument,
+		{ silent: true },
+	);
+
+	/** Optional override for the new Drive subfolder name (default: Nav user name without TYRESOLES\\ and whole-word Backup). */
+	let backupFolderCreateLabel = $state('');
+	let replaceBackupGdriveFolder = $state(false);
 
 	let respCenterOptions = $derived(
         rcQuery.data?.responsibilityCenters?.items?.map((i: any) => ({ code: i.code, name: i.name })) ?? []
@@ -244,8 +291,18 @@
 		}[]
 	});
 
+	let gdriveBackupFolderPreview = $derived(
+		previewGDriveBackupFolderName(user.userName, backupFolderCreateLabel),
+	);
+
 	let loading = $derived(userQuery.isPending && !isNewUser);
-	let saving = $derived(permsMut.isPending || rcMut.isPending || postingMut.isPending || userMut.isPending);
+	let saving = $derived(
+		permsMut.isPending ||
+			rcMut.isPending ||
+			postingMut.isPending ||
+			userMut.isPending ||
+			provisionDriveMut.isPending,
+	);
 	let error = $derived(
 		!isNewUser && userQuery.isError
 			? userQuery.error.message
@@ -371,8 +428,16 @@
 		{ value: 0, label: 'Select...' },
 		{ value: 1, label: 'Employee' },
 		{ value: 2, label: 'Customer' },
-		{ value: 3, label: 'Partner' }
+		{ value: 3, label: 'Partner' },
+		{ value: 4, label: 'Partner group' }
 	] as const;
+
+	/** Nav `RespCenterUserSetupType` int → GraphQL enum names (HotChocolate default naming). */
+	function navRespCenterSetupTypeToGraphQL(n: number): string {
+		const names = ['NONE', 'EMPLOYEE', 'CUSTOMER', 'PARTNER', 'PARTNER_GROUP'] as const;
+		const i = Math.min(Math.max(0, Math.trunc(Number(n)) || 0), 4);
+		return names[i];
+	}
 
 	async function saveUser() {
 		const confirmed = await Dialog.confirm(
@@ -383,6 +448,12 @@
 		if (!confirmed) return;
 
 		try {
+			const rcAssignments = user.respCenterSetup.filter(r => r.respCenter).map((r) => ({
+				respCenter: r.respCenter,
+				default: r.default || 0,
+				type: navRespCenterSetupTypeToGraphQL(Number(r.type) || 0),
+				code: r.code || ''
+			}));
             await Promise.all([
                 permsMut.mutateAsync({
                     userName: user.userName,
@@ -394,12 +465,7 @@
                 }),
                 rcMut.mutateAsync({
                     userName: user.userName,
-                    assignments: user.respCenterSetup.filter(r => r.respCenter).map(r => ({
-                        respCenter: r.respCenter,
-                        default: r.default || 0,
-                        type: r.type || 0,
-                        code: r.code || ''
-                    }))
+                    assignments: rcAssignments
                 }),
                 postingMut.mutateAsync({
                     userName: user.userName,
@@ -433,6 +499,45 @@
 		} catch (e) {
             // Error toasts are handled by queryClient globally, but if something fails here, we can fallback
             console.error("Save failure bubble:", e);
+		}
+	}
+
+	async function provisionBackupFolder() {
+		if (isNewUser) {
+			toast.error('Save the user first before creating a backup folder.');
+			return;
+		}
+		if (!user.userName?.trim()) {
+			toast.error('User name is required.');
+			return;
+		}
+		if (user.backupGDriveFolderId?.trim() && !replaceBackupGdriveFolder) {
+			toast.error('This user already has a backup folder ID. Enable "Replace existing folder assignment" below, or clear the ID manually.');
+			return;
+		}
+
+		const hint = gdriveBackupFolderPreview;
+		const ok = await Dialog.confirm(
+			'Create Google Drive folder',
+			`Create folder "${hint}" under the server-configured parent (DriveSync:UserBackupFoldersParentId) and write the new folder ID to this Nav user?`,
+			{ confirmLabel: 'Create folder', cancelLabel: 'Cancel' },
+		);
+		if (!ok) return;
+
+		try {
+			const res = await provisionDriveMut.mutateAsync({
+				targetUserId: user.userName.trim(),
+				folderName: backupFolderCreateLabel.trim() || null,
+				replaceExisting: replaceBackupGdriveFolder,
+			});
+			const cfg = res?.provisionDriveSyncBackupFolder;
+			if (cfg?.targetFolderId) {
+				user.backupGDriveFolderId = cfg.targetFolderId;
+			}
+			toast.success('Backup folder created and assigned.');
+			await userQuery.refetch();
+		} catch (e) {
+			console.error('provisionBackupFolder', e);
 		}
 	}
 </script>
@@ -769,9 +874,66 @@
                           Google Drive backup / sync
                         </h3>
                         <p class="text-xs text-muted-foreground mt-1">
-                          Stored on the Nav <code class="text-[10px]">User</code> record. Used by the desktop sync client and <code class="text-[10px]">getDriveSyncConfig</code>.
+                          Stored on the Nav <code class="text-[10px]">User</code> record. Enables backup when folder ID is set. Admins can create a subfolder under <code class="text-[10px]">DriveSync:UserBackupFoldersParentId</code> via <code class="text-[10px]">provisionDriveSyncBackupFolder</code>. Clients use <code class="text-[10px]">getDriveSyncConfig</code>, upload credentials, and proxied download <code class="text-[10px]">/api/drive-sync/download/</code>.
                         </p>
                       </div>
+                      {#if !isNewUser}
+                        <div
+                          class="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3"
+                        >
+                          <p class="text-xs font-medium text-foreground">
+                            Create folder in Google Drive
+                          </p>
+                          <p class="text-[11px] text-muted-foreground">
+                            Requires Drive sync enabled and a parent folder id on the API. Leave the label empty to name the folder from this user’s Nav login: strip
+                            <span class="font-mono">TYRESOLES\</span> and remove the whole word
+                            <span class="font-mono">Backup</span> (any casing).
+                          </p>
+                          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="space-y-1.5 sm:col-span-2">
+                              <span class="text-xs font-medium text-muted-foreground"
+                                >New folder name (optional)</span
+                              >
+                              <Input
+                                bind:value={backupFolderCreateLabel}
+                                placeholder={previewGDriveBackupFolderName(user.userName || '', '')}
+                                class="h-9 bg-background/50"
+                                disabled={provisionDriveMut.isPending}
+                              />
+                            </div>
+                            <div class="flex items-center gap-2 sm:col-span-2">
+                              <Checkbox
+                                id="chk-replace-gdrive"
+                                checked={replaceBackupGdriveFolder}
+                                onCheckedChange={(v) => (replaceBackupGdriveFolder = !!v)}
+                                disabled={provisionDriveMut.isPending}
+                              />
+                              <label
+                                for="chk-replace-gdrive"
+                                class="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                Replace existing folder assignment (creates a new Drive folder; old ID in Drive is not deleted)
+                              </label>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            class="shadow-sm"
+                            onclick={provisionBackupFolder}
+                            disabled={provisionDriveMut.isPending}
+                          >
+                            <Icon
+                              name="folder-plus"
+                              class="size-4 mr-2 {provisionDriveMut.isPending ? 'animate-pulse' : ''}"
+                            />
+                            {provisionDriveMut.isPending
+                              ? 'Creating…'
+                              : 'Create & assign folder'}
+                          </Button>
+                        </div>
+                      {/if}
                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="space-y-1.5">
                           <span

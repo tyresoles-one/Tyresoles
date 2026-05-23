@@ -62,7 +62,8 @@
 			class="flex flex-col group p-4 rounded-xl border bg-card transition-all {onRowClick ? 'cursor-pointer hover:border-primary/50 hover:shadow-md' : ''}"
 			onclick={() => onRowClick?.(original)}
 			onkeydown={(e) => {
-				if (onRowClick && (e.key === "Enter" || e.key === " ")) {
+				if (onRowClick && (e.key === 'Enter' || e.key === ' ')) {
+					e.preventDefault();
 					onRowClick(original);
 				}
 			}}

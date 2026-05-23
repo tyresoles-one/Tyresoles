@@ -52,6 +52,10 @@ export interface NavEditLookupFilterCondition {
   value?: string;
   /** List values (in / nin) */
   values?: string[];
+  /** Where to get the value from. Default is 'static'. */
+  valueSource?: 'static' | 'auth';
+  /** If valueSource is 'auth', which property of the auth store to use. */
+  authProperty?: string;
 }
 
 /** NAV WebServe Req* when admin marks a request processed (server-side). */
@@ -177,7 +181,7 @@ const LOOKUP_FILTER_OPS: NavEditLookupFilterOp[] = [
 
 function normalizeLookupFilter(raw: unknown): NavEditLookupFilterCondition {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { column: '', op: 'eq', value: '', values: [] };
+    return { column: '', op: 'eq', value: '', values: [], valueSource: 'static' };
   }
   const r = raw as Record<string, unknown>;
   const opRaw = String(r.op ?? 'eq').toLowerCase();
@@ -190,6 +194,8 @@ function normalizeLookupFilter(raw: unknown): NavEditLookupFilterCondition {
     op,
     value: r.value != null ? String(r.value) : '',
     values,
+    valueSource: (r.valueSource as any) || 'static',
+    authProperty: r.authProperty != null ? String(r.authProperty) : undefined,
   };
 }
 
@@ -279,12 +285,21 @@ function serializeLookupFilter(f: NavEditLookupFilterCondition): Record<string, 
   const column = f.column.trim();
   if (!column) return null;
   const op = (f.op || 'eq').toLowerCase() as NavEditLookupFilterOp;
+  const source = f.valueSource || 'static';
+
+  const base: Record<string, any> = { column, op };
+  if (source !== 'static') {
+    base.valueSource = source;
+    if (f.authProperty) base.authProperty = f.authProperty;
+    return base;
+  }
+
   if (op === 'in' || op === 'nin') {
     const values = (f.values ?? []).map((v) => String(v).trim()).filter(Boolean);
     if (values.length === 0) return null;
-    return { column, op, values };
+    return { ...base, values };
   }
-  if (op === 'isnull' || op === 'isnotnull') return { column, op };
+  if (op === 'isnull' || op === 'isnotnull') return base;
   const value = f.value ?? '';
   if (
     (op === 'contains' || op === 'notcontains' || op === 'starts' || op === 'ends') &&
@@ -292,7 +307,7 @@ function serializeLookupFilter(f: NavEditLookupFilterCondition): Record<string, 
   ) {
     return null;
   }
-  return { column, op, value };
+  return { ...base, value };
 }
 
 function serializeApproval(a: NavEditApprovalStep): Record<string, unknown> {

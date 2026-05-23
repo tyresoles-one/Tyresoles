@@ -98,8 +98,8 @@
   `;
 
   const LOOKUP_RECORDS = `
-    query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int) {
-      navEditLookupRecords(requestTypeId: $requestTypeId, search: $search, take: $take) {
+    query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int, $authValues: [NavEditAuthValueInput!]) {
+      navEditLookupRecords(requestTypeId: $requestTypeId, search: $search, take: $take, authValues: $authValues) {
         key value
       }
     }
@@ -311,9 +311,19 @@
       searchLoading = false;
       return;
     }
+    const auth = get(authStore);
+    const locationCodes = (auth.locations ?? []).map(l => l.code).filter(Boolean).join(',');
+
     searchLoading = true;
     const res = await graphqlQuery<{ navEditLookupRecords: KVItem[][] }>(LOOKUP_RECORDS, {
-      variables: { requestTypeId: typeId, search: term, take: LOOKUP_TAKE },
+      variables: {
+        requestTypeId: typeId,
+        search: term,
+        take: LOOKUP_TAKE,
+        authValues: [
+          { key: 'locations', value: locationCodes }
+        ]
+      },
       skipCache: true,
     });
     // Drop stale responses if the user kept typing or switched request type
@@ -335,9 +345,19 @@
       copySearchLoading = false;
       return;
     }
+    const auth = get(authStore);
+    const locationCodes = (auth.locations ?? []).map(l => l.code).filter(Boolean).join(',');
+
     copySearchLoading = true;
     const res = await graphqlQuery<{ navEditLookupRecords: KVItem[][] }>(LOOKUP_RECORDS, {
-      variables: { requestTypeId: typeId, search: term, take: LOOKUP_TAKE },
+      variables: {
+        requestTypeId: typeId,
+        search: term,
+        take: LOOKUP_TAKE,
+        authValues: [
+          { key: 'locations', value: locationCodes }
+        ]
+      },
       skipCache: true,
     });
     if (selectedTypeId !== typeId || copySearchTerm.trim() !== term) {

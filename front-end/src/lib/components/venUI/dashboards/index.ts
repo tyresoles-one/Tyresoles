@@ -10,3 +10,6 @@ export { default as SalesDashboard } from "./SalesDashboard.svelte";
 export { default as SuperDashboard } from "./SuperDashboard.svelte";
 export { default as ClassicDashboard } from "./ClassicDashboard.svelte";
 export { default as EcomileProcMgmtDashboard } from "./EcomileProcMgmtDashboard.svelte";
+export { default as ClaimsDashboard } from "./ClaimsDashboard.svelte";
+export { default as ProcurementDashboard } from "./ProcurementDashboard.svelte";
+
