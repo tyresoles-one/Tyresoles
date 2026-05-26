@@ -762,7 +762,8 @@ WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
                     soldGroupSql = "GROUP BY Item.[Alternative Item No_], ILE.[Sub Make], ILE.[Responsibility Center], ILE.Make";
                     soldSelectSql = ", '' as [Level01], Item.[Alternative Item No_] as [Level02], ILE.Make as [Level03], ILE.[Sub Make] as [Level04] ";
                     soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_]";
-                    claimSelectSql = "Settlement.[Fault Description] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.Make as [Level03], Posted.[Sub Make] as [Level04],";
+                    claimSelectSql = "FaultArea.[Description] as [Level01], Item.[Alternative Item No_] as [Level02], Posted.Make as [Level03], Posted.[Sub Make] as [Level04],";
+                    claimJoinSql = "LEFT join [Tyresoles (India) Pvt_ Ltd_$Fault Code] as FaultCode\r\n\t\t\t  on Settlement.[Fault Code] = FaultCode.Code\r\n\t\t\t  left join [Tyresoles (India) Pvt_ Ltd_$Fault Area] as FaultArea\r\n\t\t\t  on FaultArea.Code = FaultCode.[Fault Area Code]";
                     break;
                 }
             case "Procurement":
@@ -835,10 +836,10 @@ WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
           ) AS rn
         FROM [dbo].[Tyresoles (India) Pvt_ Ltd_$Claim & Failure Posted] AS Posted
         LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] AS Item
-        ON Item.No_ = Posted.[Item No_]
-        {claimJoinSql}
+        ON Item.No_ = Posted.[Item No_]        
         LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Claim & Failure Settlement] AS Settlement
         ON Settlement.[Document No_] = Posted.No_        
+        {claimJoinSql}
         WHERE Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
           AND Item.[Item Category Code] = 'ECOMILE'
           AND Posted.Type = 0

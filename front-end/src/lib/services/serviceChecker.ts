@@ -1,115 +1,69 @@
 /**
  * serviceChecker.ts
  * ------------------
- * Typed wrapper around the Tauri `check_services`, `start_service`,
- * `stop_service`, and `restart_service` commands.
+ * Typed wrapper around the backend /api/windows-services REST endpoints.
  *
- * All functions are no-ops (returning a "not available" status) when the app
- * is running in a regular browser so callers don't need to guard every call.
+ * Admins in the browser can query, start, stop, and restart allowlisted
+ * Windows services on the IIS host.
  */
 
-import { getInvoke, isTauri } from '$lib/tauri';
+import { secureFetch } from '$lib/services/api';
+import type { ServiceDescriptor, ServiceState, ServiceStatus } from './serviceChecker.types';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+export type { ServiceDescriptor, ServiceState, ServiceStatus } from './serviceChecker.types';
 
-export type ServiceState =
-	| 'Running'
-	| 'Stopped'
-	| 'StartPending'
-	| 'StopPending'
-	| 'PausePending'
-	| 'Paused'
-	| 'ContinuePending'
-	| 'Unknown';
-
-export interface ServiceStatus {
-	/** Windows short service name */
-	name: string;
-	/** Human-readable display name from the SCM */
-	displayName: string;
-	/** Current state string */
-	state: ServiceState;
-	/** Convenience boolean */
-	isRunning: boolean;
-	/** Whether the UI should show a "Start" button */
-	canStart: boolean;
-	/** Whether the UI should show a "Stop" button */
-	canStop: boolean;
-}
-
-export interface ServiceDescriptor {
-	name: string;
-	canStart?: boolean;
-	canStop?: boolean;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function unavailable(name: string): ServiceStatus {
-	return {
-		name,
-		displayName: name,
-		state: 'Unknown',
-		isRunning: false,
-		canStart: false,
-		canStop: false
-	};
-}
-
-async function invokeCmd<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-	if (!isTauri()) throw new Error('Service management is only available in the desktop app.');
-	const invoke = getInvoke();
-	if (!invoke) throw new Error('Tauri invoke not available.');
-	return invoke(cmd, args) as Promise<T>;
-}
-
-// ── Public API ─────────────────────────────────────────────────────────────
-
-/**
- * Check the status of one or more services in a single call.
- * Returns an array of ServiceStatus in the same order as the input descriptors.
- *
- * @example
- * const statuses = await checkServices([
- *   { name: 'TyrsolesApi', canStart: true, canStop: true },
- *   { name: 'MSSQLSERVER', canStart: false, canStop: false },
- * ]);
- */
-export async function checkServices(services: ServiceDescriptor[]): Promise<ServiceStatus[]> {
-	if (!isTauri()) return services.map((s) => unavailable(s.name));
-	try {
-		return await invokeCmd<ServiceStatus[]>('check_services', {
-			input: { services }
-		});
-	} catch (e) {
-		console.error('[serviceChecker] check_services failed:', e);
-		return services.map((s) => unavailable(s.name));
+async function parseResponse<T>(response: Response): Promise<T> {
+	if (response.ok) {
+		return response.json() as Promise<T>;
 	}
+
+	let message = `Request failed (${response.status})`;
+	try {
+		const body = (await response.json()) as { error?: string };
+		if (body.error) message = body.error;
+	} catch {
+		/* ignore */
+	}
+	throw new Error(message);
 }
 
 /**
- * Start a single Windows service. Polls until Running or timeout (~5 s).
- * Returns the final ServiceStatus.
+ * Fetch status of all configured Windows services from the backend allowlist.
+ */
+export async function checkServices(_services?: ServiceDescriptor[]): Promise<ServiceStatus[]> {
+	const response = await secureFetch('/api/windows-services');
+	return parseResponse<ServiceStatus[]>(response);
+}
+
+/**
+ * Start a single Windows service. Polls on the server until Running or timeout.
  */
 export async function startService(serviceName: string): Promise<ServiceStatus> {
-	if (!isTauri()) return unavailable(serviceName);
-	return invokeCmd<ServiceStatus>('start_service', { serviceName });
+	const response = await secureFetch(
+		`/api/windows-services/${encodeURIComponent(serviceName)}/start`,
+		{ method: 'POST' }
+	);
+	return parseResponse<ServiceStatus>(response);
 }
 
 /**
- * Stop a single Windows service. Polls until Stopped or timeout (~5 s).
- * Returns the final ServiceStatus.
+ * Stop a single Windows service. Polls on the server until Stopped or timeout.
  */
 export async function stopService(serviceName: string): Promise<ServiceStatus> {
-	if (!isTauri()) return unavailable(serviceName);
-	return invokeCmd<ServiceStatus>('stop_service', { serviceName });
+	const response = await secureFetch(
+		`/api/windows-services/${encodeURIComponent(serviceName)}/stop`,
+		{ method: 'POST' }
+	);
+	return parseResponse<ServiceStatus>(response);
 }
 
 /**
- * Restart a single Windows service (stop → start).
- * Returns the final ServiceStatus after restart.
+ * Restart a single Windows service (stop then start).
  */
 export async function restartService(serviceName: string): Promise<ServiceStatus> {
-	if (!isTauri()) return unavailable(serviceName);
-	return invokeCmd<ServiceStatus>('restart_service', { serviceName });
+	const response = await secureFetch(
+		`/api/windows-services/${encodeURIComponent(serviceName)}/restart`,
+		{ method: 'POST' }
+	);
+	return parseResponse<ServiceStatus>(response);
 }

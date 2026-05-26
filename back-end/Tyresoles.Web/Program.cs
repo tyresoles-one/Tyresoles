@@ -31,10 +31,12 @@ using Tyresoles.Data.Features.Calendar;
 using Tyresoles.Data.Features.Accounts;
 using Tyresoles.Data.Features.Accounts.Models;
 using Tyresoles.Data.Features.RemoteAssist;
+using Tyresoles.Data.Features.WindowsServices;
 using Tyresoles.Sql.Abstractions;
 using Tyresoles.Web.Features.RemoteAssist;
 using Tyresoles.Web.Features.VpnInstaller;
 using Tyresoles.Web.Features.DriveSync;
+using Tyresoles.Web.Features.WindowsServices;
 using StackExchange.Redis;
 using Microsoft.Data.SqlClient;
 
@@ -176,6 +178,9 @@ builder.Services.Configure<DriveSyncGoogleOptions>(builder.Configuration.GetSect
 builder.Services.AddScoped<IDriveSyncOAuthService, DriveSyncOAuthService>();
 builder.Services.AddScoped<IGoogleDriveBackupGateway, GoogleDriveBackupGateway>();
 builder.Services.AddScoped<IDriveSyncService, DriveSyncService>();
+
+builder.Services.Configure<WindowsServiceOptions>(builder.Configuration.GetSection(WindowsServiceOptions.SectionName));
+builder.Services.AddSingleton<IWindowsServiceManager, WindowsServiceManager>();
 
 // JWT: expiry options for UserService (Data layer); token generation in Web.
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -620,6 +625,7 @@ app.MapGet("/api/easebuzz/status", (IEasebuzzPaymentService paymentService) =>
 
 app.MapGraphQL();
 app.MapDriveSyncEndpoints();
+app.MapWindowsServiceEndpoints();
 app.MapControllers();
 app.MapRemoteAssistWebSocket();
 

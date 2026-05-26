@@ -63,7 +63,19 @@
   });
 
   const filteredRows = $derived.by(() => {
-    return rows.filter(r => r.respCenter && viewFilteredRc.includes(r.respCenter));
+    const allowedMakes = ["APOLLO", "MRF", "JK", "CEAT", "BRIDGESTON", "BRIDGESTONE", "MICHELIN", "BKT", "MODI CONTINENTAL"];
+    return rows
+      .filter(r => r.respCenter && viewFilteredRc.includes(r.respCenter))
+      .map(r => {
+        if (currentView === "Make" && r.level01) {
+          const makeUpper = r.level01.toUpperCase().trim();
+          return {
+            ...r,
+            level01: allowedMakes.includes(makeUpper) ? makeUpper : "OTHERS"
+          };
+        }
+        return r;
+      });
   });
 
 
@@ -173,8 +185,9 @@
   };
 
   const grandTotalClaims = $derived(filteredRows.reduce((a, r) => a + (r.claims ?? 0), 0));
+  const grandTotalPass = $derived(filteredRows.reduce((a, r) => a + (r.pass ?? 0), 0));
 
-  function sumAgg(list: ClaimRatioRow[], totalClaims: number) {
+  function sumAgg(list: ClaimRatioRow[], totalClaims: number, totalPass: number) {
     const sold = list.reduce((a, r) => a + (r.sold ?? 0), 0);
     const purchase = list.reduce((a, r) => a + (r.purchase ?? 0), 0);
     const claims = list.reduce((a, r) => a + (r.claims ?? 0), 0);
@@ -184,11 +197,16 @@
     const specialCase = list.reduce((a, r) => a + (r.specialCase ?? 0), 0);
     
     let baseValue = sold;
-    if (currentView === "Defect") baseValue = totalClaims;
+    if (currentView === "Defect" || currentView === "Pattern") baseValue = totalClaims;
     else if (currentView === "Procurement") baseValue = purchase;
 
     const claimPercent = baseValue > 0 ? (claims * 100) / baseValue : 0;
-    const passPercent = baseValue > 0 ? (pass * 100) / baseValue : 0;
+    
+    let passBaseValue = baseValue;
+    if (currentView === "Defect" || currentView === "Pattern") {
+      passBaseValue = totalPass;
+    }
+    const passPercent = passBaseValue > 0 ? (pass * 100) / passBaseValue : 0;
     return {
       sold,
       purchase,
@@ -220,7 +238,7 @@
       const groupedData = Array.from(groups.entries()).map(([label, children]) => ({
         label,
         children,
-        agg: sumAgg(children, grandTotalClaims)
+        agg: sumAgg(children, grandTotalClaims, grandTotalPass)
       }));
 
       // Apply Sorting
@@ -261,7 +279,7 @@
 
   const grandTotal = $derived.by(() => {
     if (filteredRows.length === 0) return null;
-    return sumAgg(filteredRows, grandTotalClaims);
+    return sumAgg(filteredRows, grandTotalClaims, grandTotalPass);
   });
 
   function toIso(date: unknown): string {

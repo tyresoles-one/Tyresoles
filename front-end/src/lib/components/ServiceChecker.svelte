@@ -6,14 +6,10 @@
     stopService,
     restartService,
     type ServiceStatus,
-    type ServiceDescriptor,
   } from "$lib/services/serviceChecker";
-  import { isTauri } from "$lib/tauri";
 
   // ── Props ──────────────────────────────────────────────────────────────
   interface Props {
-    /** List of services to monitor */
-    services?: ServiceDescriptor[];
     /** Auto-refresh interval in ms (0 = disabled) */
     refreshInterval?: number;
     /** Show header card */
@@ -21,11 +17,6 @@
   }
 
   let {
-    services = [
-      { name: "TyrsolesApi", canStart: true, canStop: true },
-      { name: "MSSQLSERVER", canStart: false, canStop: false },
-      { name: "W3SVC", canStart: false, canStop: false },
-    ],
     refreshInterval = 30_000,
     showHeader = true,
   }: Props = $props();
@@ -40,8 +31,8 @@
   let rows = $state<ServiceRow[]>([]);
   let globalLoading = $state(false);
   let lastRefresh = $state<Date | null>(null);
+  let loadError = $state("");
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
-  let isDesktop = $state(false);
 
   // ── Computed ───────────────────────────────────────────────────────────
   const runningCount = $derived(rows.filter((r) => r.isRunning).length);
@@ -76,11 +67,14 @@
   async function refresh() {
     if (globalLoading) return;
     globalLoading = true;
+    loadError = "";
     try {
-      const statuses = await checkServices(services);
+      const statuses = await checkServices();
       mergeRows(statuses);
       lastRefresh = new Date();
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      loadError = msg;
       console.error("[ServiceChecker] refresh failed:", e);
     } finally {
       globalLoading = false;
@@ -120,7 +114,6 @@
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   onMount(async () => {
-    isDesktop = isTauri();
     await refresh();
     if (refreshInterval > 0) {
       refreshTimer = setInterval(refresh, refreshInterval);
@@ -180,14 +173,14 @@
     </div>
   {/if}
 
-  {#if !isDesktop}
+  {#if loadError}
     <div class="sc-notice">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="12" />
         <line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
-      Service management is only available in the desktop (Tauri) app.
+      {loadError}
     </div>
   {:else if rows.length === 0 && globalLoading}
     <div class="sc-loading-state">
@@ -278,7 +271,7 @@
     </div>
   {/if}
 
-  {#if lastRefresh && isDesktop}
+  {#if lastRefresh}
     <div class="sc-footer">
       <span>Last updated: {formatTime(lastRefresh)}</span>
       {#if refreshInterval > 0}
