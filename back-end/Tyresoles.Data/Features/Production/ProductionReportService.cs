@@ -1096,7 +1096,9 @@ group by Vend.[Group Details], Lines.No_, Lines.Make, Lines.[Responsibility Cent
         };
 
         var purchaseLineT = scope.GetQualifiedTableName("Purchase Line", false);
-        var purchaseHeaderT = scope.GetQualifiedTableName("Purchase Header", false);
+//        var purchaseHeaderT = scope.GetQualifiedTableName("Purchase Header", false);
+        var itemLedgerT = scope.GetQualifiedTableName("Item Ledger Entry", false);
+        var valueEntryT = scope.GetQualifiedTableName("Value Entry", false);
         var vendorT = scope.GetQualifiedTableName("Vendor", false);
         var configT = scope.GetQualifiedTableName("Procurement Configs", false);
 
@@ -1104,19 +1106,27 @@ group by Vend.[Group Details], Lines.No_, Lines.Make, Lines.[Responsibility Cent
         select [Item No] as Size, Market, CAST(Qty AS INT) as [Target]
         from {configT} where [From Date] >= @from and [To Date] <= @to";
 
-        var purchasedSql = $@"select Lines.No_ as [Size], Vend.[Group Details] as [Market], CAST(SUM(Lines.Quantity) AS INT) as Purchased, ISNULL(AVG(Lines.[Direct Unit Cost]), 0) as AvgCost, ISNULL(AVG(Lines.[Casing Freight]), 0) as Freight 
+        var purchasedSql = $@"select Ledger.[Item No_] as [Size], Vend.[Group Details] as [Market], CAST(SUM(Ledger.Quantity) AS INT) as Purchased, ISNULL(AVG([Values].[Cost Amount (Actual)]), 0) as AvgCost, 0 as Freight 
+from {itemLedgerT} as Ledger
+left join (select * from {valueEntryT}) as [Values]
+on [Values].[Item Ledger Entry No_] = Ledger.[Entry No_]
+left join (select * from {vendorT}) as Vend
+on Vend.No_ = Ledger.[Source No_]
+where Ledger.[Entry Type] = 0 and Ledger.[Item Category Code] = 'CASING'
+and Ledger.[Posting Date] between @from and @to and Vend.[Group Category] = 'CASING PROCUREMENT'
+group by Ledger.[Item No_], Vend.[Group Details]";
+
+        var inTransitSql = $@"select CAST(SUM(Lines.Quantity) AS INT) as InTransitSql, Vend.[Group Details] as [Market], Lines.[No_] as [Size]
 from {purchaseLineT} as Lines
-left join (select * from {purchaseHeaderT}) as Header
-on Header.No_ = Lines.[Document No_]
 left join (select * from {vendorT}) as Vend
 on Vend.No_ = Lines.[Buy-from Vendor No_]
-where Lines.[Order Status] in (4) and Lines.[Document Type] in (6)
-and Header.[Posting Date] between @from and @to
-group by Lines.No_, Vend.[Group Details]";
+where Lines.[Order Status] in (2) and Lines.[Document Type] in (6)
+group by Vend.[Group Details], Lines.[No_]";
 
         var targets = await scope.RawQueryToArrayAsync<ProcurementDashboard>(targetSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
         var currentPurchased = await scope.RawQueryToArrayAsync<ProcurementDashboard>(purchasedSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
         var lastMonthPurchased = await scope.RawQueryToArrayAsync<ProcurementDashboard>(purchasedSql, lastMonthParameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
+        var inTransitData = await scope.RawQueryToArrayAsync<ProcurementDashboard>(inTransitSql, parameters, ct).ConfigureAwait(false) ?? Array.Empty<ProcurementDashboard>();
 
         string Normalize(string? s) => (s ?? "").Trim().ToUpperInvariant();
 
@@ -1136,6 +1146,7 @@ group by Lines.No_, Vend.[Group Details]";
         foreach (var t in targets) RegisterOriginalKey(t.Size, t.Market);
         foreach (var cp in currentPurchased) RegisterOriginalKey(cp.Size, cp.Market);
         foreach (var lp in lastMonthPurchased) RegisterOriginalKey(lp.Size, lp.Market);
+        foreach (var it in inTransitData) RegisterOriginalKey(it.Size, it.Market);
 
         var targetLookup = targets
             .GroupBy(t => (Normalize(t.Size), Normalize(t.Market)))
@@ -1147,6 +1158,10 @@ group by Lines.No_, Vend.[Group Details]";
 
         var lastMonthLookup = lastMonthPurchased
             .GroupBy(lp => (Normalize(lp.Size), Normalize(lp.Market)))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var inTransitLookup = inTransitData
+            .GroupBy(it => (Normalize(it.Size), Normalize(it.Market)))
             .ToDictionary(g => g.Key, g => g.First());
 
         foreach (var key in allKeys)
@@ -1174,6 +1189,11 @@ group by Lines.No_, Vend.[Group Details]";
             {
                 item.PurchasedLastMonth = lastMonthData.Purchased;
                 item.AvgCostLastMonth = lastMonthData.AvgCost;
+            }
+
+            if (inTransitLookup.TryGetValue(key, out var inTransitItem))
+            {
+                item.InTransitSql = inTransitItem.InTransitSql;
             }
 
             list.Add(item);

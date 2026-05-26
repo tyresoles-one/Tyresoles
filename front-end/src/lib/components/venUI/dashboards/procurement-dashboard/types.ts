@@ -3,6 +3,7 @@ export interface ProcurementRow {
   market: string;
   target: number;
   purchased: number;
+  inTransitSql?: number;
   purchasedLastMonth: number;
   avgCost: number;
   avgCostLastMonth: number;

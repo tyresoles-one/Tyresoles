@@ -225,6 +225,8 @@ public class ProcurementDashboard
     public string Market { get; set; } = string.Empty;    
     public int Target { get; set; } = 0;
     public int Purchased { get; set; } = 0;
+    public int InTransit { get; set; } = 0;
+    public int InTransitSql { get; set; } = 0;
     public int PurchasedLastMonth { get; set; } = 0;
     public decimal AvgCost { get; set;  } = 0;
     public decimal AvgCostLastMonth { get; set; } = 0;

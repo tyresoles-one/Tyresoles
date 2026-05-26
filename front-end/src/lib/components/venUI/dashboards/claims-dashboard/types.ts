@@ -11,6 +11,8 @@ export interface ClaimRatioRow {
   bValue?: boolean;
   sold?: number;
   purchase?: number;
+  inTransit?: number;
+  inTransitSql?: number;
   claims?: number;
   pass?: number;
   reject?: number;

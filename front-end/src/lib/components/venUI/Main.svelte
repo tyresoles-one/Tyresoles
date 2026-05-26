@@ -125,9 +125,12 @@
       >
         {#snippet children({ props })}
           <Avatar.Root
-            class="h-8 w-8 cursor-pointer border-2 border-transparent transition-all hover:border-accent hover:scale-105"
+            class="h-8 w-8 cursor-pointer border-2 border-transparent transition-all hover:border-accent hover:scale-105"            
             {...props}
           >
+            {#if $authStore.user?.avatar}
+              <Avatar.Image src={images[$authStore.user.avatar].url} />
+            {/if}
             <!-- Intentionally fallback-only in dev; backend /images assets are not present. -->
             <Avatar.Fallback class="bg-primary text-primary-foreground">
               {$authStore.username?.slice(0, 2).toUpperCase() ?? "U"}

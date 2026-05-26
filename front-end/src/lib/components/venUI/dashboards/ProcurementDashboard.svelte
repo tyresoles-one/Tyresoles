@@ -27,6 +27,7 @@
   });
   let rows = $state<ProcurementRow[]>([]);
   let expanded = $state<Record<string, boolean>>({});
+  let viewMode = $state<"Structure" | "Size" | "Market">("Structure");
 
   let activeController: AbortController | null = null;
   let fetchId = 0;
@@ -102,6 +103,7 @@
     agg: {
       target: number;
       purchased: number;
+      inTransitSql: number;
       purchasedLastMonth: number;
       avgCost: number;
       avgCostLastMonth: number;
@@ -114,6 +116,7 @@
   function sumAgg(list: ProcurementRow[]) {
     const target = list.reduce((a, r) => a + (r.target ?? 0), 0);
     const purchased = list.reduce((a, r) => a + (r.purchased ?? 0), 0);
+    const inTransitSql = list.reduce((a, r) => a + (r.inTransitSql ?? 0), 0);
     const purchasedLastMonth = list.reduce((a, r) => a + (r.purchasedLastMonth ?? 0), 0);
 
     const totalCostCurrent = list.reduce((a, r) => a + (r.purchased ?? 0) * (r.avgCost ?? 0), 0);
@@ -128,6 +131,7 @@
     return {
       target,
       purchased,
+      inTransitSql,
       purchasedLastMonth,
       avgCost,
       avgCostLastMonth,
@@ -138,48 +142,73 @@
   const procurementTree = $derived.by((): TreeNode[] => {
     if (!rows.length) return [];
 
-    const sizeGroups = new Map<string, ProcurementRow[]>();
-    for (const r of rows) {
-      const sz = r.size?.trim() || "Unknown Size";
-      if (!sizeGroups.has(sz)) {
-        sizeGroups.set(sz, []);
-      }
-      sizeGroups.get(sz)!.push(r);
-    }
+    let nodes: TreeNode[] = [];
 
-    const sizeNodes = Array.from(sizeGroups.entries()).map(([sizeName, childRows]) => {
-      const marketNodes: TreeNode[] = childRows.map((r) => {
-        const mktName = r.market?.trim() || "Default Market";
+    if (viewMode === "Structure") {
+      const sizeGroups = new Map<string, ProcurementRow[]>();
+      for (const r of rows) {
+        const sz = r.size?.trim() || "Unknown Size";
+        if (!sizeGroups.has(sz)) {
+          sizeGroups.set(sz, []);
+        }
+        sizeGroups.get(sz)!.push(r);
+      }
+
+      nodes = Array.from(sizeGroups.entries()).map(([sizeName, childRows]) => {
+        const marketNodes: TreeNode[] = childRows.map((r) => {
+          const mktName = r.market?.trim() || "Default Market";
+          return {
+            key: `size_${sizeName}_market_${mktName}`,
+            label: mktName,
+            level: 1,
+            agg: {
+              target: r.target ?? 0,
+              purchased: r.purchased ?? 0,
+              inTransitSql: r.inTransitSql ?? 0,
+              purchasedLastMonth: r.purchasedLastMonth ?? 0,
+              avgCost: r.avgCost ?? 0,
+              avgCostLastMonth: r.avgCostLastMonth ?? 0,
+              freight: r.freight ?? 0,
+            },
+            children: [],
+            isLeaf: true,
+          };
+        });
+
+        const parentAgg = sumAgg(childRows);
+
         return {
-          key: `size_${sizeName}_market_${mktName}`,
-          label: mktName,
-          level: 1,
-          agg: {
-            target: r.target ?? 0,
-            purchased: r.purchased ?? 0,
-            purchasedLastMonth: r.purchasedLastMonth ?? 0,
-            avgCost: r.avgCost ?? 0,
-            avgCostLastMonth: r.avgCostLastMonth ?? 0,
-            freight: r.freight ?? 0,
-          },
+          key: `size_${sizeName}`,
+          label: sizeName,
+          level: 0,
+          agg: parentAgg,
+          children: marketNodes,
+          isLeaf: marketNodes.length === 0,
+        };
+      });
+    } else {
+      const groups = new Map<string, ProcurementRow[]>();
+      for (const r of rows) {
+        const val = viewMode === "Size" 
+          ? (r.size?.trim() || "Unknown Size") 
+          : (r.market?.trim() || "Default Market");
+        if (!groups.has(val)) groups.set(val, []);
+        groups.get(val)!.push(r);
+      }
+
+      nodes = Array.from(groups.entries()).map(([label, childRows]) => {
+        return {
+          key: `${viewMode.toLowerCase()}_${label}`,
+          label,
+          level: 0,
+          agg: sumAgg(childRows),
           children: [],
           isLeaf: true,
         };
       });
+    }
 
-      const parentAgg = sumAgg(childRows);
-
-      return {
-        key: `size_${sizeName}`,
-        label: sizeName,
-        level: 0,
-        agg: parentAgg,
-        children: marketNodes,
-        isLeaf: marketNodes.length === 0,
-      };
-    });
-
-    sizeNodes.sort((a, b) => {
+    nodes.sort((a, b) => {
       let vA, vB;
       if (sortField === "label") {
         vA = a.label.toLowerCase();
@@ -195,25 +224,27 @@
       return 0;
     });
 
-    for (const parent of sizeNodes) {
-      parent.children.sort((a, b) => {
-        let vA, vB;
-        if (sortField === "label") {
-          vA = a.label.toLowerCase();
-          vB = b.label.toLowerCase();
-        } else {
-          vA = a.agg[sortField] ?? 0;
-          vB = b.agg[sortField] ?? 0;
-        }
+    if (viewMode === "Structure") {
+      for (const parent of nodes) {
+        parent.children.sort((a, b) => {
+          let vA, vB;
+          if (sortField === "label") {
+            vA = a.label.toLowerCase();
+            vB = b.label.toLowerCase();
+          } else {
+            vA = a.agg[sortField] ?? 0;
+            vB = b.agg[sortField] ?? 0;
+          }
 
-        const modifier = sortDir === "asc" ? 1 : -1;
-        if (vA < vB) return -1 * modifier;
-        if (vA > vB) return 1 * modifier;
-        return 0;
-      });
+          const modifier = sortDir === "asc" ? 1 : -1;
+          if (vA < vB) return -1 * modifier;
+          if (vA > vB) return 1 * modifier;
+          return 0;
+        });
+      }
     }
 
-    return sizeNodes;
+    return nodes;
   });
 
   const grandTotal = $derived.by(() => {
@@ -372,6 +403,9 @@
     <Table.Cell class="text-right tabular-nums text-primary font-semibold text-xs sm:text-sm p-2 sm:p-4"
       >{fmtInt(node.agg.purchased)}</Table.Cell
     >
+    <Table.Cell class="text-right tabular-nums text-cyan-600 dark:text-cyan-400 font-semibold text-xs sm:text-sm p-2 sm:p-4"
+      >{fmtInt(node.agg.inTransitSql)}</Table.Cell
+    >
     <Table.Cell class="text-right tabular-nums text-muted-foreground text-xs sm:text-sm p-2 sm:p-4"
       >{fmtInt(node.agg.purchasedLastMonth)}</Table.Cell
     >
@@ -436,6 +470,19 @@
         </div>
       </div>        
     </div>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+    {#each ["Structure", "Size", "Market"] as vm}
+      <button
+        class="rounded-full px-5 py-2 text-xs font-black tracking-wide transition-all {viewMode === vm
+          ? 'bg-foreground text-background shadow-lg scale-[1.02]'
+          : 'bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground'}"
+        onclick={() => (viewMode = vm as any)}
+      >
+        {vm === 'Structure' ? 'Size / Market' : vm}
+      </button>
+    {/each}
   </div>
 
   {#if varianceMetrics}
@@ -557,6 +604,15 @@
               </div>
             </Table.Head>
             <Table.Head 
+              class="text-right text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-cyan-600 cursor-pointer group/head py-3 sm:py-4 px-2 sm:px-4 whitespace-normal leading-tight min-w-[60px] sm:min-w-[80px]"
+              onclick={() => toggleSort('inTransitSql')}
+            >
+              <div class="flex items-center justify-end text-right gap-1">
+                <span>In Transit</span>
+                {@render sortIcon('inTransitSql')}
+              </div>
+            </Table.Head>
+            <Table.Head 
               class="text-right text-[9px] sm:text-[10px] font-black uppercase tracking-widest cursor-pointer group/head py-2 sm:py-3 px-1.5 sm:px-3 whitespace-normal leading-tight max-w-[80px] sm:max-w-[110px] min-w-[85px] sm:min-w-[110px]"
               onclick={() => toggleSort('purchasedLastMonth')}
             >
@@ -610,6 +666,9 @@
               </Table.Cell>
               <Table.Cell class="text-right tabular-nums font-black text-primary text-xs sm:text-sm p-2 sm:p-4">
                 {fmtInt(grandTotal.purchased)}
+              </Table.Cell>
+              <Table.Cell class="text-right tabular-nums font-black text-cyan-600 dark:text-cyan-400 text-xs sm:text-sm p-2 sm:p-4">
+                {fmtInt(grandTotal.inTransitSql)}
               </Table.Cell>
               <Table.Cell class="text-right tabular-nums font-black text-muted-foreground text-xs sm:text-sm p-2 sm:p-4">
                 {fmtInt(grandTotal.purchasedLastMonth)}
