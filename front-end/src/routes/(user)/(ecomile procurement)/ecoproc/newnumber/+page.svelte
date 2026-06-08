@@ -414,8 +414,8 @@
 		<TableCell class="font-mono text-xs whitespace-nowrap">{item.sortNo || "—"}</TableCell>
 		<TableCell class="font-medium">{item.no || "—"}</TableCell>
 		<TableCell>{item.make || "—"}</TableCell>
-		<TableCell class="font-mono text-xs">{item.serialNo || "—"}</TableCell>
-		<TableCell class="font-mono text-xs">{item.newSerialNo || "—"}</TableCell>
+		<TableCell class="font-mono text-base font-medium">{item.serialNo || "—"}</TableCell>
+		<TableCell class="font-mono text-base font-semibold text-primary">{item.newSerialNo || "—"}</TableCell>
 		<TableCell class="hidden lg:table-cell max-w-[140px] truncate" title={item.location}
 			>{item.location || "—"}</TableCell
 		>
@@ -438,11 +438,11 @@
 			</div>
 			<div>
 				<p class="text-base font-semibold leading-tight">{item.no} · {item.make}</p>
-				<p class="mt-1 font-mono text-xs text-muted-foreground">S/N {item.serialNo || "—"}</p>
+				<p class="mt-1 font-mono text-sm text-muted-foreground">S/N <span class="font-medium text-foreground">{item.serialNo || "—"}</span></p>
 			</div>
-			<div class="mt-auto flex flex-wrap items-center gap-2 border-t pt-3 text-xs">
-				<span class="text-muted-foreground">New:</span>
-				<span class="font-mono font-medium">{item.newSerialNo || "—"}</span>
+			<div class="mt-auto flex flex-wrap items-center gap-2 border-t pt-3 text-sm">
+				<span class="text-muted-foreground text-xs">New:</span>
+				<span class="font-mono font-bold text-primary">{item.newSerialNo || "—"}</span>
 				<Badge variant="secondary" class="ml-auto text-[10px]">{item.orderStatus || "—"}</Badge>
 			</div>
 			{#if item.location}

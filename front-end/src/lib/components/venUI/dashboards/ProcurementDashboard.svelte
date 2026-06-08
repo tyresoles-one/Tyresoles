@@ -27,7 +27,7 @@
   });
   let rows = $state<ProcurementRow[]>([]);
   let expanded = $state<Record<string, boolean>>({});
-  let viewMode = $state<"Structure" | "Size" | "Market">("Structure");
+  let viewMode = $state<"Size" | "Market">("Size");
 
   let activeController: AbortController | null = null;
   let fetchId = 0;
@@ -100,6 +100,7 @@
     key: string;
     label: string;
     level: number;
+    nodeType: "size" | "market";
     agg: {
       target: number;
       purchased: number;
@@ -144,7 +145,7 @@
 
     let nodes: TreeNode[] = [];
 
-    if (viewMode === "Structure") {
+    if (viewMode === "Size") {
       const sizeGroups = new Map<string, ProcurementRow[]>();
       for (const r of rows) {
         const sz = r.size?.trim() || "Unknown Size";
@@ -161,6 +162,7 @@
             key: `size_${sizeName}_market_${mktName}`,
             label: mktName,
             level: 1,
+            nodeType: "market" as const,
             agg: {
               target: r.target ?? 0,
               purchased: r.purchased ?? 0,
@@ -181,29 +183,54 @@
           key: `size_${sizeName}`,
           label: sizeName,
           level: 0,
+          nodeType: "size" as const,
           agg: parentAgg,
           children: marketNodes,
           isLeaf: marketNodes.length === 0,
         };
       });
     } else {
-      const groups = new Map<string, ProcurementRow[]>();
+      const marketGroups = new Map<string, ProcurementRow[]>();
       for (const r of rows) {
-        const val = viewMode === "Size" 
-          ? (r.size?.trim() || "Unknown Size") 
-          : (r.market?.trim() || "Default Market");
-        if (!groups.has(val)) groups.set(val, []);
-        groups.get(val)!.push(r);
+        const mkt = r.market?.trim() || "Default Market";
+        if (!marketGroups.has(mkt)) {
+          marketGroups.set(mkt, []);
+        }
+        marketGroups.get(mkt)!.push(r);
       }
 
-      nodes = Array.from(groups.entries()).map(([label, childRows]) => {
+      nodes = Array.from(marketGroups.entries()).map(([mktName, childRows]) => {
+        const sizeNodes: TreeNode[] = childRows.map((r) => {
+          const szName = r.size?.trim() || "Unknown Size";
+          return {
+            key: `market_${mktName}_size_${szName}`,
+            label: szName,
+            level: 1,
+            nodeType: "size" as const,
+            agg: {
+              target: r.target ?? 0,
+              purchased: r.purchased ?? 0,
+              inTransitSql: r.inTransitSql ?? 0,
+              purchasedLastMonth: r.purchasedLastMonth ?? 0,
+              avgCost: r.avgCost ?? 0,
+              avgCostLastMonth: r.avgCostLastMonth ?? 0,
+              freight: r.freight ?? 0,
+            },
+            children: [],
+            isLeaf: true,
+          };
+        });
+
+        const parentAgg = sumAgg(childRows);
+
         return {
-          key: `${viewMode.toLowerCase()}_${label}`,
-          label,
+          key: `market_${mktName}`,
+          label: mktName,
           level: 0,
-          agg: sumAgg(childRows),
-          children: [],
-          isLeaf: true,
+          nodeType: "market" as const,
+          agg: parentAgg,
+          children: sizeNodes,
+          isLeaf: sizeNodes.length === 0,
         };
       });
     }
@@ -224,24 +251,22 @@
       return 0;
     });
 
-    if (viewMode === "Structure") {
-      for (const parent of nodes) {
-        parent.children.sort((a, b) => {
-          let vA, vB;
-          if (sortField === "label") {
-            vA = a.label.toLowerCase();
-            vB = b.label.toLowerCase();
-          } else {
-            vA = a.agg[sortField] ?? 0;
-            vB = b.agg[sortField] ?? 0;
-          }
+    for (const parent of nodes) {
+      parent.children.sort((a, b) => {
+        let vA, vB;
+        if (sortField === "label") {
+          vA = a.label.toLowerCase();
+          vB = b.label.toLowerCase();
+        } else {
+          vA = a.agg[sortField] ?? 0;
+          vB = b.agg[sortField] ?? 0;
+        }
 
-          const modifier = sortDir === "asc" ? 1 : -1;
-          if (vA < vB) return -1 * modifier;
-          if (vA > vB) return 1 * modifier;
-          return 0;
-        });
-      }
+        const modifier = sortDir === "asc" ? 1 : -1;
+        if (vA < vB) return -1 * modifier;
+        if (vA > vB) return 1 * modifier;
+        return 0;
+      });
     }
 
     return nodes;
@@ -410,13 +435,13 @@
       >{fmtInt(node.agg.purchasedLastMonth)}</Table.Cell
     >
     <Table.Cell class="text-right tabular-nums text-green-600 dark:text-green-400 text-xs sm:text-sm p-2 sm:p-4"
-      >{fmtMoney(node.agg.avgCost)}</Table.Cell
+      >{node.nodeType === 'market' ? '' : fmtMoney(node.agg.avgCost)}</Table.Cell
     >
     <Table.Cell class="text-right tabular-nums text-amber-600 dark:text-amber-400 text-xs sm:text-sm p-2 sm:p-4"
       >{fmtMoney(node.agg.freight)}</Table.Cell
     >
     <Table.Cell class="text-right tabular-nums text-muted-foreground text-xs sm:text-sm p-2 sm:p-4"
-      >{fmtMoney(node.agg.avgCostLastMonth)}</Table.Cell
+      >{node.nodeType === 'market' ? '' : fmtMoney(node.agg.avgCostLastMonth)}</Table.Cell
     >
   </Table.Row>
 
@@ -473,14 +498,14 @@
   </div>
 
   <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-    {#each ["Structure", "Size", "Market"] as vm}
+    {#each ["Size", "Market"] as vm}
       <button
         class="rounded-full px-5 py-2 text-xs font-black tracking-wide transition-all {viewMode === vm
           ? 'bg-foreground text-background shadow-lg scale-[1.02]'
           : 'bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground'}"
         onclick={() => (viewMode = vm as any)}
       >
-        {vm === 'Structure' ? 'Size / Market' : vm}
+        {vm}
       </button>
     {/each}
   </div>
@@ -581,7 +606,7 @@
               onclick={() => toggleSort('label')}
             >
               <div class="flex items-center gap-1">
-                <span class="whitespace-normal">Size / Market Structure</span>
+                <span class="whitespace-normal">{viewMode === 'Size' ? 'Size / Market' : 'Market / Size'}</span>
                 {@render sortIcon('label')}
               </div>
             </Table.Head>

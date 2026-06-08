@@ -91,27 +91,43 @@ public static class WindowsServiceEndpoints
         try
         {
             var status = await execute(manager, serviceName, cancellationToken).ConfigureAwait(false);
-            LogAudit(loggerFactory, http.User, action, serviceName);
+            LogAudit(loggerFactory, http.User, action, serviceName, true);
             return Results.Ok(status);
         }
         catch (WindowsServiceException ex)
         {
+            LogAudit(loggerFactory, http.User, action, serviceName, false, ex.Message);
             return ToErrorResult(ex);
         }
     }
 
-    private static void LogAudit(ILoggerFactory loggerFactory, ClaimsPrincipal user, string action, string? serviceName)
+    private static void LogAudit(ILoggerFactory loggerFactory, ClaimsPrincipal user, string action, string? serviceName, bool success = true, string? error = null)
     {
         var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)
                      ?? user.FindFirstValue("sub")
                      ?? "unknown";
         var logger = loggerFactory.CreateLogger("Tyresoles.WindowsServices");
-        logger.LogInformation(
-            "Windows service {Action} by admin {UserId} for service {ServiceName}",
-            action,
-            userId,
-            serviceName ?? "(all)");
+        
+        if (success)
+        {
+            logger.LogInformation(
+                "Windows service {Action} by admin {UserId} for service {ServiceName} succeeded",
+                action,
+                userId,
+                serviceName ?? "(all)");
+        }
+        else
+        {
+            logger.LogWarning(
+                "Windows service {Action} by admin {UserId} for service {ServiceName} failed: {Error}",
+                action,
+                userId,
+                serviceName ?? "(all)",
+                error);
+        }
     }
+
+
 
     private static IResult ToErrorResult(WindowsServiceException ex) => ex switch
     {

@@ -147,6 +147,18 @@ namespace WebService
         [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqGLEntry", ReplyAction="*")]
         [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
         System.Threading.Tasks.Task<WebService.ReqGLEntry_Result> ReqGLEntryAsync(WebService.ReqGLEntry request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqItem", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqItem_Result> ReqItemAsync(WebService.ReqItem request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqMonthlySaleClose", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqMonthlySaleClose_Result> ReqMonthlySaleCloseAsync(WebService.ReqMonthlySaleClose request);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqItemBOM", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.ReqItemBOM_Result> ReqItemBOMAsync(WebService.ReqItemBOM request);
     }
     
     [System.Diagnostics.DebuggerStepThroughAttribute()]
@@ -2156,6 +2168,175 @@ namespace WebService
         }
     }
     
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqItem", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqItem
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string no;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        public string description;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=2)]
+        public string uom;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=3)]
+        public string itemCategory;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=4)]
+        public string prodGroup;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=5)]
+        public string genprodpostGroup;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=6)]
+        public string gstGroup;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=7)]
+        public string hsn;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=8)]
+        public string inventpostGroup;
+        
+        public ReqItem()
+        {
+        }
+        
+        public ReqItem(string no, string description, string uom, string itemCategory, string prodGroup, string genprodpostGroup, string gstGroup, string hsn, string inventpostGroup)
+        {
+            this.no = no;
+            this.description = description;
+            this.uom = uom;
+            this.itemCategory = itemCategory;
+            this.prodGroup = prodGroup;
+            this.genprodpostGroup = genprodpostGroup;
+            this.gstGroup = gstGroup;
+            this.hsn = hsn;
+            this.inventpostGroup = inventpostGroup;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqItem_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqItem_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqItem_Result()
+        {
+        }
+        
+        public ReqItem_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqMonthlySaleClose", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqMonthlySaleClose
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string respCenterCode;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        [System.Xml.Serialization.XmlElementAttribute(DataType="date")]
+        public System.DateTime date;
+        
+        public ReqMonthlySaleClose()
+        {
+        }
+        
+        public ReqMonthlySaleClose(string respCenterCode, System.DateTime date)
+        {
+            this.respCenterCode = respCenterCode;
+            this.date = date;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqMonthlySaleClose_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqMonthlySaleClose_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqMonthlySaleClose_Result()
+        {
+        }
+        
+        public ReqMonthlySaleClose_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqItemBOM", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqItemBOM
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string parentItemNo;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=1)]
+        public string itemNo;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=2)]
+        public string variantCode;
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=3)]
+        public decimal qty;
+        
+        public ReqItemBOM()
+        {
+        }
+        
+        public ReqItemBOM(string parentItemNo, string itemNo, string variantCode, decimal qty)
+        {
+            this.parentItemNo = parentItemNo;
+            this.itemNo = itemNo;
+            this.variantCode = variantCode;
+            this.qty = qty;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="ReqItemBOM_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class ReqItemBOM_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public ReqItemBOM_Result()
+        {
+        }
+        
+        public ReqItemBOM_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
     public interface WebServe_PortChannel : WebService.WebServe_Port, System.ServiceModel.IClientChannel
     {
@@ -2860,6 +3041,57 @@ namespace WebService
             inValue.amount = amount;
             inValue.postingDate = postingDate;
             return ((WebService.WebServe_Port)(this)).ReqGLEntryAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqItem_Result> WebService.WebServe_Port.ReqItemAsync(WebService.ReqItem request)
+        {
+            return base.Channel.ReqItemAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqItem_Result> ReqItemAsync(string no, string description, string uom, string itemCategory, string prodGroup, string genprodpostGroup, string gstGroup, string hsn, string inventpostGroup)
+        {
+            WebService.ReqItem inValue = new WebService.ReqItem();
+            inValue.no = no;
+            inValue.description = description;
+            inValue.uom = uom;
+            inValue.itemCategory = itemCategory;
+            inValue.prodGroup = prodGroup;
+            inValue.genprodpostGroup = genprodpostGroup;
+            inValue.gstGroup = gstGroup;
+            inValue.hsn = hsn;
+            inValue.inventpostGroup = inventpostGroup;
+            return ((WebService.WebServe_Port)(this)).ReqItemAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqMonthlySaleClose_Result> WebService.WebServe_Port.ReqMonthlySaleCloseAsync(WebService.ReqMonthlySaleClose request)
+        {
+            return base.Channel.ReqMonthlySaleCloseAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqMonthlySaleClose_Result> ReqMonthlySaleCloseAsync(string respCenterCode, System.DateTime date)
+        {
+            WebService.ReqMonthlySaleClose inValue = new WebService.ReqMonthlySaleClose();
+            inValue.respCenterCode = respCenterCode;
+            inValue.date = date;
+            return ((WebService.WebServe_Port)(this)).ReqMonthlySaleCloseAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.ReqItemBOM_Result> WebService.WebServe_Port.ReqItemBOMAsync(WebService.ReqItemBOM request)
+        {
+            return base.Channel.ReqItemBOMAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.ReqItemBOM_Result> ReqItemBOMAsync(string parentItemNo, string itemNo, string variantCode, decimal qty)
+        {
+            WebService.ReqItemBOM inValue = new WebService.ReqItemBOM();
+            inValue.parentItemNo = parentItemNo;
+            inValue.itemNo = itemNo;
+            inValue.variantCode = variantCode;
+            inValue.qty = qty;
+            return ((WebService.WebServe_Port)(this)).ReqItemBOMAsync(inValue);
         }
         
         public virtual System.Threading.Tasks.Task OpenAsync()

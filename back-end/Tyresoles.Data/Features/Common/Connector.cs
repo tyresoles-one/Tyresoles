@@ -372,4 +372,28 @@ public class Connector
         await Task.CompletedTask;
         return "SUCCESS";
     }
+
+    /// <summary>NAV WebServe <c>ReqItem</c> — item request.</summary>
+    public Task<bool> ReqItemAsync(string no, string description, string uom, string itemCategory, string prodGroup, string genprodpostGroup, string gstGroup, string hsn, string inventpostGroup) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqItemAsync(no, description, uom, itemCategory, prodGroup, genprodpostGroup, gstGroup, hsn, inventpostGroup);
+            return result.return_value;
+        });
+
+    /// <summary>NAV WebServe <c>ReqMonthlySaleClose</c> — monthly sale close request.</summary>
+    public Task<bool> ReqMonthlySaleCloseAsync(string respCenterCode, DateTime date) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqMonthlySaleCloseAsync(respCenterCode, date);
+            return result.return_value;
+        });
+
+    /// <summary>NAV WebServe <c>ReqItemBOM</c> — item BOM request.</summary>
+    public Task<bool> ReqItemBOMAsync(string parentItemNo, string itemNo, string variantCode, decimal qty) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.ReqItemBOMAsync(parentItemNo, itemNo, variantCode, qty);
+            return result.return_value;
+        });
 }

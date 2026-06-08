@@ -9,6 +9,17 @@ public class ProteanException : Exception
     public ProteanException(string message, Exception inner) : base(message, inner) { }
 }
 
+public class EInvoiceException : ProteanException
+{
+    public string ErrorCode { get; }
+    public string ErrorMessageText { get; }
+    public EInvoiceException(string message, string errorCode, string errorMessageText) : base(message)
+    {
+        ErrorCode = errorCode;
+        ErrorMessageText = errorMessageText;
+    }
+}
+
 /// <summary>
 /// Thrown when the IRP returns error code 2150 (duplicate IRN).
 /// The caller can read <see cref="IrnInfo"/> to obtain the existing IRN details.

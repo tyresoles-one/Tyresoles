@@ -173,13 +173,21 @@ export const fetchMarkets = async () => {
 };
 
 export const insertCasingItems = async (items: CasingItemInput[]) => {
-    const result = await graphqlQuery<InsertProductionCasingItemsMutation, InsertProductionCasingItemsMutationVariables>(InsertProductionCasingItemsDocument, {
+    const UPDATE_M = `
+        mutation UpdateProductionCasingItems($casingItems: [CasingItemInput!]!) {
+            updateProductionCasingItems(casingItems: $casingItems) {
+                success
+                message
+            }
+        }
+    `;
+    const result = await graphqlQuery<{ updateProductionCasingItems: { success: boolean; message?: string | null } }>(UPDATE_M, {
         variables: { casingItems: items }
     });
-    if (result.success && result.data?.insertProductionCasingItems.success) {
-        toast.success(result.data.insertProductionCasingItems.message || 'Items saved successfully');
+    if (result.success && result.data?.updateProductionCasingItems?.success) {
+        toast.success(result.data.updateProductionCasingItems.message || 'Items updated successfully');
         return { success: true };
     }
-    toast.error(result.error || result.data?.insertProductionCasingItems.message || 'Failed to save items');
+    toast.error(result.error || result.data?.updateProductionCasingItems?.message || 'Failed to update items');
     return { success: false };
 };

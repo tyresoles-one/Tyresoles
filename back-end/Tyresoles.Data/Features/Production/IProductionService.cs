@@ -14,8 +14,10 @@ public interface IProductionService
 {
     // Masters
     Task<List<CasingItem>> GetItemNosAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
+    Task<List<CasingItem>> GetCasingsAsync(ITenantScope scope);
     Task UpdateCasingAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
     Task InsertCasingItemsAsync(ITenantScope scope, List<CasingItem> casingItems, CancellationToken ct = default);
+    Task UpdateCasingItemsAsync(ITenantScope scope, List<CasingItem> casingItems, CancellationToken ct = default);
     Task<List<CodeName>> GetMakesAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
     Task<List<CodeName>> GetMakeSubMakeAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);
     Task<List<CodeName>> GetVendorsCodeNamesAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default);

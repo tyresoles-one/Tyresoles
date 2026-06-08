@@ -14,11 +14,26 @@
     refreshInterval?: number;
     /** Show header card */
     showHeader?: boolean;
+    /** Bound function to trigger refresh from parent */
+    refreshFn?: () => Promise<void>;
+    /** Bound state for global loading */
+    isRefreshing?: boolean;
+    /** Bound state for running count */
+    runningCount?: number;
+    /** Bound state for stopped count */
+    stoppedCount?: number;
+    /** Bound state for unknown count */
+    unknownCount?: number;
   }
 
   let {
     refreshInterval = 30_000,
     showHeader = true,
+    refreshFn = $bindable(),
+    isRefreshing = $bindable(false),
+    runningCount = $bindable(0),
+    stoppedCount = $bindable(0),
+    unknownCount = $bindable(0),
   }: Props = $props();
 
   // ── State ──────────────────────────────────────────────────────────────
@@ -35,10 +50,18 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   // ── Computed ───────────────────────────────────────────────────────────
-  const runningCount = $derived(rows.filter((r) => r.isRunning).length);
-  const stoppedCount = $derived(rows.filter((r) => !r.isRunning && r.state !== "Unknown").length);
-  const unknownCount = $derived(rows.filter((r) => r.state === "Unknown").length);
-  const allHealthy = $derived(rows.length > 0 && runningCount === rows.length);
+  const _runningCount = $derived(rows.filter((r) => r.isRunning).length);
+  const _stoppedCount = $derived(rows.filter((r) => !r.isRunning && r.state !== "Unknown").length);
+  const _unknownCount = $derived(rows.filter((r) => r.state === "Unknown").length);
+  const allHealthy = $derived(rows.length > 0 && _runningCount === rows.length);
+
+  $effect(() => {
+    refreshFn = refresh;
+    isRefreshing = globalLoading;
+    runningCount = _runningCount;
+    stoppedCount = _stoppedCount;
+    unknownCount = _unknownCount;
+  });
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function makeRows(statuses: ServiceStatus[]): ServiceRow[] {
@@ -211,11 +234,11 @@
 
           <!-- Actions -->
           <div class="sc-actions">
-            {#if row.canStart && !row.isRunning && row.state !== "StartPending"}
+            {#if row.canStart && !row.isRunning}
               <button
                 class="sc-btn sc-btn-start"
                 onclick={() => handleAction(row.name, "start")}
-                disabled={row.actionLoading !== null}
+                disabled={row.actionLoading !== null || row.state === "StartPending"}
                 title="Start service"
               >
                 {#if row.actionLoading === "start"}
@@ -229,11 +252,11 @@
               </button>
             {/if}
 
-            {#if row.canStop && row.isRunning && row.state !== "StopPending"}
+            {#if row.canStop && row.isRunning}
               <button
                 class="sc-btn sc-btn-stop"
                 onclick={() => handleAction(row.name, "stop")}
-                disabled={row.actionLoading !== null}
+                disabled={row.actionLoading !== null || row.state === "StopPending"}
                 title="Stop service"
               >
                 {#if row.actionLoading === "stop"}
@@ -247,11 +270,11 @@
               </button>
             {/if}
 
-            {#if (row.canStart || row.canStop) && row.state !== "StartPending" && row.state !== "StopPending"}
+            {#if (row.canStart || row.canStop)}
               <button
                 class="sc-btn sc-btn-restart"
                 onclick={() => handleAction(row.name, "restart")}
-                disabled={row.actionLoading !== null}
+                disabled={row.actionLoading !== null || row.state === "StartPending" || row.state === "StopPending"}
                 title="Restart service"
               >
                 {#if row.actionLoading === "restart"}
@@ -284,20 +307,21 @@
 <style>
   /* ── Reset & tokens ─────────────────────────────────────────────── */
   .sc-wrapper {
-    --sc-radius: 14px;
-    --sc-green: #22c55e;
-    --sc-green-bg: rgba(34, 197, 94, 0.08);
-    --sc-red: #ef4444;
-    --sc-red-bg: rgba(239, 68, 68, 0.08);
-    --sc-yellow: #f59e0b;
-    --sc-yellow-bg: rgba(245, 158, 11, 0.08);
-    --sc-grey: #64748b;
-    --sc-grey-bg: rgba(100, 116, 139, 0.08);
-    --sc-card-bg: hsl(220 18% 8%);
-    --sc-surface: hsl(220 16% 12%);
-    --sc-border: hsl(220 14% 18%);
-    --sc-text: hsl(215 20% 92%);
-    --sc-text-muted: hsl(215 12% 55%);
+    --sc-radius: 0.75rem;
+    --sc-green: #10b981; /* emerald-500 */
+    --sc-green-bg: rgba(16, 185, 129, 0.1);
+    --sc-red: #f43f5e; /* rose-500 */
+    --sc-red-bg: rgba(244, 63, 94, 0.1);
+    --sc-yellow: #f59e0b; /* amber-500 */
+    --sc-yellow-bg: rgba(245, 158, 11, 0.1);
+    --sc-grey: #64748b; /* slate-500 */
+    --sc-grey-bg: var(--muted);
+    
+    --sc-card-bg: var(--card);
+    --sc-surface: var(--card);
+    --sc-border: var(--border);
+    --sc-text: var(--foreground);
+    --sc-text-muted: var(--muted-foreground);
 
     font-family: "Inter", system-ui, sans-serif;
     color: var(--sc-text);

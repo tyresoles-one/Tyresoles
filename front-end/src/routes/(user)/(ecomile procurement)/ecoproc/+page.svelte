@@ -146,40 +146,6 @@
   });
 </script>
 
-{#snippet beforeList()}
-  <div class="mb-6 space-y-8">
-    <section class="space-y-3" aria-labelledby="ecoproc-vendors-scope-heading">
-      <div class="flex items-center gap-2">
-        <div class="h-px flex-1 bg-linear-to-r from-primary/20 via-primary/40 to-transparent"></div>
-        <h2 id="ecoproc-vendors-scope-heading" class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-          <Icon name="package" class="size-3.5 shrink-0" />
-          Procurement scope
-        </h2>
-        <div class="h-px flex-1 bg-linear-to-l from-primary/20 via-primary/40 to-transparent"></div>
-      </div>
-      <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-        Suppliers listed here are limited to
-        <span class="font-medium text-foreground">casing procurement</span>
-        for Ecomile. Use search to filter by name; open a row to edit full supplier details.
-      </p>
-    </section>
-
-    <section class="space-y-3" aria-labelledby="ecoproc-vendors-directory-heading">
-      <div class="flex items-center gap-2">
-        <div class="h-px flex-1 bg-linear-to-r from-primary/20 via-primary/40 to-transparent"></div>
-        <h2 id="ecoproc-vendors-directory-heading" class="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-2">
-          <Icon name="users" class="size-3.5 shrink-0" />
-          Supplier directory
-        </h2>
-        <div class="h-px flex-1 bg-linear-to-l from-primary/20 via-primary/40 to-transparent"></div>
-      </div>
-      <p class="text-xs text-muted-foreground sm:text-sm">
-        Switch between grid and table using the toolbar above. Balances reflect the current ledger total.
-      </p>
-    </section>
-  </div>
-{/snippet}
-
 <MasterList
   title="Suppliers"
   description="Manage Casing Procurement Vendors"
@@ -193,8 +159,7 @@
   bind:viewMode
   searchPlaceholder="Search by supplier name…"
   onRefresh={reload}
-  onLoadMore={loadMore}
-  {beforeList}
+  onLoadMore={loadMore}  
 >
   {#snippet actions()}
     <Button

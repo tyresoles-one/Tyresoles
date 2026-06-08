@@ -461,37 +461,71 @@ ORDER BY Header.[No_], (Line.[Line No_]/100)";
                 }
                 catch (Exception ex)
                 {
-                    Interlocked.Increment(ref errors);                    
-                    ErrorDetail errorDetail = new ErrorDetail();
-                    if (ex.Message.Contains("ErrorCode"))
-                        errorDetail = JsonSerializer.Deserialize<ErrorDetail>(ex.Message);                      
-                    
-                    
+                    Interlocked.Increment(ref errors);
+                    string errCode = "RECOVERY-ERR";
+                    string errMsg = ex.Message;
+
+                    if (ex is Tyresoles.Protean.EInvoiceException einvEx && !string.IsNullOrWhiteSpace(einvEx.ErrorCode))
+                    {
+                        errCode = einvEx.ErrorCode;
+                        errMsg = einvEx.ErrorMessageText;
+                    }
+                    else if (ex.Message.Contains("\"ErrorCode\""))
+                    {
+                        try
+                        {
+                            var errorDetail = JsonSerializer.Deserialize<ErrorDetail>(ex.Message);
+                            if (errorDetail != null)
+                            {
+                                errCode = !string.IsNullOrWhiteSpace(errorDetail.ErrorCode) ? errorDetail.ErrorCode : "RECOVERY-ERR";
+                                errMsg = !string.IsNullOrWhiteSpace(errorDetail.ErrorMessage) ? errorDetail.ErrorMessage : ex.Message;
+                            }
+                        }
+                        catch { }
+                    }
+
                     await _connector.InsertGstApiLogAsync(new Tyresoles.Data.Features.Common.GSTApiLog
                     {
                         DocumentType = candidate.DocumentType,
                         DocumentNo = candidate.DocumentNo,
                         Source = "GST-EINV",
-                        ErrorCode = errorDetail != null && !errorDetail.ErrorCode.IsWhiteSpace() ? errorDetail.ErrorCode : "RECOVERY-ERR",
-                        ErrorMessage = errorDetail != null && !errorDetail.ErrorMessage.IsWhiteSpace() ? errorDetail.ErrorMessage : ex.Message
+                        ErrorCode = errCode,
+                        ErrorMessage = errMsg
                     }).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
             {
                 Interlocked.Increment(ref errors);
+                string errCode = "RECOVERY-ERR";
+                string errMsg = ex.Message;
 
-                ErrorDetail errorDetail = new ErrorDetail();
-                if (ex.Message.Contains("ErrorCode"))
-                    errorDetail = JsonSerializer.Deserialize<ErrorDetail>(ex.Message);
+                if (ex is Tyresoles.Protean.EInvoiceException einvEx && !string.IsNullOrWhiteSpace(einvEx.ErrorCode))
+                {
+                    errCode = einvEx.ErrorCode;
+                    errMsg = einvEx.ErrorMessageText;
+                }
+                else if (ex.Message.Contains("\"ErrorCode\""))
+                {
+                    try
+                    {
+                        var errorDetail = JsonSerializer.Deserialize<ErrorDetail>(ex.Message);
+                        if (errorDetail != null)
+                        {
+                            errCode = !string.IsNullOrWhiteSpace(errorDetail.ErrorCode) ? errorDetail.ErrorCode : "RECOVERY-ERR";
+                            errMsg = !string.IsNullOrWhiteSpace(errorDetail.ErrorMessage) ? errorDetail.ErrorMessage : ex.Message;
+                        }
+                    }
+                    catch { }
+                }
 
                 await _connector.InsertGstApiLogAsync(new Tyresoles.Data.Features.Common.GSTApiLog
                 {
                     DocumentType = candidate.DocumentType,
                     DocumentNo = candidate.DocumentNo,
                     Source = "GST-EINV",
-                    ErrorCode = errorDetail != null && !errorDetail.ErrorCode.IsWhiteSpace() ? errorDetail.ErrorCode : "RECOVERY-ERR",
-                    ErrorMessage = errorDetail != null && !errorDetail.ErrorMessage.IsWhiteSpace() ? errorDetail.ErrorMessage : ex.Message
+                    ErrorCode = errCode,
+                    ErrorMessage = errMsg
                 }).ConfigureAwait(false);
             }
         });

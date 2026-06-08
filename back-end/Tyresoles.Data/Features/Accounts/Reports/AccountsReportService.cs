@@ -202,7 +202,7 @@ public sealed class AccountsReportService : IAccountsReportService
             "GST Report 04" => ("ReportGST04", await GetReportGST04Async(scope, p, ct).ConfigureAwait(false)),
             "GST Report 05" => ("ReportGST05", await GetReportGST05Async(scope, p, ct).ConfigureAwait(false)),
             "GST Report 06" => ("ReportGST06", await GetReportGST06Async(scope, p, ct).ConfigureAwait(false)),
-            "E Invoice Errors" => ("ReportEInvoiceErrors", await GetReportEInvoiceErrorsAsync(scope, p, ct).ConfigureAwait(false)),
+            "E Invoice Errors" => ("EInvoiceErrors", await GetReportEInvoiceErrorsAsync(scope, p, ct).ConfigureAwait(false)),
             _ => ("", null)
         };
         return (result.rdlc, result.data, null);
@@ -536,6 +536,14 @@ ORDER BY Header.[No_]";
     {
         var logT = scope.GetQualifiedTableName("GST Api Log", false);
         
+        var fromDateStr = p.From ?? DateTime.Now.AddMonths(-1).ToString("yyyy-MM-01");
+        var toDateStr = p.To ?? DateTime.Now.ToString("yyyy-MM-dd");
+
+        if (!DateTime.TryParse(fromDateStr, out var fromDate)) fromDate = DateTime.Now.AddMonths(-1);
+        if (!DateTime.TryParse(toDateStr, out var toDate)) toDate = DateTime.Now;
+
+        var periodText = $"Period : {fromDate:dd-MMM-yy} .. {toDate:dd-MMM-yy}";
+
         var sql = $@"
 SELECT IIF([Document Type] = 1, 'Invoice', 'Cred Memo') as DocType,
     [Document No_] as DocumentNo,
@@ -543,14 +551,15 @@ SELECT IIF([Document Type] = 1, 'Invoice', 'Cred Memo') as DocType,
     [Resp_ Center] as RespCenter,
     FORMAT([Date], 'dd-MMM-yy') as [Date],
     'E Invoice Errors' as ReportName,
-    'Period : ' + @from + ' .. ' + @to as PeriodText
+    @periodText as PeriodText
 FROM {logT}
-WHERE [Date] BETWEEN @from AND @to";
+WHERE [Date] BETWEEN @from AND @to and [Source] not in ('GST-EWB')";
 
         var parameters = new Dictionary<string, object?>
         {
-            ["from"] = p.From ?? DateTime.Now.AddMonths(-1).ToString("yyyy-MM-01"),
-            ["to"] = p.To ?? DateTime.Now.ToString("yyyy-MM-dd")
+            ["from"] = fromDateStr,
+            ["to"] = toDateStr,
+            ["periodText"] = periodText
         };
 
         var results = await scope.RawQueryToArrayAsync<EInvoiceErrors>(sql, parameters, ct).ConfigureAwait(false);

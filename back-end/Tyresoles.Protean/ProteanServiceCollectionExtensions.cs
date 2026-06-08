@@ -8,6 +8,9 @@ using Polly;
 using Polly.Extensions.Http;
 using System;
 using System.Net.Http;
+using Microsoft.Extensions.Hosting;
+using Tyresoles.Logger.Configuration;
+using Tyresoles.Logger.Core;
 
 namespace Tyresoles.Protean;
 
@@ -46,6 +49,19 @@ public static class ProteanServiceCollectionExtensions
 
         // Session management (scoped per-request)
         services.TryAddScoped<IProteanSessionService, ProteanSessionService>();
+
+        // EInvoice Payload Custom Logger Setup
+        var traceConfig = new LogConfig 
+        {
+            LogDirectory = "logs/einvoice_traces",
+            FilePrefix = "payload",
+            Format = LogFormat.Text,
+            MinLevel = Microsoft.Extensions.Logging.LogLevel.Information,
+            MaxRetentionDays = 30
+        };
+        var traceProcessor = new LogProcessor(traceConfig);
+        services.AddSingleton<IHostedService>(traceProcessor);
+        services.AddSingleton(new TyresolesLogger("EInvoiceTrace", traceProcessor, traceConfig));
 
         // Business services
         services.TryAddScoped<IEInvoiceService, EInvoiceService>();

@@ -40,6 +40,7 @@ public class CasingItem
     public string MaxRate { get; set; } = "";
     public string Category { get; set; } = "";
     public string Name { get; set; } = "";
+    public bool IsActive { get; set; } = false;
 }
 
 public class CodeName

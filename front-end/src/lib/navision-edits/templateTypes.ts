@@ -59,7 +59,7 @@ export interface NavEditLookupFilterCondition {
 }
 
 /** NAV WebServe Req* when admin marks a request processed (server-side). */
-export type NavEditConnectorProcess = 'none' | 'reqCustEdit' | 'reqUserSetup' | 'reqGlEntry';
+export type NavEditConnectorProcess = 'none' | 'reqCustEdit' | 'reqUserSetup' | 'reqGlEntry' | 'reqItem' | 'reqMonthlySaleClose' | 'reqItemBOM';
 
 /** One logical Req* parameter key mapped to a Nav column name in `connectorParamColumns` (server: ResolveConnectorParam). */
 export interface NavEditConnectorParamRow {
@@ -95,6 +95,27 @@ export const CONNECTOR_PARAM_ROWS: Record<
     { key: 'amount', label: 'Amount' },
     { key: 'postingDate', label: 'Posting date' },
   ],
+  reqItem: [
+    { key: 'no', label: 'Item No.' },
+    { key: 'description', label: 'Description' },
+    { key: 'uom', label: 'Base Unit of Measure' },
+    { key: 'itemCategory', label: 'Item Category Code' },
+    { key: 'prodGroup', label: 'Product Group Code' },
+    { key: 'genprodpostGroup', label: 'Gen. Prod. Posting Group' },
+    { key: 'gstGroup', label: 'GST Group Code' },
+    { key: 'hsn', label: 'HSN/SAC Code' },
+    { key: 'inventpostGroup', label: 'Inventory Posting Group' }
+  ],
+  reqMonthlySaleClose: [
+    { key: 'respCenterCode', label: 'Responsibility Center' },
+    { key: 'date', label: 'Date' }
+  ],
+  reqItemBOM: [
+    { key: 'parentItemNo', label: 'Parent Item No.' },
+    { key: 'itemNo', label: 'Component Item No.' },
+    { key: 'variantCode', label: 'Variant Code' },
+    { key: 'qty', label: 'Quantity per' }
+  ]
 };
 
 export interface NavEditFieldsTemplate {
@@ -234,7 +255,7 @@ function normalizeTemplate(o: Record<string, unknown>): NavEditFieldsTemplate {
 
   const cpRaw = o.connectorProcess;
   const connectorProcess: NavEditConnectorProcess =
-    cpRaw === 'reqCustEdit' || cpRaw === 'reqUserSetup' || cpRaw === 'reqGlEntry' ? cpRaw : 'none';
+    cpRaw === 'reqCustEdit' || cpRaw === 'reqUserSetup' || cpRaw === 'reqGlEntry' || cpRaw === 'reqItem' || cpRaw === 'reqMonthlySaleClose' || cpRaw === 'reqItemBOM' ? cpRaw : 'none';
 
   let connectorParamColumns: Record<string, string> = {};
   if (o.connectorParamColumns != null && typeof o.connectorParamColumns === 'object' && !Array.isArray(o.connectorParamColumns)) {

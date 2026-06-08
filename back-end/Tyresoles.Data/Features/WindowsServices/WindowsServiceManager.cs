@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ServiceProcess;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,10 +8,11 @@ namespace Tyresoles.Data.Features.WindowsServices;
 public sealed class WindowsServiceManager : IWindowsServiceManager
 {
     private const int PollIntervalMs = 500;
-    private const int MaxPollAttempts = 12;
+    private const int MaxPollAttempts = 120; // 60 seconds total
 
     private readonly WindowsServiceOptions _options;
     private readonly ILogger<WindowsServiceManager> _logger;
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _serviceLocks = new(StringComparer.OrdinalIgnoreCase);
 
     public WindowsServiceManager(
         IOptions<WindowsServiceOptions> options,
@@ -49,31 +51,40 @@ public sealed class WindowsServiceManager : IWindowsServiceManager
         if (!entry.CanStart)
             throw new WindowsServiceNotAllowedException($"Starting service '{entry.Name}' is not permitted.");
 
-        _logger.LogInformation("Starting Windows service {ServiceName}", entry.Name);
-
-        await Task.Run(() =>
+        var serviceLock = _serviceLocks.GetOrAdd(entry.Name, _ => new SemaphoreSlim(1, 1));
+        await serviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            using var controller = CreateController(entry.Name);
-            if (controller.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending)
-                return;
+            _logger.LogInformation("Starting Windows service {ServiceName}", entry.Name);
 
-            try
+            await Task.Run(() =>
             {
-                controller.Start();
-            }
-            catch (InvalidOperationException ex)
-            {
-                controller.Refresh();
+                using var controller = CreateController(entry.Name);
                 if (controller.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending)
                     return;
 
-                throw new WindowsServiceOperationException(
-                    $"Failed to start service '{entry.Name}': {ex.Message}");
-            }
-        }, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    controller.Start();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    controller.Refresh();
+                    if (controller.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending)
+                        return;
 
-        return await PollForStateAsync(entry, ServiceControllerStatus.Running, cancellationToken)
-            .ConfigureAwait(false);
+                    throw new WindowsServiceOperationException(
+                        $"Failed to start service '{entry.Name}': {ex.Message}");
+                }
+            }, cancellationToken).ConfigureAwait(false);
+
+            return await PollForStateAsync(entry, ServiceControllerStatus.Running, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            serviceLock.Release();
+        }
     }
 
     public async Task<WindowsServiceStatusDto> StopAsync(string serviceName, CancellationToken cancellationToken = default)
@@ -83,31 +94,40 @@ public sealed class WindowsServiceManager : IWindowsServiceManager
         if (!entry.CanStop)
             throw new WindowsServiceNotAllowedException($"Stopping service '{entry.Name}' is not permitted.");
 
-        _logger.LogInformation("Stopping Windows service {ServiceName}", entry.Name);
-
-        await Task.Run(() =>
+        var serviceLock = _serviceLocks.GetOrAdd(entry.Name, _ => new SemaphoreSlim(1, 1));
+        await serviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            using var controller = CreateController(entry.Name);
-            if (controller.Status is ServiceControllerStatus.Stopped or ServiceControllerStatus.StopPending)
-                return;
+            _logger.LogInformation("Stopping Windows service {ServiceName}", entry.Name);
 
-            try
+            await Task.Run(() =>
             {
-                controller.Stop();
-            }
-            catch (InvalidOperationException ex)
-            {
-                controller.Refresh();
+                using var controller = CreateController(entry.Name);
                 if (controller.Status is ServiceControllerStatus.Stopped or ServiceControllerStatus.StopPending)
                     return;
 
-                throw new WindowsServiceOperationException(
-                    $"Failed to stop service '{entry.Name}': {ex.Message}");
-            }
-        }, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    controller.Stop();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    controller.Refresh();
+                    if (controller.Status is ServiceControllerStatus.Stopped or ServiceControllerStatus.StopPending)
+                        return;
 
-        return await PollForStateAsync(entry, ServiceControllerStatus.Stopped, cancellationToken)
-            .ConfigureAwait(false);
+                    throw new WindowsServiceOperationException(
+                        $"Failed to stop service '{entry.Name}': {ex.Message}");
+                }
+            }, cancellationToken).ConfigureAwait(false);
+
+            return await PollForStateAsync(entry, ServiceControllerStatus.Stopped, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            serviceLock.Release();
+        }
     }
 
     public async Task<WindowsServiceStatusDto> RestartAsync(string serviceName, CancellationToken cancellationToken = default)

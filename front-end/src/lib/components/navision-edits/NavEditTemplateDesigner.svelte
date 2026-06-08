@@ -22,6 +22,9 @@
     { value: "reqCustEdit", label: "ReqCustEdit (customer, dealer, area)" },
     { value: "reqUserSetup", label: "ReqUserSetup (user, RC, date range)" },
     { value: "reqGlEntry", label: "ReqGLEntry (entry, G/L, amount, …)" },
+    { value: "reqItem", label: "ReqItem (item details, GST, …)" },
+    { value: "reqMonthlySaleClose", label: "ReqMonthlySaleClose (resp center, date)" },
+    { value: "reqItemBOM", label: "ReqItemBOM (parent item, component, qty)" },
   ];
 
   const DISPLAY_FORMAT_OPTIONS: { value: NavEditDisplayColumnFormat; label: string }[] = [
@@ -132,7 +135,7 @@
   /** Legacy templates without connector fields. */
   $effect(() => {
     const cp = model.connectorProcess;
-    if (cp !== "none" && cp !== "reqCustEdit" && cp !== "reqUserSetup" && cp !== "reqGlEntry") {
+    if (cp !== "none" && cp !== "reqCustEdit" && cp !== "reqUserSetup" && cp !== "reqGlEntry" && cp !== "reqItem" && cp !== "reqMonthlySaleClose" && cp !== "reqItemBOM") {
       patchModel((m) => {
         m.connectorProcess = "none";
       });

@@ -45,6 +45,7 @@ public sealed class ProductionReportService : IProductionReportService
         "Claim Analysis",
         "Casing Average Cost",
         "Claim Ratios",
+        "Claim Pending Settlements"
     };
 
     // Aligns with legacy ProductionReportData and RDLC requirements.
@@ -64,7 +65,8 @@ public sealed class ProductionReportService : IProductionReportService
         new() { Id = 12, Name = "Ecomile Inv. Sales Stat.", ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "dateRange" },
         new() { Id = 13, Name = "Claim Analysis", ShowType = true, ShowView = true, TypeOptions = new List<string> { "Claim Receipt", "Claim Sanctioned" }, ViewOptions = new List<string> { "Customers", "Dealers", "Fault Reasons", "Tread Patterns", "Casing Makes", "Prod. Agings" }, ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "dateRange" },
         new() { Id = 14, Name = "Casing Average Cost", ShowNos = true, ShowRespCenters = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields = "nos" },
-        new(){ Id = 15, Name="Claim Ratios", ShowView=true, ViewOptions= new List<string>{"Product wise","Pattern wise","Make wise","Submake wise","Dealer wise","Salesperson wise","Defect wise","Proc. Market wise" }, DatePreset="thisMonth, lastMonth",OutputFormats = "pdf,excel", RequiredFields = "dateRange,view,respCenters" }
+        new() { Id = 15, Name="Claim Ratios", ShowView=true, ViewOptions= new List<string>{"Product wise","Pattern wise","Make wise","Submake wise","Dealer wise","Salesperson wise","Defect wise","Proc. Market wise" }, DatePreset="thisMonth, lastMonth",OutputFormats = "pdf,excel", RequiredFields = "dateRange,view,respCenters" },
+        new() { Id = 16, Name="Claim Pending Settlements", DatePreset="thisMonth, lastMonth", OutputFormats = "pdf,excel", RequiredFields = "dateRange" }
     };
 
     public ProductionReportService(IReportRenderer reportRenderer)
@@ -220,6 +222,7 @@ public sealed class ProductionReportService : IProductionReportService
             "Claim Analysis" => ("ClaimAnalysis", await GetClaimAnalysisAsync(scope, p, ct).ConfigureAwait(false), null),
             "Casing Average Cost" => ("PostedDispatchAverageCost", await GetPostedDispatchAverageCostAsync(scope, p, ct).ConfigureAwait(false), null),
             "Claim Ratios" => ("ClaimRatios", await BuildClaimRatiosListAsync(scope, p, ct).ConfigureAwait(false), null),
+            "Claim Pending Settlements" => ("ClaimUnsettled", await GetClaimPendingSettlementsAsync(scope, p, ct).ConfigureAwait(false), null),
             _ => ("", null, null)
         };
     }
@@ -1854,6 +1857,54 @@ GROUP BY {groupTopic}";
             dt.Rows.Add(row);
         }
         return dt;
+    }
+
+    private async Task<object?> GetClaimPendingSettlementsAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    {
+        var headerT = scope.GetQualifiedTableName("Claim & Failure Posted", false);
+        var settleT = scope.GetQualifiedTableName("Claim & Failure Settlement", false);
+        var itemT = scope.GetQualifiedTableName("Item", false);
+
+        var dr = ResolveCasingPurchaseSqlAndDisplayRange(p);
+
+        var respCentersIn = p.RespCenters?.Count > 0 ? $" AND Posted.[Responsibility Center] IN ({string.Join(",", p.RespCenters.Select((_, i) => $"@rc{i}"))})" : "";
+
+        var sql = $@"
+SELECT 
+    Posted.[Responsibility Center] as [RespCenter], 
+    Posted.[No_] as [ClaimNo],
+    Item.[Alternative Item No_] as [Size], 
+    Posted.[Make] as [Make],
+    Posted.[Serial No_] as [SerialNo], 
+    Posted.[User ID] as [UserID]
+FROM {headerT} as Posted
+LEFT JOIN {itemT} as Item ON Item.[No_] = Posted.[Item No_]
+LEFT JOIN {settleT} as Settlement ON Settlement.[Document No_] = Posted.[No_]
+WHERE Posted.[Posting Date] >= @from AND Posted.[Posting Date] <= @to
+    AND Posted.[Type] = 0
+    AND Settlement.[Decision] IS NULL
+    {respCentersIn}";
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["from"] = dr.FromSql,
+            ["to"] = dr.ToSql
+        };
+        if (p.RespCenters?.Count > 0)
+        {
+            for (int i = 0; i < p.RespCenters.Count; i++) parameters[$"rc{i}"] = p.RespCenters[i];
+        }
+
+        var results = await scope.RawQueryToArrayAsync<ClaimUnsettledRow>(sql, parameters, ct).ConfigureAwait(false);
+        if (results != null)
+        {
+            foreach (var r in results)
+            {
+                r.Period = dr.DateRangeLabel;
+            }
+        }
+        
+        return ToDataTable(results ?? Array.Empty<ClaimUnsettledRow>());
     }
 
     #endregion

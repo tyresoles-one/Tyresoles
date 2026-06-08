@@ -861,7 +861,16 @@ public sealed class NavEditService : INavEditService
         if (string.Equals(p, NavEditConnectorProcess.ReqGlEntry, StringComparison.OrdinalIgnoreCase))
             return await ExecuteReqGlEntryAsync(template, request, changeMap, ct);
 
-        throw new InvalidOperationException($"Unknown connectorProcess \"{p}\". Use none, reqCustEdit, reqUserSetup, or reqGlEntry.");
+        if (string.Equals(p, NavEditConnectorProcess.ReqItem, StringComparison.OrdinalIgnoreCase))
+            return await ExecuteReqItemAsync(template, request, changeMap, ct);
+
+        if (string.Equals(p, NavEditConnectorProcess.ReqMonthlySaleClose, StringComparison.OrdinalIgnoreCase))
+            return await ExecuteReqMonthlySaleCloseAsync(template, request, changeMap, ct);
+
+        if (string.Equals(p, NavEditConnectorProcess.ReqItemBOM, StringComparison.OrdinalIgnoreCase))
+            return await ExecuteReqItemBOMAsync(template, request, changeMap, ct);
+
+        throw new InvalidOperationException($"Unknown connectorProcess \"{p}\". Use none, reqCustEdit, reqUserSetup, reqGlEntry, reqItem, reqMonthlySaleClose, or reqItemBOM.");
     }
 
     private async Task<bool> ExecuteReqCustEditAsync(
@@ -1186,6 +1195,68 @@ public sealed class NavEditService : INavEditService
 
         ct.ThrowIfCancellationRequested();
         return await _connector.ReqGLEntryAsync(entryNo, glAccountNo, respCenter, amount, postingDate);
+    }
+
+    private async Task<bool> ExecuteReqItemAsync(
+        FieldsTemplate template,
+        NavEditRequest request,
+        IReadOnlyDictionary<string, string> changeMap,
+        CancellationToken ct)
+    {
+        var no = ResolveConnectorParam(template, changeMap, "no", "No_")?.Trim() ?? request.RecordKey?.Trim();
+        if (string.IsNullOrWhiteSpace(no))
+            throw new InvalidOperationException("ReqItem: missing item number (record key or mapped column).");
+
+        var description = ResolveConnectorParam(template, changeMap, "description", "Description")?.Trim() ?? "";
+        var uom = ResolveConnectorParam(template, changeMap, "uom", "Base Unit of Measure")?.Trim() ?? "";
+        var itemCategory = ResolveConnectorParam(template, changeMap, "itemCategory", "Item Category Code")?.Trim() ?? "";
+        var prodGroup = ResolveConnectorParam(template, changeMap, "prodGroup", "Product Group Code")?.Trim() ?? "";
+        var genprodpostGroup = ResolveConnectorParam(template, changeMap, "genprodpostGroup", "Gen_ Prod_ Posting Group")?.Trim() ?? "";
+        var gstGroup = ResolveConnectorParam(template, changeMap, "gstGroup", "GST Group Code")?.Trim() ?? "";
+        var hsn = ResolveConnectorParam(template, changeMap, "hsn", "HSN_SAC Code")?.Trim() ?? "";
+        var inventpostGroup = ResolveConnectorParam(template, changeMap, "inventpostGroup", "Inventory Posting Group")?.Trim() ?? "";
+
+        ct.ThrowIfCancellationRequested();
+        return await _connector.ReqItemAsync(no, description, uom, itemCategory, prodGroup, genprodpostGroup, gstGroup, hsn, inventpostGroup);
+    }
+
+    private async Task<bool> ExecuteReqMonthlySaleCloseAsync(
+        FieldsTemplate template,
+        NavEditRequest request,
+        IReadOnlyDictionary<string, string> changeMap,
+        CancellationToken ct)
+    {
+        var respCenterCode = ResolveConnectorParam(template, changeMap, "respCenterCode", "Code")?.Trim() ?? request.RecordKey?.Trim();
+        if (string.IsNullOrWhiteSpace(respCenterCode))
+            throw new InvalidOperationException("ReqMonthlySaleClose: missing responsibility center code (record key or mapped column).");
+
+        var dateStr = ResolveConnectorParam(template, changeMap, "date", "Date");
+        if (string.IsNullOrWhiteSpace(dateStr) || !TryParseNavDate(dateStr, out var date))
+            throw new InvalidOperationException("ReqMonthlySaleClose: missing or invalid date.");
+
+        ct.ThrowIfCancellationRequested();
+        return await _connector.ReqMonthlySaleCloseAsync(respCenterCode, date);
+    }
+
+    private async Task<bool> ExecuteReqItemBOMAsync(
+        FieldsTemplate template,
+        NavEditRequest request,
+        IReadOnlyDictionary<string, string> changeMap,
+        CancellationToken ct)
+    {
+        var parentItemNo = ResolveConnectorParam(template, changeMap, "parentItemNo", "Parent Item No_")?.Trim() ?? request.RecordKey?.Trim();
+        if (string.IsNullOrWhiteSpace(parentItemNo))
+            throw new InvalidOperationException("ReqItemBOM: missing parent item number (record key or mapped column).");
+
+        var itemNo = ResolveConnectorParam(template, changeMap, "itemNo", "No_")?.Trim() ?? "";
+        var variantCode = ResolveConnectorParam(template, changeMap, "variantCode", "Variant Code")?.Trim() ?? "";
+        
+        var qtyStr = ResolveConnectorParam(template, changeMap, "qty", "Quantity per");
+        if (string.IsNullOrWhiteSpace(qtyStr) || !decimal.TryParse(qtyStr.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var qty))
+            qty = 0;
+
+        ct.ThrowIfCancellationRequested();
+        return await _connector.ReqItemBOMAsync(parentItemNo, itemNo, variantCode, qty);
     }
 
     private static bool TryParseNavDate(string? s, out DateTime dt)
@@ -1781,6 +1852,9 @@ internal static class NavEditConnectorProcess
     public const string ReqCustEdit = "reqCustEdit";
     public const string ReqUserSetup = "reqUserSetup";
     public const string ReqGlEntry = "reqGlEntry";
+    public const string ReqItem = "reqItem";
+    public const string ReqMonthlySaleClose = "reqMonthlySaleClose";
+    public const string ReqItemBOM = "reqItemBOM";
 }
 
 internal class FieldsTemplate

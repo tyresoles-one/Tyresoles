@@ -312,3 +312,15 @@ public sealed class ClaimAnalysisRecordRow
     public string Type { get; set; } = "";
     public int Figure { get; set; }
 }
+
+/// <summary>Claim Pending Settlements report row.</summary>
+public sealed class ClaimUnsettledRow
+{
+    public string Period { get; set; } = "";
+    public string Size { get; set; } = "";
+    public string Make { get; set; } = "";
+    public string SerialNo { get; set; } = "";
+    public string ClaimNo { get; set; } = "";
+    public string RespCenter { get; set; } = "";
+    public string UserID { get; set; } = "";
+}

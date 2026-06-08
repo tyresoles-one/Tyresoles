@@ -1144,8 +1144,7 @@ public class Query
 
     /// <summary>Get casing items. Ported from Db.Production.ItemNos.</summary>
     [Authorize]
-    public async Task<List<CasingItem>> GetProductionItemNos(
-        ProductionFetchParams param,
+    public async Task<List<CasingItem>> GetCasingItems(        
         [Service] IDataverseDataService dataService,
         [Service] IProductionService productionService,
         [Service] IHttpContextAccessor httpContextAccessor,
@@ -1153,7 +1152,7 @@ public class Query
     {
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
-        return await productionService.GetItemNosAsync(scope, param, cancellationToken);
+        return await productionService.GetCasingsAsync(scope);
     }
 
 
@@ -1475,7 +1474,7 @@ public class Query
     {
         var dict = authValues?.ToDictionary(kv => kv.Key, kv => kv.Value ?? "");
         var rows = await navEditService.LookupRecordsAsync(requestTypeId, search, take ?? 20, dict, cancellationToken);
-        return rows.Select(r => r.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value?.ToString() }).ToList()).ToList();
+        return rows.Select(r => r.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value is DateTime dt ? dt.ToString("s") : kv.Value?.ToString() }).ToList()).ToList();
     }
 
     /// <summary>Fetch a single Nav record by its primary key.</summary>
@@ -1488,7 +1487,7 @@ public class Query
         CancellationToken cancellationToken = default)
     {
         var row = await navEditService.GetRecordByKeyAsync(requestTypeId, recordKey, cancellationToken);
-        return row?.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value?.ToString() }).ToList();
+        return row?.Select(kv => new Tyresoles.Data.Features.NavisionEdits.KeyValueItem { Key = kv.Key, Value = kv.Value is DateTime dt ? dt.ToString("s") : kv.Value?.ToString() }).ToList();
     }
 
     /// <summary>Get my edit requests (for current user).</summary>

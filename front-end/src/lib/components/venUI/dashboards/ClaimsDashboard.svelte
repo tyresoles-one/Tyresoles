@@ -197,13 +197,13 @@
     const specialCase = list.reduce((a, r) => a + (r.specialCase ?? 0), 0);
     
     let baseValue = sold;
-    if (currentView === "Defect" || currentView === "Pattern") baseValue = totalClaims;
+    if (currentView === "Defect") baseValue = totalClaims;
     else if (currentView === "Procurement") baseValue = purchase;
 
     const claimPercent = baseValue > 0 ? (claims * 100) / baseValue : 0;
     
     let passBaseValue = baseValue;
-    if (currentView === "Defect" || currentView === "Pattern") {
+    if (currentView === "Defect") {
       passBaseValue = totalPass;
     }
     const passPercent = passBaseValue > 0 ? (pass * 100) / passBaseValue : 0;

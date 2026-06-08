@@ -141,6 +141,11 @@ public sealed class SalesReportService : ISalesReportService
                 var (sql, prms) = BuildInClause("[No_]", "no", p.Nos);
                 query = query.Where(sql, prms);
             }
+            if (!string.IsNullOrWhiteSpace(p.Search))
+            {
+                var search = $"%{p.Search}%";
+                query = query.Where("([No_] LIKE @search OR [Name] LIKE @search)", new { search });
+            }
             if (p.RespCenters?.Count > 0)
             {
                 var (sql, prms) = BuildInClause("[Responsibility Center]", "rc", p.RespCenters);
@@ -191,6 +196,11 @@ public sealed class SalesReportService : ISalesReportService
             {
                 var (sql, prms) = BuildInClause("[No_]", "no", p.Nos);
                 query = query.Where(sql, prms);
+            }
+            if (!string.IsNullOrWhiteSpace(p.Search))
+            {
+                var search = $"%{p.Search}%";
+                query = query.Where("([No_] LIKE @search OR [Sell-to Customer Name] LIKE @search)", new { search });
             }
             if (p.RespCenters?.Count > 0)
             {
@@ -275,6 +285,11 @@ public sealed class SalesReportService : ISalesReportService
             {
                 var (sql, prms) = BuildInClause("[No_]", "no", p.Nos);
                 query = query.Where(sql, prms);
+            }
+            if (!string.IsNullOrWhiteSpace(p.Search))
+            {
+                var search = $"%{p.Search}%";
+                query = query.Where("([No_] LIKE @search OR [Sell-to Customer Name] LIKE @search)", new { search });
             }
             if (p.RespCenters?.Count > 0)
             {
@@ -1309,6 +1324,8 @@ public sealed class SalesReportService : ISalesReportService
                 where.Add("Cust.[No_] = @userCode");
             else if (string.Equals(entityType, "Partner", StringComparison.OrdinalIgnoreCase))
                 where.Add("Cust.[Dealer Code] = @userCode");
+            else if (string.Equals(entityType, "PartnerGroup", StringComparison.OrdinalIgnoreCase))
+                where.Add($"Cust.[Dealer Code] IN (SELECT [Code] FROM {dealerT} Where [Group] = @userCode)");
             else if (string.Equals(entityType, "Employee", StringComparison.OrdinalIgnoreCase) && string.Equals(p.EntityDepartment, "Sales", StringComparison.OrdinalIgnoreCase))
                 where.Add($"Cust.[Area Code] IN (SELECT A.[Code] FROM {areaT} A JOIN {teamsT} T ON A.[Team]=T.[Team Code] WHERE T.[Code] = @userCode)");
         }
@@ -2378,6 +2395,7 @@ LEFT JOIN (
         string ledgerT = scope.GetQualifiedTableName("Cust_ Ledger Entry", isShared: false);
         string detailedLedgerT = scope.GetQualifiedTableName("Detailed Cust_ Ledg_ Entry", isShared: false);
         string custT = scope.GetQualifiedTableName("Customer", isShared: false);
+        string dealerT = scope.GetQualifiedTableName("Salesperson_Purchaser", false);
         string invT = scope.GetQualifiedTableName("Sales Invoice Header", isShared: false);
         string crnT = scope.GetQualifiedTableName("Sales Cr_Memo Header", isShared: false);
         string areaT = scope.GetQualifiedTableName("Area", isShared: false);
@@ -2421,6 +2439,8 @@ LEFT JOIN (
                 where.Add("Customer.[No_] = @userCode");
             else if (string.Equals(entityType, "Partner", StringComparison.OrdinalIgnoreCase))
                 where.Add("Customer.[Dealer Code] = @userCode");
+            else if (string.Equals(entityType, "PartnerGroup", StringComparison.OrdinalIgnoreCase))
+                where.Add($"Customer.[Dealer Code] in (SELECT [Code] FROM {dealerT} WHERE [Group] = @userCode)");
             else if (string.Equals(entityType, "Employee", StringComparison.OrdinalIgnoreCase) && string.Equals(p.EntityDepartment, "Sales", StringComparison.OrdinalIgnoreCase))
                 where.Add($"Customer.[Area Code] IN (SELECT A.[Code] FROM {areaT} A JOIN {teamsT} T ON A.[Team]=T.[Team Code] WHERE T.[Code] = @userCode)");
         }

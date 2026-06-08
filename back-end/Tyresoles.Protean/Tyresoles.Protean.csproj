@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tyresoles.Sql\Tyresoles.Sql.csproj" />
+    <ProjectReference Include="..\Tyresoles.Logger\Tyresoles.Logger.csproj" />
   </ItemGroup>
 
 </Project>

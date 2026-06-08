@@ -226,7 +226,8 @@ public sealed class SalesService : ISalesService
             DateOfAniversary = new DateTime(1753, 1, 1).Date,
             DealershipExpDate = new DateTime(1753, 1, 1).Date,
             DealershipStartDate = new DateTime(1753, 1, 1).Date,
-            ResponsibilityCenter = TruncateNavField(customer.ResponsibilityCenter, NavRespCenterMax)
+            ResponsibilityCenter = customer.ResponsibilityCenter,
+            //ResponsibilityCenter = TruncateNavField(customer.ResponsibilityCenter, NavRespCenterMax)
         };
 
         using var tx = await scope.BeginTransactionAsync(ct).ConfigureAwait(false);

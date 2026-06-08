@@ -57,7 +57,28 @@ WHERE [Category] IN (SELECT [Code] FROM {catT} WHERE [Type] = 9 {(param.RespCent
             return result.ToList();
         }
     }
+    public async Task<List<CasingItem>> GetCasingsAsync (ITenantScope scope)
+    {
+        var casingItemSql = $@"select [No_] as Code from [Tyresoles (India) Pvt_ Ltd_$Item] where [Item Category Code] = 'CASING'";
+        var casingBgmSql = $@"select Code, [Value] as MinRate, [Extra Value] as MaxRate, Category from [Tyresoles (India) Pvt_ Ltd_$Group Details] where Category = 'BCASING'";
 
+        var casings = (await scope.QueryAsync<CasingItem>(casingItemSql, null)).ToList();
+        var bgmCasings = await scope.QueryAsync<CasingItem>(casingBgmSql, null);
+
+        foreach (var casing in casings)
+        {
+            var bgm = bgmCasings.FirstOrDefault(b => b.Code == casing.Code);
+            if (bgm != null)
+            {
+                casing.MinRate = bgm.MinRate;
+                casing.MaxRate = bgm.MaxRate;
+                casing.Category = bgm.Category;
+                casing.IsActive = true;
+            }
+        }
+
+        return casings;
+    }
     public async Task UpdateCasingAsync(ITenantScope scope, FetchParams param, CancellationToken ct = default)
     {
         if (param.Nos.Any() && param.RespCenters.Any())
@@ -94,6 +115,38 @@ WHERE [Category] IN (SELECT [Code] FROM {catT} WHERE [Type] = 9 {(param.RespCent
         {
             var insertSql = $@"INSERT INTO {detailT} ([Code], [Category], [Name], [Value], [Extra Value]) VALUES (@Code, @Category, @Name, @Value, @ExtraValue)";
             await scope.ExecuteNonQueryAsync(insertSql, new { Code = item.Code, Category = item.Category, Name = item.Code, Value = item.MinRate, ExtraValue = item.MaxRate }, ct);
+        }
+    }
+
+    public async Task UpdateCasingItemsAsync(ITenantScope scope, List<CasingItem> casingItems, CancellationToken ct = default)
+    {
+        if (casingItems == null || !casingItems.Any()) return;
+
+        var detailT = scope.GetQualifiedTableName("Group Details", false);
+
+        foreach (var item in casingItems)
+        {
+            if (item.IsActive)
+            {
+                var checkSql = $@"SELECT COUNT(1) FROM {detailT} WHERE [Code] = @Code AND [Category] = @Category";
+                var count = await scope.ExecuteScalarAsync<int>(checkSql, new { Code = item.Code, Category = item.Category }, ct);
+                
+                if (count > 0)
+                {
+                    var updateSql = $@"UPDATE {detailT} SET [Name] = @Name, [Value] = @Value, [Extra Value] = @ExtraValue WHERE [Code] = @Code AND [Category] = @Category";
+                    await scope.ExecuteNonQueryAsync(updateSql, new { Code = item.Code, Category = item.Category, Name = item.Name ?? item.Code, Value = item.MinRate, ExtraValue = item.MaxRate }, ct);
+                }
+                else
+                {
+                    var insertSql = $@"INSERT INTO {detailT} ([Code], [Category], [Name], [Value], [Extra Value]) VALUES (@Code, @Category, @Name, @Value, @ExtraValue)";
+                    await scope.ExecuteNonQueryAsync(insertSql, new { Code = item.Code, Category = item.Category, Name = item.Name ?? item.Code, Value = item.MinRate, ExtraValue = item.MaxRate }, ct);
+                }
+            }
+            else
+            {
+                var deleteSql = $@"DELETE FROM {detailT} WHERE [Code] = @Code AND [Category] = @Category";
+                await scope.ExecuteNonQueryAsync(deleteSql, new { Code = item.Code, Category = item.Category }, ct);
+            }
         }
     }
 

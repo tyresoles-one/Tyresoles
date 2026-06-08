@@ -6809,7 +6809,7 @@ export type GetMyBalanceQueryVariables = Exact<{
 }>;
 
 
-export type GetMyBalanceQuery = { __typename: 'Query', myBalance: Array<{ __typename: 'EntityBalance', code: string, balance: unknown }> };
+export type GetMyBalanceQuery = { __typename: 'Query', myBalance: Array<{ __typename: 'EntityBalance', code: string, balance: unknown, product: string }> };
 
 export type GetMyAreasQueryVariables = Exact<{
   entityType?: InputMaybe<Scalars['String']['input']>;
@@ -7820,6 +7820,7 @@ export const GetMyBalanceDocument = gql`
   ) {
     code
     balance
+    product
   }
 }
     `;

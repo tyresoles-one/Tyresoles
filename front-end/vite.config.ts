@@ -9,8 +9,8 @@ export default defineConfig(({ mode }) => {
 	const watchPolling = env.VITE_DEV_WATCH_POLLING === '1';
 
 	/**
-	 * Ignore Capacitor / Gradle / Xcode output so native builds do not trigger Vite reloads
-	 * and starve SSR `fetchModule` (e.g. churn under `android/build/reports/**`).
+	 * Ignore Capacitor / Gradle / Xcode / Tauri output so native builds do not trigger Vite reloads
+	 * and starve SSR `fetchModule` (e.g. churn under `android/build/reports/**` or `src-tauri/target/**`).
 	 */
 	const capNativeWatchIgnores = [
 		'**/android/build/**',
@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
 		'**/ios/App/build/**',
 		'**/ios/Pods/**',
 		'**/ios/DerivedData/**',
+		'**/src-tauri/**',
 	];
 
 	return {

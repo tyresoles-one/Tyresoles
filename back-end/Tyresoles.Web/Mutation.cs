@@ -119,7 +119,42 @@ public class Mutation
             var context = httpContextAccessor.HttpContext;
             var ipAddress = context?.Connection?.RemoteIpAddress?.ToString();
             var userAgent = context?.Request?.Headers["User-Agent"].ToString();
-            return await userService.LoginAsync(username, password, platform, ipAddress, userAgent, cancellationToken);
+            var result = await userService.LoginAsync(username, password, platform, ipAddress, userAgent, cancellationToken);
+
+            if (result.Success && OperatingSystem.IsWindows() && string.Equals(platform, "win", StringComparison.OrdinalIgnoreCase))
+            {
+                var options = (Microsoft.Extensions.Options.IOptions<Tyresoles.Data.Features.WindowsServices.WindowsServiceOptions>?)context?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Tyresoles.Data.Features.WindowsServices.WindowsServiceOptions>));
+                if (options?.Value.Enabled == true)
+                {
+                    var svcManager = (Tyresoles.Data.Features.WindowsServices.IWindowsServiceManager?)context?.RequestServices.GetService(typeof(Tyresoles.Data.Features.WindowsServices.IWindowsServiceManager));
+                    var logger = (ILogger<Mutation>?)context?.RequestServices.GetService(typeof(ILogger<Mutation>));
+
+                    if (svcManager != null)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var statuses = await svcManager.GetAllStatusesAsync(CancellationToken.None);
+                                foreach (var svc in statuses)
+                                {
+                                    if (svc.CanStart && !svc.IsRunning && svc.State != "Unknown" && svc.State != "StartPending")
+                                    {
+                                        logger?.LogInformation("Auto-starting stopped service '{ServiceName}' upon Windows login.", svc.Name);
+                                        await svcManager.StartAsync(svc.Name, CancellationToken.None);
+                                    }
+                                }
+                            }
+                            catch (Exception autoEx)
+                            {
+                                logger?.LogError(autoEx, "Failed to auto-start windows services during login.");
+                            }
+                        });
+                    }
+                }
+            }
+
+            return result;
         }
         catch (Exception ex)
         {
@@ -615,6 +650,26 @@ public class Mutation
             using var scope = dataService.ForTenant("NavLive");
             await productionService.InsertCasingItemsAsync(scope, casingItems, cancellationToken);
             return new MutationResult { Success = true, Message = "Casing items inserted successfully." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = NavConnectorErrorFormatting.FormatMessage(ex) };
+        }
+    }
+
+    /// <summary>Update casing items, adding or removing based on IsActive prop.</summary>
+    [Authorize]
+    public async Task<MutationResult> UpdateProductionCasingItems(
+        List<CasingItem> casingItems,
+        [Service] IDataverseDataService dataService,
+        [Service] IProductionService productionService,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            await productionService.UpdateCasingItemsAsync(scope, casingItems, cancellationToken);
+            return new MutationResult { Success = true, Message = "Casing items updated successfully." };
         }
         catch (Exception ex)
         {

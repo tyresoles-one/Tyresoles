@@ -17,7 +17,7 @@ internal sealed class EInvoiceService(
     IProteanHttpClient        client,
     IProteanSessionService    sessions,
     IProteanEncryptor         encryptor,
-    ILogger<EInvoiceService>  logger)
+    Tyresoles.Logger.Core.TyresolesLogger logger)
     : IEInvoiceService
 {
     // ──────────────────────────────────────────────────────────────
@@ -29,16 +29,19 @@ internal sealed class EInvoiceService(
                                     .ConfigureAwait(false);
 
         var sekBytes = Convert.FromBase64String(session.Sek);
+        var rawPayloadStr = JsonSerializer.Serialize(request.Request);
         var payload  = encryptor.EncryptAes(
-            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request.Request)), sekBytes);
+            Encoding.UTF8.GetBytes(rawPayloadStr), sekBytes);
 
         var body    = new { Data = payload };
         var headers = BuildHeaders(request.Gstin, session.AuthToken, session.Username, "EInvoice");
 
-        logger.LogInformation("GenerateIRN {Doc}", request.DocumentLabel());
+        logger.LogInformation("GenerateIRN {Doc} | Raw Payload: {RawPayload} | Encrypted: {EncPayload}", request.DocumentLabel(), rawPayloadStr, payload);
 
         var resp = await client.PostAsync<EInvPackResponse>(
             EInvoiceUrls.GenerateEInvoice(Constants.Sandbox), body, headers, ct).ConfigureAwait(false);
+
+        logger.LogInformation("GenerateIRN {Doc} | Raw Response: {RawResp}", request.DocumentLabel(), JsonSerializer.Serialize(resp));
 
         return DecryptInvoiceResponse(resp, session.Sek, request.DocumentLabel());
     }
@@ -166,13 +169,16 @@ internal sealed class EInvoiceService(
                     first.ToString() ?? "Duplicate IRN",
                     new DuplicateIrnInfo(info.Desc?.AckNo, info.Desc?.AckDt, info.Desc?.Irn));
             }
-            throw new ProteanException($"{label}: {resp.ErrorDetails[0]}");
+            throw new EInvoiceException($"{label}: {first}", first.ErrorCode ?? "", first.ErrorMessage ?? "");
         }
 
         if (resp.Status != 1 || string.IsNullOrEmpty(resp.Data))
             throw new ProteanException($"{label}: Unexpected response status={resp.Status}");
 
         var bytes = encryptor.DecryptAesBytes(resp.Data, Convert.FromBase64String(sekBase64));
+        var decryptedStr = Encoding.UTF8.GetString(bytes);
+        logger.LogInformation("DecryptIRN {Doc} | Decoded Response: {DecodedResp}", label, decryptedStr);
+
         return JsonSerializer.Deserialize<EInvoiceResult>(bytes, _jsonOpts)
                ?? throw new ProteanException("Failed to deserialize EInvoice response.");
     }
