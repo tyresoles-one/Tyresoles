@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Tyresoles.Web</RootNamespace>
+    <UserSecretsId>aaa4122a-3baa-4940-bb1f-001377e924ca</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

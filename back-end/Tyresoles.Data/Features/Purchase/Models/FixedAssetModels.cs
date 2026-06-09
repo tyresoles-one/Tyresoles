@@ -45,6 +45,8 @@ public class FixedAsset
     public string VendorNo { get; set; } = string.Empty;
     [NavColumn("Blocked")]
     public byte Blocked { get; set; }
+    
+    public string ResponsibleEmployeeInitials { get; set; } = string.Empty;
 }
 
 [NavTable("G_L Entry", IsShared = false)]
@@ -62,16 +64,20 @@ public class GLEntry
     public string SourceNo { get; set; } = string.Empty;
     [NavColumn("FA No_")]
     public string FANo { get; set; } = string.Empty;
+    [NavColumn("Responsibility Center")]
+    public string ResponsibilityCenter { get; set; } = string.Empty;
 }
 
 public class FixedAssetServiceLog
 {
-    public DateTime Date { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string Location { get; set; } = string.Empty;
-    public string Employee { get; set; } = string.Empty;
-    public string SubClass { get; set; } = string.Empty;
-    public decimal Amount { get; set; }
-    public string VendorNo { get; set; } = string.Empty;
-    public string VendorName { get; set; } = string.Empty;
+    [NavColumn("Posting Date")] [JoinSqlAlias("t0")] public DateTime Date { get; set; }
+    [NavColumn("Description")] [JoinSqlAlias("t0")] public string? Description { get; set; }
+    [NavColumn("Responsibility Center")] [JoinSqlAlias("t1")] public string? Location { get; set; }
+    [NavColumn("Responsibility Center")] [JoinSqlAlias("t1")] public string? RespCenter { get; set; }
+    [NavColumn("Initials")] [JoinSqlAlias("t2")] public string? Employee { get; set; }
+    [NavColumn("FA Class Code")] [JoinSqlAlias("t1")] public string? Class { get; set; }
+    [NavColumn("FA Subclass Code")] [JoinSqlAlias("t1")] public string? SubClass { get; set; }
+    [NavColumn("Amount")] [JoinSqlAlias("t0")] public decimal Amount { get; set; }
+    [NavColumn("Source No_")] [JoinSqlAlias("t0")] public string? VendorNo { get; set; }
+    [NavColumn("Name")] [JoinSqlAlias("t3")] public string? VendorName { get; set; }
 }

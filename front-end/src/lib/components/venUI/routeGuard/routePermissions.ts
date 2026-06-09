@@ -11,7 +11,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   "/vendors": "Vendors",
   "/sessions": "Sessions",
   "/rungstprocess": "GST Process",
-  "/fixed-assets": "Fixed Assets",
+  "/fixedasset": "Fixed Assets",
   // /assist, /notifications: not listed — any logged-in user may access (no menu permission required)
 };
 

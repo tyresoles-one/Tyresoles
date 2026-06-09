@@ -41,6 +41,8 @@ export interface UsePaginatedListConfig<T> {
 	/** See SmartPagination `paginationMode` / `pageInfoPath`. */
 	paginationMode?: 'offset' | 'cursor';
 	pageInfoPath?: string;
+	itemsPath?: string;
+	countPath?: string;
 	/** If true, the composable will not automatically sync search to pagination. Use when merging search into manual filters. */
 	manualSearch?: boolean;
 }
@@ -84,6 +86,8 @@ export function usePaginatedList<T>(
 		strategy: config.strategy ?? 'server',
 		pageSize: config.pageSize ?? 50,
 		dataPath: config.dataPath,
+		itemsPath: config.itemsPath,
+		countPath: config.countPath,
 		skipCache: config.skipCache ?? true,
 		mapSearchToVariables: config.mapSearchToVariables,
 		serverVariableAllowlist: config.serverVariableAllowlist,

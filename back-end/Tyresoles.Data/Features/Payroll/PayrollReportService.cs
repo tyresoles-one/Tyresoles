@@ -595,7 +595,7 @@ public sealed partial class PayrollReportService : IPayrollReportService
         foreach (var payD in payDates)
         {
             decimal employeeShare = records.Where(p => p.ESIC != 0 && p.Date == payD.Date).Sum(p => p.ESIC);
-            decimal grossPay = records.Where(p => p.ESIC != 0 && p.Date == payD.Date).Sum(p => p.TotalEarn);
+            decimal grossPay = records.Where(p => p.ESIC != 0 && p.Date == payD.Date).Sum(p => p.Basic + p.DA);
             decimal employerShare = 0;
             if (payD.Date < new DateTime(2019, 7, 1))
                 employerShare = grossPay == 0 ? 0 : Math.Round((grossPay * Convert.ToDecimal(4.75 / 100)), 0);

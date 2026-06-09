@@ -148,12 +148,20 @@
     return [...s].sort((a, b) => a.localeCompare(b));
   }
 
-  function mergePkOptions(current: string): string[] {
-    const s = new Set(navColumnOptions);
-    const t = current?.trim();
-    if (t) s.add(t);
-    return [...s].sort((a, b) => a.localeCompare(b));
-  }
+  // mergePkOptions removed, options are merged when fetched
+
+  let editingTypePkArray = $state<string[]>([]);
+  
+  // One-way sync from array to string during edit
+
+  $effect(() => {
+    if (editingType) {
+      const newStr = editingTypePkArray.join(', ');
+      if (editingType.navPrimaryKeyColumn !== newStr) {
+        editingType.navPrimaryKeyColumn = newStr;
+      }
+    }
+  });
 
   $effect(() => {
     if (!editingType) {
@@ -193,8 +201,15 @@
         skipCache: true,
       });
       if (cancelled) return;
-      if (res.success && res.data) navColumnOptions = res.data.navEditNavTableColumns;
-      else navColumnOptions = [];
+      if (res.success && res.data) {
+        const s = new Set(res.data.navEditNavTableColumns);
+        const currentPk = editingType.navPrimaryKeyColumn ?? "";
+        const parts = currentPk ? currentPk.split(',').map(p => p.trim()).filter(Boolean) : [];
+        for (const pt of parts) s.add(pt);
+        navColumnOptions = [...s].sort((a, b) => a.localeCompare(b));
+      } else {
+        navColumnOptions = [];
+      }
       navColumnsLoading = false;
     })();
     return () => {
@@ -236,6 +251,7 @@
       isActive: true,
       sortOrder: 0,
     };
+    editingTypePkArray = [];
   }
 
   function startEditType(rt: RequestType) {
@@ -251,6 +267,7 @@
       Toast.error(`Could not load template into designer: ${parsed.error}. Edit as raw JSON or fix syntax.`);
     }
     editingType = { ...rt };
+    editingTypePkArray = rt.navPrimaryKeyColumn ? rt.navPrimaryKeyColumn.split(',').map(p => p.trim()).filter(Boolean) : [];
   }
 
   function cancelEdit() {
@@ -659,9 +676,10 @@
                 {/if}
                 <div class="nea-select-wrap">
                   <Select
-                    options={mergePkOptions(editingType.navPrimaryKeyColumn ?? "")}
-                    bind:value={editingType.navPrimaryKeyColumn}
-                    placeholder="Select primary key column…"
+                    options={navColumnOptions}
+                    bind:value={editingTypePkArray}
+                    multiple={true}
+                    placeholder="Select primary key column(s)…"
                     clearable
                     searchPlaceholder="Search columns…"
                     emptyText="No columns — choose Nav Table first"

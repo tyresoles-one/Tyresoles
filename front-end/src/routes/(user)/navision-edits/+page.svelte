@@ -245,6 +245,11 @@
     return rt?.navPrimaryKeyColumn?.trim() ?? "";
   }
 
+  function primaryKeyColumnsArray(): string[] {
+    const pk = primaryKeyColumn();
+    return pk ? pk.split(',').map(c => c.trim()).filter(Boolean) : [];
+  }
+
   const LIVE_SEARCH_DEBOUNCE_MS = 200;
   let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -293,10 +298,10 @@
   /** Columns Nav uses for substring search: template `searchColumns`, or primary key only if unset. */
   function getSearchableColumnsDisplay(): string[] {
     const rt = selectedTypeId ? requestTypes.find((t) => t.id === selectedTypeId) : undefined;
-    const pk = rt?.navPrimaryKeyColumn?.trim() ?? "";
+    const pks = primaryKeyColumnsArray();
     const configured = templateConfig?.searchColumns?.map((c) => c.trim()).filter(Boolean) ?? [];
     if (configured.length > 0) return configured;
-    return pk ? [pk] : [];
+    return pks;
   }
 
   async function runLiveLookup() {
@@ -375,8 +380,13 @@
     const rt = requestTypes.find(t => t.id === selectedTypeId);
     if (!rt) return;
 
-    const pk = row.find(kv => kv.key.toLowerCase().replace(/[_ ]/g, '') === rt.navPrimaryKeyColumn.toLowerCase().replace(/[_ ]/g, ''));
-    const key = pk?.value ?? row[0]?.value;
+    const pkCols = rt.navPrimaryKeyColumn.split(',').map(c => c.trim()).filter(Boolean);
+    const keyParts = [];
+    for (const pk of pkCols) {
+      const match = row.find(kv => kv.key.toLowerCase().replace(/[_ ]/g, '') === pk.toLowerCase().replace(/[_ ]/g, ''));
+      keyParts.push(match?.value ?? "");
+    }
+    const key = keyParts.length > 0 ? keyParts.join('|') : row[0]?.value;
     if (!key) return;
 
     recordLoading = true;
@@ -415,11 +425,13 @@
     const rt = requestTypes.find((t) => t.id === selectedTypeId);
     if (!rt) return;
 
-    const pk = row.find(
-      (kv) =>
-        kv.key.toLowerCase().replace(/[_ ]/g, "") === rt.navPrimaryKeyColumn.toLowerCase().replace(/[_ ]/g, "")
-    );
-    const key = pk?.value ?? row[0]?.value;
+    const pkCols = rt.navPrimaryKeyColumn.split(',').map(c => c.trim()).filter(Boolean);
+    const keyParts = [];
+    for (const pk of pkCols) {
+      const match = row.find(kv => kv.key.toLowerCase().replace(/[_ ]/g, '') === pk.toLowerCase().replace(/[_ ]/g, ''));
+      keyParts.push(match?.value ?? "");
+    }
+    const key = keyParts.length > 0 ? keyParts.join('|') : row[0]?.value;
     if (!key) return;
 
     recordLoading = true;
@@ -447,8 +459,8 @@
           editValues[f.column] = v;
         }
       }
-      const pkCol = rt.navPrimaryKeyColumn.trim();
-      if (pkCol) {
+      const pkCols = rt.navPrimaryKeyColumn.split(',').map(c => c.trim()).filter(Boolean);
+      for (const pkCol of pkCols) {
         editValues[pkCol] = "";
       }
       newRecordKey = "";
@@ -487,16 +499,28 @@
     const rt = requestTypes.find((t) => t.id === selectedTypeId);
     if (!rt) return;
 
-    const pk = rt.navPrimaryKeyColumn.trim();
+    const pkCols = primaryKeyColumnsArray();
     const isCreate = workflowMode === "create" && templateConfig.allowNewRecordCreate;
 
     if (isCreate) {
-      const nk = (newRecordKey.trim() || (pk ? (editValues[pk] ?? "").trim() : "")).trim();
-      if (!nk) {
-        Toast.error(`Enter the new ${pk || "primary key"} for the new record.`);
+      let nk = newRecordKey.trim();
+      if (!nk && pkCols.length > 0) {
+        nk = pkCols.map(c => (editValues[c] ?? "").trim()).join('|');
+      }
+      
+      if (!nk || nk === '|'.repeat(Math.max(0, pkCols.length - 1))) {
+        Toast.error(`Enter the new ${pkCols.join(', ') || "primary key"} for the new record.`);
         return;
       }
-      if (pk) editValues[pk] = nk;
+
+      const parts = nk.split('|');
+      if (parts.length === pkCols.length) {
+        for (let i = 0; i < pkCols.length; i++) {
+           editValues[pkCols[i]] = parts[i].trim();
+        }
+      } else if (pkCols.length === 1) {
+        editValues[pkCols[0]] = nk;
+      }
       newRecordKey = nk;
     } else {
       if (!selectedRecord || !searchTerm.trim()) return;
@@ -528,12 +552,22 @@
       return;
     }
 
-    const recordKeyForSubmit = isCreate ? (pk ? (editValues[pk] ?? newRecordKey).trim() : newRecordKey.trim()) : searchTerm.trim();
+    const recordKeyForSubmit = isCreate ? newRecordKey.trim() : searchTerm.trim();
+
+    const connectorParams: Record<string, string> = {};
+    if (templateConfig.connectorParamColumns) {
+      for (const [logicalKey, colName] of Object.entries(templateConfig.connectorParamColumns)) {
+        if (!colName) continue;
+        const val = editValues[colName] ?? baseRecord[colName] ?? "";
+        connectorParams[logicalKey] = String(val);
+      }
+    }
 
     const requestBody = JSON.stringify({
       mode: isCreate ? "create" : "edit",
       ...(isCreate && sourceRecordKey ? { sourceRecordKey } : {}),
       changes,
+      connectorParams,
     });
 
     submitting = true;
@@ -618,10 +652,13 @@
         used.add(kv.key.trim().toLowerCase());
       }
     }
-    const pk = pkColumn?.trim() ? find(pkColumn) : undefined;
-    if (pk && !used.has(pk.key.trim().toLowerCase())) {
-      out.unshift(pk);
-      used.add(pk.key.trim().toLowerCase());
+    const pks = pkColumn ? pkColumn.split(',').map(c => c.trim()).filter(Boolean) : [];
+    for (const pk of pks) {
+      const pkKv = find(pk);
+      if (pkKv && !used.has(pkKv.key.trim().toLowerCase())) {
+        out.unshift(pkKv);
+        used.add(pkKv.key.trim().toLowerCase());
+      }
     }
     for (const kv of row) {
       if (!used.has(kv.key.trim().toLowerCase())) out.push(kv);
@@ -994,7 +1031,7 @@
                     <Input
                       id="nav-new-pk"
                       bind:value={newRecordKey}
-                      placeholder="Enter the new record key…"
+                      placeholder="Enter the new record key (use | for multiple columns)…"
                       autocomplete="off"
                     />
                   </div>

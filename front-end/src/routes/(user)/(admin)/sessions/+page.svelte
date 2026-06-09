@@ -240,7 +240,7 @@
       {:else if error}
         <div class="flex flex-col items-center justify-center py-20 text-center">
           <div class="bg-rose-500/10 p-4 rounded-full mb-4">
-             <Icon name="alert-triangle" class="h-10 w-10 text-rose-500" />
+             <Icon name="triangle-alert" class="h-10 w-10 text-rose-500" />
           </div>
           <p class="text-sm font-semibold text-rose-500">{error}</p>
           <button class="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold" onclick={fetchSessions}>

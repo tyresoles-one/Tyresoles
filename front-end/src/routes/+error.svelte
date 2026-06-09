@@ -21,7 +21,7 @@
       ? "map-pin-off"
       : isServerError
         ? "server-crash"
-        : "alert-triangle",
+        : "triangle-alert",
     title: isNotFound
       ? "Page Not Found"
       : isServerError

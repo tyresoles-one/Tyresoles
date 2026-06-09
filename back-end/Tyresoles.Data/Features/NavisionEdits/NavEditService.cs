@@ -120,9 +120,12 @@ public sealed class NavEditService : INavEditService
 
         var template = ParseTemplate(reqType.FieldsJson);
         // Must not treat "array with only empty column specs" as configured — that yields SELECT PK only.
-        var displayColumns = ResolveDisplayColumnsForLookup(template, reqType.FieldsJson, reqType.NavPrimaryKeyColumn);
+        var pkCols = reqType.NavPrimaryKeyColumn.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var displayColumns = ResolveDisplayColumnsForLookup(template, reqType.FieldsJson, pkCols.FirstOrDefault() ?? "");
 
-        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { reqType.NavPrimaryKeyColumn };
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pk in pkCols) columns.Add(pk);
+
         foreach (var spec in displayColumns)
         {
             var col = spec.Column?.Trim();
@@ -149,7 +152,7 @@ public sealed class NavEditService : INavEditService
 
         var selectClause = string.Join(", ", columns.Select(c => $"[{SanitizeColumnName(c)}]"));
         var tableName = SanitizeTableName(reqType.NavTable);
-        var pkCol = SanitizeColumnName(reqType.NavPrimaryKeyColumn);
+        var safePkCols = pkCols.Select(SanitizeColumnName).Where(c => !string.IsNullOrEmpty(c)).ToList();
 
         var sql = $"SELECT TOP (@take) {selectClause} FROM [{tableName}]";
         var parameters = new List<SqlParameter> { new("@take", take) };
@@ -168,9 +171,9 @@ public sealed class NavEditService : INavEditService
                 .Select(SanitizeColumnName)
                 .ToList() ?? new List<string>();
 
-            if (searchCols.Count == 0)
-                whereParts.Add(string.Format(navLikePredicate, pkCol));
-            else
+            if (searchCols.Count == 0 && safePkCols.Count > 0)
+                whereParts.Add("(" + string.Join(" OR ", safePkCols.Select(c => string.Format(navLikePredicate, c))) + ")");
+            else if (searchCols.Count > 0)
                 whereParts.Add("(" + string.Join(" OR ", searchCols.Select(c => string.Format(navLikePredicate, c))) + ")");
 
             var escapedSearch = EscapeSqlServerLikeWildcard(search);
@@ -182,7 +185,8 @@ public sealed class NavEditService : INavEditService
         if (whereParts.Count > 0)
             sql += " WHERE " + string.Join(" AND ", whereParts);
 
-        sql += $" ORDER BY [{pkCol}]";
+        if (safePkCols.Count > 0)
+            sql += " ORDER BY " + string.Join(", ", safePkCols.Select(c => $"[{c}]"));
 
         return await ExecuteNavQuery(sql, parameters, ct);
     }
@@ -341,10 +345,22 @@ public sealed class NavEditService : INavEditService
 
         var selectClause = string.Join(", ", allColumns.Select(c => $"[{SanitizeColumnName(c)}]"));
         var tableName = SanitizeTableName(reqType.NavTable);
-        var pkCol = SanitizeColumnName(reqType.NavPrimaryKeyColumn);
+        var pkCols = reqType.NavPrimaryKeyColumn.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(SanitizeColumnName).Where(c => !string.IsNullOrEmpty(c)).ToList();
+        var keyParts = recordKey.Split('|');
 
-        var sql = $"SELECT TOP 1 {selectClause} FROM [{tableName}] WHERE [{pkCol}] = @key";
-        var parameters = new List<SqlParameter> { new("@key", recordKey) };
+        var sql = $"SELECT TOP 1 {selectClause} FROM [{tableName}] WHERE ";
+        var parameters = new List<SqlParameter>();
+        var whereParts = new List<string>();
+
+        for (int i = 0; i < pkCols.Count; i++)
+        {
+            var val = i < keyParts.Length ? keyParts[i] : "";
+            whereParts.Add($"[{pkCols[i]}] = @key{i}");
+            parameters.Add(new SqlParameter($"@key{i}", val));
+        }
+
+        sql += string.Join(" AND ", whereParts);
 
         var results = await ExecuteNavQuery(sql, parameters, ct);
         return results.Count > 0 ? results[0] : null;
@@ -352,7 +368,9 @@ public sealed class NavEditService : INavEditService
 
     private static HashSet<string> CollectColumnsForRecordFetch(NavEditRequestType reqType, FieldsTemplate template)
     {
-        var allColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { reqType.NavPrimaryKeyColumn };
+        var allColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pkCols = reqType.NavPrimaryKeyColumn.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var pk in pkCols) allColumns.Add(pk);
 
         if (template.DisplayColumns != null)
             foreach (var spec in template.DisplayColumns)
@@ -426,9 +444,22 @@ public sealed class NavEditService : INavEditService
         if (string.IsNullOrEmpty(col))
             return null;
         var tableName = SanitizeTableName(reqType.NavTable);
-        var pkCol = SanitizeColumnName(reqType.NavPrimaryKeyColumn);
-        var sql = $"SELECT TOP 1 [{col}] FROM [{tableName}] WHERE [{pkCol}] = @key";
-        var parameters = new List<SqlParameter> { new("@key", recordKey) };
+        var pkCols = reqType.NavPrimaryKeyColumn.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(SanitizeColumnName).Where(c => !string.IsNullOrEmpty(c)).ToList();
+        var keyParts = recordKey.Split('|');
+
+        var sql = $"SELECT TOP 1 [{col}] FROM [{tableName}] WHERE ";
+        var parameters = new List<SqlParameter>();
+        var whereParts = new List<string>();
+
+        for (int i = 0; i < pkCols.Count; i++)
+        {
+            var val = i < keyParts.Length ? keyParts[i] : "";
+            whereParts.Add($"[{pkCols[i]}] = @key{i}");
+            parameters.Add(new SqlParameter($"@key{i}", val));
+        }
+
+        sql += string.Join(" AND ", whereParts);
         var results = await ExecuteNavQuery(sql, parameters, ct);
         if (results.Count == 0 || results[0].Count == 0)
             return null;
@@ -806,10 +837,11 @@ public sealed class NavEditService : INavEditService
 
         var template = ParseTemplate(reqType.FieldsJson);
         var changeMap = BuildChangeMapFromRequestBody(request.RequestBody);
+        var connectorParamsMap = ParseConnectorParamsFromRequestBody(request.RequestBody);
 
         if (ShouldRunNavConnector(template))
         {
-            var navOk = await TryExecuteNavConnectorAsync(template, request, changeMap, ct);
+            var navOk = await TryExecuteNavConnectorAsync(template, request, changeMap, connectorParamsMap, ct);
             if (!navOk)
             {
                 _logger.LogWarning(
@@ -849,26 +881,27 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
         var p = template.ConnectorProcess?.Trim() ?? "";
         if (string.Equals(p, NavEditConnectorProcess.ReqCustEdit, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqCustEditAsync(template, request, changeMap, ct);
+            return await ExecuteReqCustEditAsync(template, request, changeMap, connectorParamsMap, ct);
 
         if (string.Equals(p, NavEditConnectorProcess.ReqUserSetup, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqUserSetupAsync(template, request, changeMap, ct);
+            return await ExecuteReqUserSetupAsync(template, request, changeMap, connectorParamsMap, ct);
 
         if (string.Equals(p, NavEditConnectorProcess.ReqGlEntry, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqGlEntryAsync(template, request, changeMap, ct);
+            return await ExecuteReqGlEntryAsync(template, request, changeMap, connectorParamsMap, ct);
 
         if (string.Equals(p, NavEditConnectorProcess.ReqItem, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqItemAsync(template, request, changeMap, ct);
+            return await ExecuteReqItemAsync(template, request, changeMap, connectorParamsMap, ct);
 
         if (string.Equals(p, NavEditConnectorProcess.ReqMonthlySaleClose, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqMonthlySaleCloseAsync(template, request, changeMap, ct);
+            return await ExecuteReqMonthlySaleCloseAsync(template, request, changeMap, connectorParamsMap, ct);
 
         if (string.Equals(p, NavEditConnectorProcess.ReqItemBOM, StringComparison.OrdinalIgnoreCase))
-            return await ExecuteReqItemBOMAsync(template, request, changeMap, ct);
+            return await ExecuteReqItemBOMAsync(template, request, changeMap, connectorParamsMap, ct);
 
         throw new InvalidOperationException($"Unknown connectorProcess \"{p}\". Use none, reqCustEdit, reqUserSetup, reqGlEntry, reqItem, reqMonthlySaleClose, or reqItemBOM.");
     }
@@ -877,15 +910,15 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var customerNo = ResolveConnectorParam(template, changeMap, "customerNo", "No_")?.Trim()
-            ?? request.RecordKey?.Trim();
+        var customerNo = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "customerNo", "No_")?.Trim();
         if (string.IsNullOrWhiteSpace(customerNo))
             throw new InvalidOperationException("ReqCustEdit: missing customer number (record key or mapped column).");
 
-        var dealerCode = ResolveConnectorParam(template, changeMap, "dealerCode", "Dealer Code", "DealerCode")?.Trim();
-        var areaCode = ResolveConnectorParam(template, changeMap, "areaCode", "Area Code", "Area Code")?.Trim();
+        var dealerCode = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "dealerCode", "Dealer Code", "DealerCode")?.Trim();
+        var areaCode = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "areaCode", "Area Code", "Area Code")?.Trim();
 
         if (string.IsNullOrWhiteSpace(dealerCode))
         {
@@ -975,14 +1008,14 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var userid = ResolveConnectorParam(template, changeMap, "userid", "User ID", "User ID")?.Trim()
-            ?? request.RecordKey?.Trim();
+        var userid = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "userid", "User ID", "User ID")?.Trim();
         if (string.IsNullOrWhiteSpace(userid))
             throw new InvalidOperationException("ReqUserSetup: missing user id (record key or connectorParamColumns.userid).");
 
-        var respCenter = ResolveConnectorParam(template, changeMap, "respCenter", "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code")?.Trim();
+        var respCenter = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "respCenter", "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code")?.Trim();
 
         if (string.IsNullOrWhiteSpace(respCenter))
         {
@@ -1020,8 +1053,8 @@ public sealed class NavEditService : INavEditService
         if (string.IsNullOrWhiteSpace(respCenter))
             throw new InvalidOperationException("ReqUserSetup: missing responsibility center in changes or mapping, or ensure Nav has the row/column.");
 
-        var fromStr = ResolveConnectorParam(template, changeMap, "fromDate", "Work Date From", "From Date", "Valid From");
-        var toStr = ResolveConnectorParam(template, changeMap, "toDate", "Work Date To", "To Date", "Valid To");
+        var fromStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "fromDate", "Work Date From", "From Date", "Valid From");
+        var toStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "toDate", "Work Date To", "To Date", "Valid To");
 
         if (string.IsNullOrWhiteSpace(fromStr) || string.IsNullOrWhiteSpace(toStr))
         {
@@ -1106,17 +1139,17 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var entryKey = ResolveConnectorParam(template, changeMap, "entryNo", "Entry No_")?.Trim()
-            ?? request.RecordKey?.Trim();
+        var entryKey = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "entryNo", "Entry No_")?.Trim();
         if (string.IsNullOrWhiteSpace(entryKey) || !int.TryParse(entryKey, NumberStyles.Integer, CultureInfo.InvariantCulture, out var entryNo))
             throw new InvalidOperationException("ReqGLEntry: entry number must be an integer (record key or Entry No_ column).");
 
-        var glAccountNo = ResolveConnectorParam(template, changeMap, "glAccountNo", "G_L Account No_", "G/L Account No_", "G_L Account No_")?.Trim();
-        var respCenter = ResolveConnectorParam(template, changeMap, "respCenter", "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code")?.Trim();
-        var amountStr = ResolveConnectorParam(template, changeMap, "amount", "Amount");
-        var postingStr = ResolveConnectorParam(template, changeMap, "postingDate", "Posting Date");
+        var glAccountNo = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "glAccountNo", "G_L Account No_", "G/L Account No_", "G_L Account No_")?.Trim();
+        var respCenter = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "respCenter", "Responsibility Center", "Resp_ Center", "Global Dimension 1 Code")?.Trim();
+        var amountStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "amount", "Amount");
+        var postingStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "postingDate", "Posting Date");
 
         var reqType = request.RequestType ?? await _db.RequestTypes.FindAsync([request.RequestTypeId], ct);
         var keyLookup = request.RecordKey?.Trim() ?? entryKey;
@@ -1201,20 +1234,21 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var no = ResolveConnectorParam(template, changeMap, "no", "No_")?.Trim() ?? request.RecordKey?.Trim();
+        var no = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "no", "No_")?.Trim();
         if (string.IsNullOrWhiteSpace(no))
             throw new InvalidOperationException("ReqItem: missing item number (record key or mapped column).");
 
-        var description = ResolveConnectorParam(template, changeMap, "description", "Description")?.Trim() ?? "";
-        var uom = ResolveConnectorParam(template, changeMap, "uom", "Base Unit of Measure")?.Trim() ?? "";
-        var itemCategory = ResolveConnectorParam(template, changeMap, "itemCategory", "Item Category Code")?.Trim() ?? "";
-        var prodGroup = ResolveConnectorParam(template, changeMap, "prodGroup", "Product Group Code")?.Trim() ?? "";
-        var genprodpostGroup = ResolveConnectorParam(template, changeMap, "genprodpostGroup", "Gen_ Prod_ Posting Group")?.Trim() ?? "";
-        var gstGroup = ResolveConnectorParam(template, changeMap, "gstGroup", "GST Group Code")?.Trim() ?? "";
-        var hsn = ResolveConnectorParam(template, changeMap, "hsn", "HSN_SAC Code")?.Trim() ?? "";
-        var inventpostGroup = ResolveConnectorParam(template, changeMap, "inventpostGroup", "Inventory Posting Group")?.Trim() ?? "";
+        var description = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "description", "Description")?.Trim() ?? "";
+        var uom = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "uom", "Base Unit of Measure")?.Trim() ?? "";
+        var itemCategory = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "itemCategory", "Item Category Code")?.Trim() ?? "";
+        var prodGroup = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "prodGroup", "Product Group Code")?.Trim() ?? "";
+        var genprodpostGroup = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "genprodpostGroup", "Gen_ Prod_ Posting Group")?.Trim() ?? "";
+        var gstGroup = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "gstGroup", "GST Group Code")?.Trim() ?? "";
+        var hsn = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "hsn", "HSN_SAC Code")?.Trim() ?? "";
+        var inventpostGroup = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "inventpostGroup", "Inventory Posting Group")?.Trim() ?? "";
 
         ct.ThrowIfCancellationRequested();
         return await _connector.ReqItemAsync(no, description, uom, itemCategory, prodGroup, genprodpostGroup, gstGroup, hsn, inventpostGroup);
@@ -1224,13 +1258,14 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var respCenterCode = ResolveConnectorParam(template, changeMap, "respCenterCode", "Code")?.Trim() ?? request.RecordKey?.Trim();
+        var respCenterCode = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "respCenterCode", "Code")?.Trim();
         if (string.IsNullOrWhiteSpace(respCenterCode))
             throw new InvalidOperationException("ReqMonthlySaleClose: missing responsibility center code (record key or mapped column).");
 
-        var dateStr = ResolveConnectorParam(template, changeMap, "date", "Date");
+        var dateStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "date", "Date");
         if (string.IsNullOrWhiteSpace(dateStr) || !TryParseNavDate(dateStr, out var date))
             throw new InvalidOperationException("ReqMonthlySaleClose: missing or invalid date.");
 
@@ -1242,16 +1277,17 @@ public sealed class NavEditService : INavEditService
         FieldsTemplate template,
         NavEditRequest request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         CancellationToken ct)
     {
-        var parentItemNo = ResolveConnectorParam(template, changeMap, "parentItemNo", "Parent Item No_")?.Trim() ?? request.RecordKey?.Trim();
+        var parentItemNo = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "parentItemNo", "Parent Item No_")?.Trim();
         if (string.IsNullOrWhiteSpace(parentItemNo))
             throw new InvalidOperationException("ReqItemBOM: missing parent item number (record key or mapped column).");
 
-        var itemNo = ResolveConnectorParam(template, changeMap, "itemNo", "No_")?.Trim() ?? "";
-        var variantCode = ResolveConnectorParam(template, changeMap, "variantCode", "Variant Code")?.Trim() ?? "";
+        var itemNo = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "itemNo", "No_")?.Trim() ?? "";
+        var variantCode = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "variantCode", "Variant Code")?.Trim() ?? "";
         
-        var qtyStr = ResolveConnectorParam(template, changeMap, "qty", "Quantity per");
+        var qtyStr = ResolveConnectorParam(template, request, changeMap, connectorParamsMap, "qty", "Quantity per");
         if (string.IsNullOrWhiteSpace(qtyStr) || !decimal.TryParse(qtyStr.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var qty))
             qty = 0;
 
@@ -1272,13 +1308,20 @@ public sealed class NavEditService : INavEditService
     /// <summary>Resolve a value from explicit JSON mapping, then change map by fallback column names.</summary>
     private static string? ResolveConnectorParam(
         FieldsTemplate template,
+        NavEditRequest? request,
         IReadOnlyDictionary<string, string> changeMap,
+        IReadOnlyDictionary<string, string> connectorParamsMap,
         string logicalKey,
         params string[] defaultFallbackColumns)
     {
+        // 1. Direct hit from stored connector parameters
+        if (connectorParamsMap.TryGetValue(logicalKey, out var paramVal) && !string.IsNullOrWhiteSpace(paramVal))
+            return paramVal;
+
+        // 2. Mapped column from change map
+        string? mappedCol = null;
         if (template.ConnectorParamColumns != null)
         {
-            string? mappedCol = null;
             if (template.ConnectorParamColumns.TryGetValue(logicalKey, out var mc))
                 mappedCol = mc;
             else
@@ -1301,11 +1344,21 @@ public sealed class NavEditService : INavEditService
             }
         }
 
+        // 3. Fallback to common column names from change map
         foreach (var col in defaultFallbackColumns)
         {
             if (string.IsNullOrWhiteSpace(col)) continue;
             if (changeMap.TryGetValue(col, out var v2) && !string.IsNullOrWhiteSpace(v2))
                 return v2;
+        }
+
+        // 4. Fallback for single PK backward compatibility only
+        if (request != null && !string.IsNullOrWhiteSpace(request.RecordKey))
+        {
+            if (!request.RecordKey.Contains('|'))
+            {
+                return request.RecordKey.Trim();
+            }
         }
 
         return null;
@@ -1320,6 +1373,28 @@ public sealed class NavEditService : INavEditService
             d[col] = nv ?? "";
         }
 
+        return d;
+    }
+
+    private static Dictionary<string, string> ParseConnectorParamsFromRequestBody(string? requestBody)
+    {
+        var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(requestBody)) return d;
+        try
+        {
+            using var doc = JsonDocument.Parse(requestBody);
+            if (TryGetJsonPropertyIgnoreCase(doc.RootElement, "connectorParams", out var obj) && obj.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in obj.EnumerateObject())
+                {
+                    d[prop.Name] = prop.Value.ValueKind == JsonValueKind.String ? prop.Value.GetString() ?? "" : prop.Value.GetRawText();
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
         return d;
     }
 

@@ -1057,13 +1057,15 @@ public class Query
     [UseFiltering]
     [UseSorting]
     public IQueryable<Tyresoles.Data.Features.Purchase.Models.FixedAssetServiceLog> GetFixedAssetServiceLogs(
+        DateTime? fromDate,
+        DateTime? toDate,
         [Service] IDataverseDataService dataService,
         [Service] IFixedAssetService fixedAssetService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var scope = dataService.ForTenant("NavLive");
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
-        return fixedAssetService.GetFixedAssetServiceLogs(scope);
+        return fixedAssetService.GetFixedAssetServiceLogs(scope, fromDate, toDate);
     }
     
     /// <summary>

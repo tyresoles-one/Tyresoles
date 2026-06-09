@@ -1,0 +1,62 @@
+{
+  "Name": "Weekly Maintenance Plan",
+  "StopOnError": true,
+  "Tasks": [
+    {
+      "Type": "SqlScript",
+      "Name": "Rebuild Indexes",
+      "Parameters": {
+        "ScriptContent": "ALTER INDEX ALL ON Tyresoles REBUILD WITH (FILLFACTOR = @FillFactor);",
+        "SqlParameters": {
+          "FillFactor": 80
+        }
+      }
+    },
+    {
+      "Type": "SqlScript",
+      "Name": "Run File Script",
+      "Parameters": {
+        "FilePath": "C:\\Scripts\\CheckDB.sql"
+      }
+    },
+    {
+      "Type": "CompressFile",
+      "Name": "Compress Latest Backup",
+      "Parameters": {
+        "FilePath": "C:\\Backups\\Sql\\Tyresoles_*.bak"
+      }
+    },
+    {
+      "Type": "SyncFile",
+      "Name": "Upload Zip to Google Drive",
+      "Parameters": {
+        "FilePath": "C:\\Backups\\Sql\\Tyresoles_*.zip"
+      }
+    },
+    {
+      "Type": "BatScript",
+      "Name": "Clean Temp Files",
+      "Parameters": {
+        "FilePath": "C:\\Scripts\\cleanup.bat",
+        "Arguments": "-force"
+      }
+    },
+    {
+      "Type": "DotnetMethod",
+      "Name": "Run Custom Logic",
+      "Parameters": {
+        "AssemblyPath": "C:\\Libs\\Tyresoles.CustomLogic.dll",
+        "ClassName": "Tyresoles.CustomLogic.Maintenance",
+        "MethodName": "RunChecks"
+      }
+    },
+    {
+      "Type": "EmailNotification",
+      "Name": "Send Success Notification",
+      "Parameters": {
+        "Subject": "Maintenance Plan Completed",
+        "Body": "All tasks in the Weekly Maintenance Plan have been completed successfully."
+      }
+    }
+  ]
+}
