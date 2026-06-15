@@ -24,6 +24,9 @@ using Tyresoles.Sql.Abstractions;
 using Tyresoles.Sql.GraphQL;
 using Tyresoles.Web.GraphQL;
 using Tyresoles.Web.Features.VpnInstaller;
+using Tyresoles.Data.Features.Crm;
+using Tyresoles.Data.Features.Crm.Models;
+using Tyresoles.Data.Features.Crm.Entities;
 using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
 using Vendor = Dataverse.NavLive.Vendor;
 
@@ -33,6 +36,45 @@ namespace Tyresoles.Web;
 public class Query
 {
     public string Version => "1.0";
+
+    [Authorize]
+    [GraphQLName("getCrmMasterItems")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmMasterItem> GetCrmMasterItems(
+        CrmMasterType type,
+        [Service] CrmDbContext db)
+    {
+        return type switch
+        {
+            CrmMasterType.ContactType => db.CrmContactTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.Source => db.CrmSources.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.Stage => db.CrmStages.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.Priority => db.CrmPriorities.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.ActivityType => db.CrmActivityTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.ActivityOutcome => db.CrmActivityOutcomes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContacts")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmContact> GetCrmContacts([Service] CrmDbContext db)
+    {
+        return db.CrmContacts;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactById")]
+    public async Task<CrmContact?> GetCrmContactById(
+        Guid id,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        return await db.CrmContacts.FindAsync(new object[] { id }, ct);
+    }
 
     /// <summary>Get Drive Sync user configuration for the specified user or the caller.</summary>
     [Authorize]

@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Dataverse.NavLive;
 using Tyresoles.Data.Constants;
 using Tyresoles.Data.Features.Common;
+using Tyresoles.Data.Features.Crm;
+using Tyresoles.Data.Features.Crm.Entities;
 using Tyresoles.Data.Infrastructure;
 using Tyresoles.Sql;
 using Tyresoles.Sql.Abstractions;
@@ -20,6 +23,7 @@ public sealed class SalesService : ISalesService
     private readonly GlobalQueryCache _cache;
     private readonly ILogger<SalesService> _logger;
     private readonly Connector _connector;
+    private readonly CrmDbContext _crmDb;
 
     // Typical NAV/BC nvarchar caps on Salesperson Purchaser (Table 13 / 5714); prevents SQL 8152 on MERGE.
     // Name / Dealership Name are often Text[30] in older DBs; BC may allow 50—truncate to 30 to match strict SQL.
@@ -38,11 +42,12 @@ public sealed class SalesService : ISalesService
         return s.Length <= maxLen ? s : s[..maxLen];
     }
 
-    public SalesService(GlobalQueryCache cache, ILogger<SalesService> logger, Connector connector)
+    public SalesService(GlobalQueryCache cache, ILogger<SalesService> logger, Connector connector, CrmDbContext crmDb)
     {
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        _crmDb = crmDb ?? throw new ArgumentNullException(nameof(crmDb));
     }
 
     /// <inheritdoc />
@@ -846,5 +851,200 @@ public sealed class SalesService : ISalesService
         if (idx >= 0)
             s = s[(idx + "base64,".Length)..].Trim();
         return s;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> ImportUniqueCrmContactsFromInvoicesAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var headerT = scope.GetQualifiedTableName("Sales Invoice Header", isShared: false);
+        var custT = scope.GetQualifiedTableName("Customer", isShared: false);
+
+        // Fetch distinct mobile rows from Sales Invoice Header (latest invoice per mobile)
+        var sqlSelect = $@"
+            WITH RankedInvoices AS (
+                SELECT
+                    h.[Mobile No_]                          AS MobileNo,
+                    h.[Sell-to Customer Name]               AS FullName,
+                    h.[Sell-to Address]                     AS Address,
+                    h.[Sell-to City]                        AS City,
+                    h.[Responsibility Center]               AS RespCenter,
+                    h.[Sell-to Customer No_]                AS ERPCustomerNo,
+                    c.[Phone No_]                           AS CustomerPhoneNo,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY LTRIM(RTRIM(h.[Mobile No_]))
+                        ORDER BY h.[Posting Date] DESC
+                    ) AS rn
+                FROM {headerT} h
+                LEFT JOIN {custT} c ON c.[No_] = h.[Sell-to Customer No_]
+                WHERE LTRIM(RTRIM(ISNULL(h.[Mobile No_], ''))) <> ''
+            )
+            SELECT MobileNo, FullName, Address, City, RespCenter, ERPCustomerNo, CustomerPhoneNo
+            FROM RankedInvoices
+            WHERE rn = 1";
+
+        var rows = await scope.QueryAsync<CrmImportRow>(sqlSelect, null, ct).ConfigureAwait(false);
+
+        // Load existing normalized mobile numbers from CrmContacts
+        var existingMobiles = await _crmDb.CrmContacts
+            .Where(c => c.MobileNo != null)
+            .Select(c => c.MobileNo!)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var existingSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var m in existingMobiles)
+        {
+            if (TryNormalizeIndianMobile(m, out var norm, out _))
+                existingSet.Add(norm);
+            else
+                existingSet.Add(m.Trim());
+        }
+
+        int imported = 0;
+        foreach (var row in rows)
+        {
+            // Normalize the mobile number
+            string? mobile = null;
+            if (!string.IsNullOrWhiteSpace(row.MobileNo))
+            {
+                if (TryNormalizeIndianMobile(row.MobileNo, out var norm, out _))
+                    mobile = norm;
+                else
+                    mobile = ExtractValidMobileNumber(row.MobileNo);
+            }
+
+            if (string.IsNullOrEmpty(mobile)) continue;
+            if (existingSet.Contains(mobile)) continue;
+
+            // Extract city from address if Sell-to City is blank
+            var city = !string.IsNullOrWhiteSpace(row.City) ? row.City.Trim() : null;
+
+            var contact = new CrmContact
+            {
+                Id = Guid.NewGuid(),
+                ContactType = "Customer",
+                FullName = !string.IsNullOrWhiteSpace(row.FullName)
+                    ? row.FullName.Trim()
+                    : mobile,
+                MobileNo = mobile,
+                Address = !string.IsNullOrWhiteSpace(row.Address) ? row.Address.Trim() : null,
+                City = city,
+                RespCenter = !string.IsNullOrWhiteSpace(row.RespCenter) ? row.RespCenter.Trim() : null,
+                ERPCustomerNos = !string.IsNullOrWhiteSpace(row.ERPCustomerNo) ? row.ERPCustomerNo.Trim() : null,
+                IsActive = true,
+                CreatedBy = "System Import"
+            };
+
+            _crmDb.CrmContacts.Add(contact);
+            existingSet.Add(mobile); // prevent duplicates within same batch
+            imported++;
+        }
+
+        if (imported > 0)
+            await _crmDb.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        _logger.LogInformation("ImportUniqueCrmContactsFromInvoicesAsync: imported {Count} new contacts.", imported);
+        return imported;
+    }
+
+    /// <inheritdoc />
+    public async Task SanitizeSalesInvoiceHeaderMobileNumbersAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var headerT = scope.GetQualifiedTableName("Sales Invoice Header", isShared: false);
+        var custT = scope.GetQualifiedTableName("Customer", isShared: false);
+
+        var sqlSelect = $@"
+            SELECT h.[No_] AS No, 
+                   h.[Sell-to Customer Name] AS SellToCustomerName, 
+                   h.[Sell-to Address] AS SellToAddress, 
+                   h.[Sell-to Address 2] AS SellToAddress2,
+                   c.[Phone No_] AS CustomerPhoneNo
+            FROM {headerT} h
+            LEFT JOIN {custT} c ON c.[No_] = h.[Sell-to Customer No_]
+            WHERE h.[Mobile No_] IS NULL OR LTRIM(RTRIM(h.[Mobile No_])) = ''";
+
+        var rows = await scope.QueryAsync<SalesInvoiceHeaderMobileSanitationRow>(sqlSelect, null, ct).ConfigureAwait(false);
+
+        var sqlUpdate = $@"
+            UPDATE {headerT}
+            SET [Mobile No_] = @MobileNo
+            WHERE [No_] = @No";
+
+        foreach (var row in rows)
+        {
+            string? mobile = ExtractValidMobileNumber(row.SellToCustomerName)
+                             ?? ExtractValidMobileNumber(row.SellToAddress)
+                             ?? ExtractValidMobileNumber(row.SellToAddress2);
+
+            if (string.IsNullOrEmpty(mobile) && !string.IsNullOrEmpty(row.CustomerPhoneNo))
+            {
+                if (TryNormalizeIndianMobile(row.CustomerPhoneNo, out var normMobile, out _))
+                {
+                    mobile = normMobile;
+                }
+                else
+                {
+                    mobile = ExtractValidMobileNumber(row.CustomerPhoneNo);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(mobile))
+            {
+                await scope.ExecuteNonQueryAsync(sqlUpdate, new { MobileNo = mobile, No = row.No }, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static string? ExtractValidMobileNumber(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+
+        var matches = System.Text.RegularExpressions.Regex.Matches(text, @"(?:\+?91|0)?[6-9]\d{9}");
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            if (TryNormalizeIndianMobile(match.Value, out var normalized, out _))
+            {
+                return normalized;
+            }
+        }
+
+        var onlyDigits = new string(text.Where(char.IsDigit).ToArray());
+        for (int i = 0; i <= onlyDigits.Length - 10; i++)
+        {
+            for (int len = 10; len <= 12 && i + len <= onlyDigits.Length; len++)
+            {
+                var candidate = onlyDigits.Substring(i, len);
+                if (TryNormalizeIndianMobile(candidate, out var normalized, out _))
+                {
+                    return normalized;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private sealed class SalesInvoiceHeaderMobileSanitationRow
+    {
+        public string No { get; set; } = "";
+        public string? SellToCustomerName { get; set; }
+        public string? SellToAddress { get; set; }
+        public string? SellToAddress2 { get; set; }
+        public string? CustomerPhoneNo { get; set; }
+    }
+
+    private sealed class CrmImportRow
+    {
+        public string? MobileNo { get; set; }
+        public string? FullName { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? RespCenter { get; set; }
+        public string? ERPCustomerNo { get; set; }
+        public string? CustomerPhoneNo { get; set; }
     }
 }

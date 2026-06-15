@@ -38,7 +38,8 @@
 		'bar-chart-2': 'chart-column',
 		'bar-chart-3': 'chart-column',
 		'bar-chart-4': 'chart-column',
-		'check-circle-2': 'circle-check'
+		'check-circle-2': 'circle-check',
+		'check-square': 'square-check'
 	};
 
 	$effect(() => {

@@ -145,4 +145,16 @@ public interface ISalesService
         int docType,
         IReadOnlyList<string> imageBase64Payloads,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Sanitizes and extracts valid mobile numbers from Sell-to Customer Name, Sell-to Address, and Sell-to Address 2 columns
+    /// in Sales Invoice Header table, updating the Mobile No_ column if it is empty.
+    /// </summary>
+    Task SanitizeSalesInvoiceHeaderMobileNumbersAsync(ITenantScope scope, CancellationToken ct = default);
+
+    /// <summary>
+    /// Fetches unique mobile numbers from table SalesInvoiceHeader and creates records under CrmContacts,
+    /// only creating if the mobile number is not already present under CrmContacts.
+    /// </summary>
+    Task<int> ImportUniqueCrmContactsFromInvoicesAsync(ITenantScope scope, CancellationToken ct = default);
 }

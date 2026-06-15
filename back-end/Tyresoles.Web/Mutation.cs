@@ -19,10 +19,218 @@ using Tyresoles.Data.Features.Purchase;
 using ProductionFetchParams = Tyresoles.Data.Features.Production.Models.FetchParams;
 using Tyresoles.Web.GraphQL;
 
+using Tyresoles.Data.Features.Crm;
+using Tyresoles.Data.Features.Crm.Models;
+using Tyresoles.Data.Features.Crm.Entities;
+
 namespace Tyresoles.Web;
 
 public class Mutation
 {
+    [Authorize]
+    [GraphQLName("createCrmMasterItem")]
+    public async Task<CrmMasterItem> CreateCrmMasterItem(
+        CrmMasterType type,
+        string name,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        int id = 0;
+        switch (type)
+        {
+            case CrmMasterType.ContactType:
+                var ctItem = new CrmContactType { Name = name };
+                db.CrmContactTypes.Add(ctItem);
+                await db.SaveChangesAsync(ct);
+                id = ctItem.Id;
+                break;
+            case CrmMasterType.Source:
+                var srcItem = new CrmSource { Name = name };
+                db.CrmSources.Add(srcItem);
+                await db.SaveChangesAsync(ct);
+                id = srcItem.Id;
+                break;
+            case CrmMasterType.Stage:
+                var stItem = new CrmStage { Name = name };
+                db.CrmStages.Add(stItem);
+                await db.SaveChangesAsync(ct);
+                id = stItem.Id;
+                break;
+            case CrmMasterType.Priority:
+                var prItem = new CrmPriority { Name = name };
+                db.CrmPriorities.Add(prItem);
+                await db.SaveChangesAsync(ct);
+                id = prItem.Id;
+                break;
+            case CrmMasterType.ActivityType:
+                var actItem = new CrmActivityType { Name = name };
+                db.CrmActivityTypes.Add(actItem);
+                await db.SaveChangesAsync(ct);
+                id = actItem.Id;
+                break;
+            case CrmMasterType.ActivityOutcome:
+                var outItem = new CrmActivityOutcome { Name = name };
+                db.CrmActivityOutcomes.Add(outItem);
+                await db.SaveChangesAsync(ct);
+                id = outItem.Id;
+                break;
+        }
+        return new CrmMasterItem { Id = id, Name = name };
+    }
+
+    [Authorize]
+    [GraphQLName("updateCrmMasterItem")]
+    public async Task<CrmMasterItem?> UpdateCrmMasterItem(
+        CrmMasterType type,
+        int id,
+        string name,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        switch (type)
+        {
+            case CrmMasterType.ContactType:
+                var ctItem = await db.CrmContactTypes.FindAsync(new object[] { id }, ct);
+                if (ctItem == null) return null;
+                ctItem.Name = name;
+                break;
+            case CrmMasterType.Source:
+                var srcItem = await db.CrmSources.FindAsync(new object[] { id }, ct);
+                if (srcItem == null) return null;
+                srcItem.Name = name;
+                break;
+            case CrmMasterType.Stage:
+                var stItem = await db.CrmStages.FindAsync(new object[] { id }, ct);
+                if (stItem == null) return null;
+                stItem.Name = name;
+                break;
+            case CrmMasterType.Priority:
+                var prItem = await db.CrmPriorities.FindAsync(new object[] { id }, ct);
+                if (prItem == null) return null;
+                prItem.Name = name;
+                break;
+            case CrmMasterType.ActivityType:
+                var actItem = await db.CrmActivityTypes.FindAsync(new object[] { id }, ct);
+                if (actItem == null) return null;
+                actItem.Name = name;
+                break;
+            case CrmMasterType.ActivityOutcome:
+                var outItem = await db.CrmActivityOutcomes.FindAsync(new object[] { id }, ct);
+                if (outItem == null) return null;
+                outItem.Name = name;
+                break;
+        }
+        await db.SaveChangesAsync(ct);
+        return new CrmMasterItem { Id = id, Name = name };
+    }
+
+    [Authorize]
+    [GraphQLName("deleteCrmMasterItem")]
+    public async Task<bool> DeleteCrmMasterItem(
+        CrmMasterType type,
+        int id,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        switch (type)
+        {
+            case CrmMasterType.ContactType:
+                var ctItem = await db.CrmContactTypes.FindAsync(new object[] { id }, ct);
+                if (ctItem == null) return false;
+                db.CrmContactTypes.Remove(ctItem);
+                break;
+            case CrmMasterType.Source:
+                var srcItem = await db.CrmSources.FindAsync(new object[] { id }, ct);
+                if (srcItem == null) return false;
+                db.CrmSources.Remove(srcItem);
+                break;
+            case CrmMasterType.Stage:
+                var stItem = await db.CrmStages.FindAsync(new object[] { id }, ct);
+                if (stItem == null) return false;
+                db.CrmStages.Remove(stItem);
+                break;
+            case CrmMasterType.Priority:
+                var prItem = await db.CrmPriorities.FindAsync(new object[] { id }, ct);
+                if (prItem == null) return false;
+                db.CrmPriorities.Remove(prItem);
+                break;
+            case CrmMasterType.ActivityType:
+                var actItem = await db.CrmActivityTypes.FindAsync(new object[] { id }, ct);
+                if (actItem == null) return false;
+                db.CrmActivityTypes.Remove(actItem);
+                break;
+            case CrmMasterType.ActivityOutcome:
+                var outItem = await db.CrmActivityOutcomes.FindAsync(new object[] { id }, ct);
+                if (outItem == null) return false;
+                db.CrmActivityOutcomes.Remove(outItem);
+                break;
+        }
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    [Authorize]
+    [GraphQLName("saveCrmContact")]
+    public async Task<CrmContact> SaveCrmContact(
+        CrmContactInput input,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        CrmContact? contact;
+        if (input.Id == null || input.Id == Guid.Empty)
+        {
+            contact = new CrmContact
+            {
+                Id = Guid.NewGuid()
+            };
+            db.CrmContacts.Add(contact);
+        }
+        else
+        {
+            contact = await db.CrmContacts.FindAsync(new object[] { input.Id.Value }, ct);
+            if (contact == null)
+            {
+                throw new GraphQLException($"CrmContact with Id {input.Id.Value} not found.");
+            }
+        }
+
+        contact.ContactType = input.ContactType;
+        contact.FullName = input.FullName;
+        contact.CompanyName = input.CompanyName;
+        contact.MobileNo = input.MobileNo;
+        contact.MobileNo2 = input.MobileNo2;
+        contact.EmailIds = input.EmailIds;
+        contact.IsDecisionMaker = input.IsDecisionMaker;
+        contact.Address = input.Address;
+        contact.City = input.City;
+        contact.State = input.State;
+        contact.RespCenter = input.RespCenter;
+        contact.ERPCustomerNos = input.ERPCustomerNos;
+        contact.ERPAreaCodes = input.ERPAreaCodes;
+        contact.Tags = input.Tags;
+        contact.IsActive = input.IsActive;
+        contact.CreatedBy = input.CreatedBy;
+        contact.AssignedTo = input.AssignedTo;
+
+        await db.SaveChangesAsync(ct);
+        return contact;
+    }
+
+    [Authorize]
+    [GraphQLName("deleteCrmContact")]
+    public async Task<bool> DeleteCrmContact(
+        Guid id,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        var contact = await db.CrmContacts.FindAsync(new object[] { id }, ct);
+        if (contact == null) return false;
+
+        db.CrmContacts.Remove(contact);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     /// <summary>
     /// Maps NAV WCF <see cref="System.ServiceModel.FaultException"/>, inner exceptions, and related failures
     /// to a <see cref="GraphQLException"/> so clients see the real message (see <see cref="NavConnectorErrorFilter"/>).
@@ -575,6 +783,56 @@ public class Mutation
                 Message = ex.InnerException?.Message ?? ex.Message,
                 DealerCode = null
             };
+        }
+    }
+
+    /// <summary>
+    /// Sanitizes and extracts valid mobile numbers from Sell-to Customer Name, Sell-to Address, and Sell-to Address 2 columns
+    /// in Sales Invoice Header table, updating the Mobile No_ column if it is empty.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("sanitizeSalesInvoiceHeaderMobileNumbers")]
+    public async Task<MutationResult> SanitizeSalesInvoiceHeaderMobileNumbers(
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            await salesService.SanitizeSalesInvoiceHeaderMobileNumbersAsync(scope, cancellationToken);
+            return new MutationResult { Success = true, Message = "Sales invoice header mobile numbers sanitized successfully." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "sanitizeSalesInvoiceHeaderMobileNumbers failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Fetches unique mobile numbers from SalesInvoiceHeader (NavLive) and imports them as new CrmContact records,
+    /// skipping any mobile numbers already present in CrmContacts.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("importCrmContactsFromInvoices")]
+    public async Task<MutationResult> ImportCrmContactsFromInvoices(
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            var count = await salesService.ImportUniqueCrmContactsFromInvoicesAsync(scope, cancellationToken);
+            return new MutationResult { Success = true, Message = $"Import complete. {count} new contact(s) created." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "importCrmContactsFromInvoices failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
         }
     }
 

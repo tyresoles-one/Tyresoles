@@ -60,6 +60,8 @@
     filtersCollapsible?: boolean;
     /** When filtersCollapsible, controls expanded state (default open). */
     filtersOpen?: boolean; // bindable from parent when collapsible
+    /** When true, strips full-page wrapper, background mesh, page-level sticky headers, and double margins/paddings. */
+    embedded?: boolean;
     /** On large viewports, Arrow keys move focus between grid cards (requires onRowClick / focusable grid items). */
     gridKeyboardNav?: boolean;
   }
@@ -93,6 +95,7 @@
     filtersCollapsible = false,
     filtersOpen = $bindable(true),
     gridKeyboardNav = false,
+    embedded = false,
   }: Props = $props();
 
   let gridNavEl: HTMLDivElement | null = $state(null);
@@ -346,27 +349,31 @@
   }
 </script>
 
-<div class="min-h-screen w-full bg-background relative selection:bg-primary/20">
-  <!-- Background Mesh (Optional: could be passed as slot or kept here if consistent across all master lists) -->
-  <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-    <div
-      class="absolute top-[-10%] right-[-5%] h-[600px] w-[600px] rounded-full bg-primary/5 blur-[120px] animate-pulse"
-    ></div>
-    <div
-      class="absolute bottom-[-10%] left-[-5%] h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[100px] animate-pulse"
-      style="animation-delay: 2s;"
-    ></div>
-  </div>
+<div class={embedded ? "w-full relative flex flex-col" : "min-h-screen w-full bg-background relative selection:bg-primary/20"}>
+  {#if !embedded}
+    <!-- Background Mesh (Optional: could be passed as slot or kept here if consistent across all master lists) -->
+    <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+      <div
+        class="absolute top-[-10%] right-[-5%] h-[600px] w-[600px] rounded-full bg-primary/5 blur-[120px] animate-pulse"
+      ></div>
+      <div
+        class="absolute bottom-[-10%] left-[-5%] h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[100px] animate-pulse"
+        style="animation-delay: 2s;"
+      ></div>
+    </div>
+  {/if}
 
   <!-- Header -->
   <header
-    class="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-xl transition-all duration-300"
+    class={embedded
+      ? "w-full pb-4 border-b bg-transparent"
+      : "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-xl transition-all duration-300"}
   >
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class={embedded ? "py-2" : "container mx-auto px-4 sm:px-6 lg:px-8 py-4"}>
       {#if filtersCollapsible && filters}
         <Collapsible bind:open={filtersOpen}>
           <div
-            class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
           >
             <CollapsibleTrigger
               class="group flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-transparent px-0 py-1.5 text-left transition-colors hover:border-border/40 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:-ml-2 sm:px-2"
@@ -378,20 +385,18 @@
                 <Icon name="layout-grid" class="size-6" />
               </div>
               <div class="min-w-0">
-                <h1
-                  class="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-foreground"
-                >
-                  {title}
+                <h1 class="text-2xl font-bold tracking-tight text-foreground">
+                  <span>{title}</span>
                   <Icon
                     name="chevron-down"
-                    class="size-5 shrink-0 text-muted-foreground transition-transform duration-200 {filtersOpen
+                    class="size-5 inline-block shrink-0 text-muted-foreground transition-transform duration-200 align-middle {filtersOpen
                       ? 'rotate-180'
                       : ''}"
                     aria-hidden="true"
                   />
                   {#if !loading && !loadingMore}
                     <span
-                      class="inline-flex items-center justify-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in"
+                      class="inline-flex items-center justify-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ml-2 align-middle animate-in fade-in zoom-in whitespace-nowrap"
                       title={totalCount != null
                         ? `${items.length} loaded of ${totalCount} total`
                         : `${items.length} items`}
@@ -411,9 +416,9 @@
             </CollapsibleTrigger>
 
             <div
-              class="flex w-full flex-wrap items-center gap-2 sm:gap-3 md:w-auto md:justify-end"
+              class="flex w-full flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:justify-end"
             >
-              <div class="group relative flex-1 md:w-64 lg:w-80">
+              <div class="group relative flex-1 lg:w-80">
                 <Icon
                   name="search"
                   class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary"
@@ -515,7 +520,7 @@
         </Collapsible>
       {:else}
         <div
-          class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+          class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
         >
           <div class="flex items-center gap-3">
             <div
@@ -524,13 +529,11 @@
               <Icon name="layout-grid" class="size-6" />
             </div>
             <div>
-              <h1
-                class="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground"
-              >
-                {title}
+              <h1 class="text-2xl font-bold tracking-tight text-foreground">
+                <span>{title}</span>
                 {#if !loading && !loadingMore}
                   <span
-                    class="inline-flex items-center justify-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground animate-in fade-in zoom-in"
+                    class="inline-flex items-center justify-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ml-2 align-middle animate-in fade-in zoom-in whitespace-nowrap"
                     title={totalCount != null
                       ? `${items.length} loaded of ${totalCount} total`
                       : `${items.length} items`}
@@ -549,8 +552,8 @@
             </div>
           </div>
 
-          <div class="flex w-full items-center gap-2 sm:gap-3 md:w-auto">
-            <div class="group relative flex-1 md:w-64 lg:w-80">
+          <div class="flex w-full items-center gap-2 sm:gap-3 lg:w-auto">
+            <div class="group relative flex-1 lg:w-80">
               <Icon
                 name="search"
                 class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary"
@@ -673,7 +676,7 @@
     </div>
   </header>
 
-  <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+  <main class={embedded ? "py-4" : "container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8"}>
     {#if beforeList}
       {@render beforeList()}
     {/if}

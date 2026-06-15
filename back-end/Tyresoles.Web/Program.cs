@@ -33,6 +33,7 @@ using Tyresoles.Data.Features.Accounts.Models;
 using Tyresoles.Data.Features.RemoteAssist;
 using Tyresoles.Data.Features.WindowsServices;
 using Tyresoles.Sql.Abstractions;
+using Tyresoles.Data.Features.Crm;
 using Tyresoles.Web.Features.RemoteAssist;
 using Tyresoles.Web.Features.VpnInstaller;
 using Tyresoles.Web.Features.DriveSync;
@@ -172,6 +173,20 @@ builder.Services.AddDbContext<Tyresoles.Data.Features.NavisionEdits.NavEditDbCon
     });
 });
 builder.Services.AddScoped<Tyresoles.Data.Features.NavisionEdits.INavEditService, Tyresoles.Data.Features.NavisionEdits.NavEditService>();
+
+// CRM module: separate DbContext on same Db_Extra database
+builder.Services.AddDbContext<CrmDbContext>(options =>
+{
+    var conn = builder.Configuration.GetConnectionString("Calendar")
+        ?? "Server=(localdb)\\mssqllocaldb;Database=TyresolesCalendar;Trusted_Connection=True;TrustServerCertificate=True";
+    options.UseSqlServer(conn, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    });
+});
 
 // DriveSync: Nav Live User fields + Google service account (hybrid: client upload token, server-proxied restore).
 builder.Services.Configure<DriveSyncGoogleOptions>(builder.Configuration.GetSection(DriveSyncGoogleOptions.SectionName));
@@ -489,6 +504,105 @@ catch (Exception ex)
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
     logger.LogWarning(ex, "Could not initialize NavisionEdits tables. Edit request features may be unavailable.");
+}
+
+// Ensure CRM tables exist in Db_Extra
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var crmDb = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        await crmDb.Database.ExecuteSqlRawAsync(@"
+            IF OBJECT_ID('dbo.CrmContactType', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmContactType] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmContactType] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmSource', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmSource] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmSource] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmStage', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmStage] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmStage] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmPriority', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmPriority] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmPriority] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmActivityType', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmActivityType] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmActivityType] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmActivityOutcome', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmActivityOutcome] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(max) NOT NULL,
+                    CONSTRAINT [PK_CrmActivityOutcome] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmContact] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [ContactType] nvarchar(max) NULL,
+                    [FullName] nvarchar(max) NOT NULL,
+                    [CompanyName] nvarchar(max) NULL,
+                    [MobileNo] nvarchar(max) NULL,
+                    [MobileNo2] nvarchar(max) NULL,
+                    [EmailIds] nvarchar(max) NULL,
+                    [IsDecisionMaker] bit NOT NULL,
+                    [Address] nvarchar(max) NULL,
+                    [City] nvarchar(max) NULL,
+                    [State] nvarchar(max) NULL,
+                    [RespCenter] nvarchar(max) NULL,
+                    [ERPCustomerNos] nvarchar(max) NULL,
+                    [ERPAreaCodes] nvarchar(max) NULL,
+                    [Tags] nvarchar(max) NULL,
+                    [IsActive] bit NOT NULL,
+                    [CreatedBy] nvarchar(max) NULL,
+                    [AssignedTo] nvarchar(max) NULL,
+                    CONSTRAINT [PK_CrmContact] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'ERPAreaCodes') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [ERPAreaCodes] nvarchar(max) NULL;
+            END
+        ");
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Could not initialize CRM tables. CRM features may be unavailable.");
 }
 
 try
