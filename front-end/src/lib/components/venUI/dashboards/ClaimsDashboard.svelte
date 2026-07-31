@@ -24,7 +24,7 @@
     end: undefined,
   });
   let selectedRc = $state<string[]>([]);
-  let currentView = $state<"Summary" | "Pattern" | "Defect" | "Procurement">("Summary");
+  let currentView = $state<"Summary" | "Pattern" | "Defect" | "Procurement" | "Make" | "Dealer">("Summary");
   let rows = $state<ClaimRatioRow[]>([]);
   let expanded = $state<Record<string, boolean>>({});
 
@@ -32,7 +32,7 @@
   let fetchId = 0;
 
   const workDate = $derived($authStore.user?.workDate);
-  const views = ['Summary','Defect','Procurement','Make','Pattern'];
+  const views = ['Summary','Defect','Procurement','Make','Pattern','Dealer'];
 
   let viewFilteredRc = $state<string[]>([]);
   let sortField = $state<keyof TreeNode["agg"] | "label">("label");

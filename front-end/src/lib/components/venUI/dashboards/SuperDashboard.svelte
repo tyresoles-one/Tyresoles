@@ -2,9 +2,8 @@
   import { getUser } from '$lib/stores/auth';
   import { BalanceWidget } from '$lib/components/venUI/balanceWidget';
   import Header from './Header.svelte';
-  import SalesTiles from './SalesTiles.svelte';
+  import SalesOverview from './SalesOverview.svelte';
   import { fade, slide } from 'svelte/transition';
-  import SalesChart from './SalesChart.svelte'; 
   import { Button } from '$lib/components/ui/button';
   import { Icon } from '$lib/components/venUI/icon';
   import { goto } from '$app/navigation';
@@ -18,11 +17,10 @@
     
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-3 items-start">
         <div class="xl:col-span-12">
-            <SalesTiles />
+            <SalesOverview class="h-full min-h-[500px]" />
         </div>
 
         <div class="xl:col-span-8 flex flex-col gap-3">
-            <SalesChart class="h-full min-h-[500px]" />
             <WeeklyEventDashboardWidget />
         </div>        
     </div>

@@ -101,36 +101,6 @@
 
 {#if draft}
   <div class="settings-container">
-    <!-- Desktop App Promotion (Only on Web) -->
-    {#if !isTauri()}
-      <section class="download-banner">
-        <div class="banner-glass"></div>
-        <div class="banner-content">
-          <div class="banner-icon-ring">
-            <Icon name="monitor" class="size-8" />
-          </div>
-          <div class="banner-text">
-            <h3>Get the Desktop Experience</h3>
-            <p>
-              For native ERP support, RDP launch, and multi-window workflows,
-              download the Tyresoles app.
-            </p>
-          </div>
-          <div class="banner-action">
-            <a
-              href={draft.downloadUrl}
-              download
-              data-sveltekit-reload
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn--white"
-            >
-              <Icon name="download" class="size-4 mr-2" /> Download For Windows
-            </a>
-          </div>
-        </div>
-      </section>
-    {/if}
 
     <section class="settings-panel native-alerts-section">
       <header class="settings-header">

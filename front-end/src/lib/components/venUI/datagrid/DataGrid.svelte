@@ -35,6 +35,7 @@
 		showFilters = false,
 		filterRules = $bindable([]),
 		onFilterRulesChange,
+		cell,
 		actions
 	}: DataGridProps<TData> = $props();
 
@@ -114,6 +115,7 @@
 		{showColumnToggle}
 		{showDensity}
 		{showFilters}
+		activeFilterCount={filterRules?.length ?? 0}
 		onFilterClick={() => filterSheetOpen = true}
 		{loading}
 		{actions}
@@ -137,6 +139,7 @@
 					{items}
 					{loadingMore} 
 					{onRowClick} 
+					{cell}
 				/>
 			{:else}
 				<DataCardGrid 
@@ -145,6 +148,7 @@
 					{onRowClick} 
 					titleKey={mobileCardTitleKey as string} 
 					subtitleKey={mobileCardSubtitleKey as string} 
+					{cell}
 				/>
 			{/if}
 		{/if}

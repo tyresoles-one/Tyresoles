@@ -221,9 +221,13 @@ export class SmartPagination<T, TVariables extends Variables = Variables> {
     const vars: Record<string, unknown> = { take: this.pageSize };
     if (this.paginationMode === "cursor") {
       vars.after = append ? this._cursorAfter : null;
+    } else {
+      if (this.serverVariableAllowlist.includes("skip")) {
+        vars.skip = skip;
+      }
     }
     for (const key of this.serverVariableAllowlist) {
-      if (key === "after") continue;
+      if (key === "after" || key === "skip" || key === "take") continue;
       if (!(key in base)) continue;
       const v = base[key];
       if (v === undefined) continue;

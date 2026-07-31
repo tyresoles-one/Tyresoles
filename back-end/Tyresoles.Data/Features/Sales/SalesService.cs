@@ -854,14 +854,52 @@ public sealed class SalesService : ISalesService
     }
 
     /// <inheritdoc />
+    public async Task<int> SyncClaimPostedMobileNumbersAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var claimT = scope.GetQualifiedTableName("Claim & Failure Posted", isShared: false);
+        var headerT = scope.GetQualifiedTableName("Sales Invoice Header", isShared: false);
+
+        // 1. Ensure Mobile No_ column exists on Claim & Failure Posted table if missing
+        var sqlCheckCol = $@"
+            IF OBJECT_ID('{claimT}', 'U') IS NOT NULL AND COL_LENGTH('{claimT}', 'Mobile No_') IS NULL
+            BEGIN
+                ALTER TABLE {claimT} ADD [Mobile No_] NVARCHAR(50) NULL;
+            END";
+        await scope.ExecuteNonQueryAsync(sqlCheckCol, null, ct).ConfigureAwait(false);
+
+        // 2. Sync Mobile No_ from Sales Invoice Header to Claim & Failure Posted mapping Invoice No_ to No_
+        // filling all empty/NULL Mobile No_ fields in Claim & Failure Posted table
+        var sqlSync = $@"
+            UPDATE c
+            SET c.[Mobile No_] = h.[Mobile No_]
+            FROM {claimT} c
+            INNER JOIN {headerT} h ON c.[Invoice No_] = h.[No_]
+            WHERE (c.[Mobile No_] IS NULL OR LTRIM(RTRIM(c.[Mobile No_])) = '')
+              AND h.[Mobile No_] IS NOT NULL 
+              AND LTRIM(RTRIM(h.[Mobile No_])) <> ''";
+
+        var count = await scope.ExecuteNonQueryAsync(sqlSync, null, ct).ConfigureAwait(false);
+        _logger.LogInformation("SyncClaimPostedMobileNumbersAsync: updated {UpdatedCount} Claim & Failure Posted records with mobile numbers.", count);
+        return count;
+    }
+
+    /// <inheritdoc />
     public async Task<int> ImportUniqueCrmContactsFromInvoicesAsync(ITenantScope scope, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(scope);
 
+        // Sanitize sales invoice header mobile numbers and sync claim mobile numbers prior to import
+        await SanitizeSalesInvoiceHeaderMobileNumbersAsync(scope, ct).ConfigureAwait(false);
+        await SyncClaimPostedMobileNumbersAsync(scope, ct).ConfigureAwait(false);
+
         var headerT = scope.GetQualifiedTableName("Sales Invoice Header", isShared: false);
+        var lineT = scope.GetQualifiedTableName("Sales Invoice Line", isShared: false);
         var custT = scope.GetQualifiedTableName("Customer", isShared: false);
 
         // Fetch distinct mobile rows from Sales Invoice Header (latest invoice per mobile)
+
         var sqlSelect = $@"
             WITH RankedInvoices AS (
                 SELECT
@@ -872,6 +910,8 @@ public sealed class SalesService : ISalesService
                     h.[Responsibility Center]               AS RespCenter,
                     h.[Sell-to Customer No_]                AS ERPCustomerNo,
                     c.[Phone No_]                           AS CustomerPhoneNo,
+                    COALESCE(NULLIF(h.[GST Bill-to State Code], ''), NULLIF(c.[State Code], '')) AS State,
+                    c.[Area Code]                           AS ERPAreaCode,
                     ROW_NUMBER() OVER (
                         PARTITION BY LTRIM(RTRIM(h.[Mobile No_]))
                         ORDER BY h.[Posting Date] DESC
@@ -880,29 +920,46 @@ public sealed class SalesService : ISalesService
                 LEFT JOIN {custT} c ON c.[No_] = h.[Sell-to Customer No_]
                 WHERE LTRIM(RTRIM(ISNULL(h.[Mobile No_], ''))) <> ''
             )
-            SELECT MobileNo, FullName, Address, City, RespCenter, ERPCustomerNo, CustomerPhoneNo
-            FROM RankedInvoices
-            WHERE rn = 1";
+            SELECT 
+                r.MobileNo, r.FullName, r.Address, r.City, r.RespCenter, r.ERPCustomerNo, r.CustomerPhoneNo, r.State, r.ERPAreaCode,
+                (
+                    SELECT STUFF((
+                        SELECT ', ' + l.[No_]
+                        FROM (
+                            SELECT DISTINCT line.[No_]
+                            FROM {lineT} line
+                            INNER JOIN {headerT} inv ON line.[Document No_] = inv.[No_]
+                            WHERE inv.[Mobile No_] = r.MobileNo 
+                              AND line.[Item Category Code] IN ('ECOMILE', 'RETD')
+                              AND line.[No_] <> ''
+                        ) l
+                        ORDER BY l.[No_]
+                        FOR XML PATH(''), TYPE
+                    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '')
+                ) AS Products
+            FROM RankedInvoices r
+            WHERE r.rn = 1";
 
         var rows = await scope.QueryAsync<CrmImportRow>(sqlSelect, null, ct).ConfigureAwait(false);
 
-        // Load existing normalized mobile numbers from CrmContacts
-        var existingMobiles = await _crmDb.CrmContacts
-            .Where(c => c.MobileNo != null)
-            .Select(c => c.MobileNo!)
+        // Load existing contacts from CrmContacts
+        var existingContacts = await _crmDb.CrmContacts
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        var existingSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var m in existingMobiles)
+        var existingMap = new Dictionary<string, CrmContact>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in existingContacts)
         {
-            if (TryNormalizeIndianMobile(m, out var norm, out _))
-                existingSet.Add(norm);
+            if (string.IsNullOrWhiteSpace(c.MobileNo)) continue;
+            
+            if (TryNormalizeIndianMobile(c.MobileNo, out var norm, out _))
+                existingMap[norm] = c;
             else
-                existingSet.Add(m.Trim());
+                existingMap[c.MobileNo.Trim()] = c;
         }
 
         int imported = 0;
+        int updated = 0;
         foreach (var row in rows)
         {
             // Normalize the mobile number
@@ -916,37 +973,100 @@ public sealed class SalesService : ISalesService
             }
 
             if (string.IsNullOrEmpty(mobile)) continue;
-            if (existingSet.Contains(mobile)) continue;
 
-            // Extract city from address if Sell-to City is blank
+            var productsValue = !string.IsNullOrWhiteSpace(row.Products) ? row.Products.Trim() : null;
+            var stateValue = !string.IsNullOrWhiteSpace(row.State) ? row.State.Trim() : null;
+            var areaCodesValue = !string.IsNullOrWhiteSpace(row.ERPAreaCode) ? row.ERPAreaCode.Trim() : null;
+            var customerNosValue = !string.IsNullOrWhiteSpace(row.ERPCustomerNo) ? row.ERPCustomerNo.Trim() : null;
             var city = !string.IsNullOrWhiteSpace(row.City) ? row.City.Trim() : null;
 
-            var contact = new CrmContact
+            if (existingMap.TryGetValue(mobile, out var contact))
             {
-                Id = Guid.NewGuid(),
-                ContactType = "Customer",
-                FullName = !string.IsNullOrWhiteSpace(row.FullName)
-                    ? row.FullName.Trim()
-                    : mobile,
-                MobileNo = mobile,
-                Address = !string.IsNullOrWhiteSpace(row.Address) ? row.Address.Trim() : null,
-                City = city,
-                RespCenter = !string.IsNullOrWhiteSpace(row.RespCenter) ? row.RespCenter.Trim() : null,
-                ERPCustomerNos = !string.IsNullOrWhiteSpace(row.ERPCustomerNo) ? row.ERPCustomerNo.Trim() : null,
-                IsActive = true,
-                CreatedBy = "System Import"
-            };
+                bool modified = false;
 
-            _crmDb.CrmContacts.Add(contact);
-            existingSet.Add(mobile); // prevent duplicates within same batch
-            imported++;
+                // Update products on existing contact in either case (empty or already populated)
+                if (!string.IsNullOrWhiteSpace(productsValue))
+                {
+                    if (string.IsNullOrWhiteSpace(contact.Products))
+                    {
+                        contact.Products = productsValue;
+                        modified = true;
+                    }
+                    else
+                    {
+                        var existingList = contact.Products.Split(',')
+                            .Select(p => p.Trim())
+                            .Where(p => !string.IsNullOrEmpty(p));
+                        var newList = productsValue.Split(',')
+                            .Select(p => p.Trim())
+                            .Where(p => !string.IsNullOrEmpty(p));
+
+                        var mergedStr = string.Join(", ", existingList.Concat(newList).Distinct(StringComparer.OrdinalIgnoreCase));
+                        if (!string.Equals(contact.Products, mergedStr, StringComparison.OrdinalIgnoreCase))
+                        {
+                            contact.Products = mergedStr;
+                            modified = true;
+                        }
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(contact.State) && !string.IsNullOrWhiteSpace(stateValue))
+                {
+                    contact.State = stateValue;
+                    modified = true;
+                }
+                if (string.IsNullOrWhiteSpace(contact.ERPAreaCodes) && !string.IsNullOrWhiteSpace(areaCodesValue))
+                {
+                    contact.ERPAreaCodes = areaCodesValue;
+                    modified = true;
+                }
+                if (string.IsNullOrWhiteSpace(contact.ERPCustomerNos) && !string.IsNullOrWhiteSpace(customerNosValue))
+                {
+                    contact.ERPCustomerNos = customerNosValue;
+                    modified = true;
+                }
+                if (string.IsNullOrWhiteSpace(contact.City) && !string.IsNullOrWhiteSpace(city))
+                {
+                    contact.City = city;
+                    modified = true;
+                }
+
+                if (modified)
+                {
+                    updated++;
+                }
+            }
+            else
+            {
+                contact = new CrmContact
+                {
+                    Id = Guid.NewGuid(),
+                    ContactType = "Customer",
+                    FullName = !string.IsNullOrWhiteSpace(row.FullName)
+                        ? row.FullName.Trim()
+                        : mobile,
+                    MobileNo = mobile,
+                    Address = !string.IsNullOrWhiteSpace(row.Address) ? row.Address.Trim() : null,
+                    City = city,
+                    State = stateValue,
+                    RespCenter = !string.IsNullOrWhiteSpace(row.RespCenter) ? row.RespCenter.Trim() : null,
+                    ERPCustomerNos = customerNosValue,
+                    ERPAreaCodes = areaCodesValue,
+                    Products = productsValue,
+                    IsActive = true,
+                    CreatedBy = "System Import"
+                };
+
+                _crmDb.CrmContacts.Add(contact);
+                existingMap[mobile] = contact; // prevent duplicates within same batch
+                imported++;
+            }
         }
 
-        if (imported > 0)
+        if (imported > 0 || updated > 0)
             await _crmDb.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        _logger.LogInformation("ImportUniqueCrmContactsFromInvoicesAsync: imported {Count} new contacts.", imported);
-        return imported;
+        _logger.LogInformation("ImportUniqueCrmContactsFromInvoicesAsync: imported {ImportedCount} new contacts, updated {UpdatedCount} existing contacts.", imported, updated);
+        return imported + updated;
     }
 
     /// <inheritdoc />
@@ -1046,5 +1166,8 @@ public sealed class SalesService : ISalesService
         public string? RespCenter { get; set; }
         public string? ERPCustomerNo { get; set; }
         public string? CustomerPhoneNo { get; set; }
+        public string? State { get; set; }
+        public string? Products { get; set; }
+        public string? ERPAreaCode { get; set; }
     }
 }

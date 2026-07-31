@@ -139,6 +139,7 @@ public partial class ClaimFailurePosted
     [NavColumn("Approval Type")] public int ApprovalType { get; set; }
     [NavColumn("Fault Area Code")] public string FaultAreaCode { get; set; } = "";
     [NavColumn("Sub Make")] public string SubMake { get; set; } = "";
+    [NavColumn("Mobile No_")] public string MobileNo { get; set; } = "";
 }
 
 [NavTable("Claim & Failure Settlement", IsShared = false)]

@@ -8,13 +8,15 @@
 		items,
 		onRowClick,
 		titleKey,
-		subtitleKey
+		subtitleKey,
+		cell
 	}: { 
 		table: Table<any>,
 		items: any[],
 		onRowClick?: (item: any) => void,
 		titleKey?: string,
-		subtitleKey?: string
+		subtitleKey?: string,
+		cell?: import("svelte").Snippet<[{ column: any; row: any; getValue: () => any; renderDefault: () => string }]>
 	} = $props();
 
 	function getPlainCellValue(col: Column<any>, original: any): unknown {
@@ -90,7 +92,18 @@
 						<DetailItem 
 							label={typeof col.columnDef.header === 'string' ? col.columnDef.header : col.id}
 						>
-							<span class="text-xs sm:text-sm">{renderCardCell(col, original, rowIndex) || '—'}</span>
+							<span class="text-xs sm:text-sm">
+								{#if cell}
+									{@render cell({
+										column: col,
+										row: original,
+										getValue: () => getPlainCellValue(col, original),
+										renderDefault: () => renderCardCell(col, original, rowIndex)
+									})}
+								{:else}
+									{renderCardCell(col, original, rowIndex) || '—'}
+								{/if}
+							</span>
 						</DetailItem>
 					{/if}
 				{/each}

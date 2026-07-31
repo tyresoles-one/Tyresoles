@@ -6,6 +6,7 @@ public class CrmContactInput
 {
     public Guid? Id { get; set; }
     public string? ContactType { get; set; }
+    public string? ContactCategory { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string? CompanyName { get; set; }
     public string? MobileNo { get; set; }
@@ -18,8 +19,8 @@ public class CrmContactInput
     public string? RespCenter { get; set; }
     public string? ERPCustomerNos { get; set; }
     public string? ERPAreaCodes { get; set; }
+    public string? Products { get; set; }
     public string? Tags { get; set; }
     public bool IsActive { get; set; }
     public string? CreatedBy { get; set; }
-    public string? AssignedTo { get; set; }
 }

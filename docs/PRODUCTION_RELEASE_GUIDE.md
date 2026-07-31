@@ -31,14 +31,13 @@ The script will create a new folder:
 `front-end\release-artifacts\v0.2.1\`
 
 Inside you will find:
--   `Tyresoles_0.2.1_x64-setup.exe` (The updater installer)
--   `Tyresoles_0.2.1_x64_en-US.msi` (The first-time installer)
+-   `Tyresoles_0.2.1_x64-setup.exe` (The installer for both first-time setup and updates)
 -   `update.json` (The manifest file for the auto-updater)
 
 ### 3. Upload to Server
 Move these files to your Windows Server:
 1.  **EXE & update.json**: Upload to `C:\inetpub\wwwroot\updates\`
-2.  **MSI**: Upload to `C:\inetpub\wwwroot\downloads\`
+2.  **Stable EXE copy (Tyresoles_Latest_x64-setup.exe)**: Upload to `C:\inetpub\wwwroot\downloads\` (used for first-time downloads)
 
 ---
 
@@ -85,8 +84,7 @@ To ensure the updater works correctly, your IIS server must be configured with c
 
 ### 1. MIME Types
 Open **IIS Manager** → Select your site → **MIME Types**. Add:
--   `.msi` → `application/octet-stream`
--   `.exe` (or `.msi.zip`) → `application/octet-stream`
+-   `.exe` → `application/octet-stream`
 -   `.json` → `application/json`
 
 ### 2. URL Rewrite (web.config)
@@ -122,7 +120,7 @@ Ensure a `web.config` file exists in the root of your web site:
 - [ ] Check `https://app.tyresoles.net/updates/update.json` in your browser. It should show the new version.
 - [ ] Launch the v0.2.0 app. It should show the "Update Available" banner within 5 seconds.
 - [ ] Click **Update Now**. The app should restart into v0.2.1.
-- [ ] Go to **Settings** in the browser. The "Download for Windows" button should point to the new MSI.
+- [ ] Go to **Settings** in the browser. The "Download for Windows" button should point to the stable setup EXE.
 
 > [!CAUTION]
 > **Signature Mismatch**: If you see "Signature verification failed" in the logs, it means the `signature` in your `update.json` does not match the file you uploaded OR the wrong public key is in `tauri.conf.json`.

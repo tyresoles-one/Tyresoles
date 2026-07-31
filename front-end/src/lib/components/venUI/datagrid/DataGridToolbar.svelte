@@ -15,6 +15,7 @@
 		showColumnToggle,
 		showDensity,
 		showFilters,
+		activeFilterCount = 0,
 		loading,
 		onFilterClick,
 		actions
@@ -28,6 +29,7 @@
 		showColumnToggle: boolean,
 		showDensity: boolean,
 		showFilters?: boolean,
+		activeFilterCount?: number,
 		loading: boolean,
 		onFilterClick?: () => void,
 		actions?: import("svelte").Snippet
@@ -116,13 +118,18 @@
 		<!-- Filters Toggle -->
 		{#if showFilters}
 			<Button 
-				variant="outline" 
+				variant={activeFilterCount && activeFilterCount > 0 ? "default" : "outline"} 
 				size="sm" 
-				class="h-9 w-9 px-0 py-0 bg-background border-border shrink-0 text-muted-foreground hover:text-foreground"
+				class="h-9 px-2.5 py-0 shrink-0 transition-all font-medium gap-1.5 {activeFilterCount && activeFilterCount > 0 ? 'bg-primary text-primary-foreground border-primary shadow-xs hover:bg-primary/95' : 'bg-background border-border text-muted-foreground hover:text-foreground'}"
 				onclick={onFilterClick}
-				title="Filters"
+				title={activeFilterCount && activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : "Filters"}
 			>
 				<Icon name="filter" class="size-4" />
+				{#if activeFilterCount && activeFilterCount > 0}
+					<span class="text-[10px] bg-primary-foreground/20 text-primary-foreground px-1.5 py-0.2 rounded-full font-bold">
+						{activeFilterCount}
+					</span>
+				{/if}
 			</Button>
 		{/if}
 

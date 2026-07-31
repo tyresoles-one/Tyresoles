@@ -16,7 +16,8 @@
   import { getAppConfig } from "$lib/config/runtime";
 
   import LoginPinField from "./LoginPinField.svelte";
-
+  import LoginUserDropdown from "./LoginUserDropdown.svelte";
+  import { recordLoginSuccess } from "$lib/stores/loginHistory";
   let appVersion = $state("...");
   let windowsUser = $state("");
   let isServerMode = $state(false);
@@ -122,6 +123,7 @@
           toast.info("Please set a new password to continue.");
           goto("/change-password");
         } else {
+          recordLoginSuccess(username);
           toast.success("Login successful!");
           goto("/");
         }
@@ -149,23 +151,35 @@
         {
           type: "group",
           children: [
-            {
-              type: "field",
-              name: "username",
-              label: "Username",
-              inputType: "text",
-              placeholder: "Enter your username",
-              leftIcon: "user",
-              clearable: !isServerMode,
-              disabled: isServerMode && !!windowsUser,
-              description: isServerMode ? "Detected Windows Account" : "Your Reg. Mobile No. / ERP Code",
-              onBlur(value, fieldName, form) {
-                if (value && value.toLowerCase().startsWith("ts:")) {
-                  const formattedValue = value.replace(/^ts:/i, "TYRESOLES\\");
-                  form.setValue(fieldName, formattedValue);
+            isTauri()
+              ? {
+                  type: "custom",
+                  component: LoginUserDropdown,
+                  props: {
+                    name: "username",
+                    label: "Username",
+                    description: isServerMode ? "Detected Windows Account" : "Your Reg. Mobile No. / ERP Code",
+                    disabled: isServerMode && !!windowsUser,
+                    clearable: !isServerMode,
+                  },
                 }
-              },
-            },
+              : {
+                  type: "field",
+                  name: "username",
+                  label: "Username",
+                  inputType: "text",
+                  placeholder: "Enter your username",
+                  leftIcon: "user",
+                  clearable: !isServerMode,
+                  disabled: isServerMode && !!windowsUser,
+                  description: isServerMode ? "Detected Windows Account" : "Your Reg. Mobile No. / ERP Code",
+                  onBlur(value, fieldName, form) {
+                    if (value && value.toLowerCase().startsWith("ts:")) {
+                      const formattedValue = value.replace(/^ts:/i, "TYRESOLES\\");
+                      form.setValue(fieldName, formattedValue);
+                    }
+                  },
+                },
             isServerMode && isTauri()
               ? {
                   type: "custom",

@@ -59,6 +59,8 @@
     <Field.Label class="mb-0">{label}</Field.Label>
     <button
       type="button"
+      tabindex="-1"
+      data-ven-form-slot
       onclick={togglePin}
       class="text-[10px] uppercase font-bold tracking-widest text-muted-foreground hover:text-accent flex items-center gap-1.5 transition-colors focus:outline-none"
     >

@@ -9,6 +9,11 @@
   import { cn } from "$lib/utils";
   import { DatePicker } from "$lib/components/venUI/date-picker";
   import { authStore } from "$lib/stores/auth";
+  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "$lib/components/ui/dialog";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import MasterSelect from "$lib/components/venUI/master-select/MasterSelect.svelte";
+  import { Toast } from "$lib/components/venUI/toast";
   import {
     today,
     getLocalTimeZone,
@@ -120,6 +125,35 @@
     itemsPath: "fixedAssetServiceLogs.nodes"
   });
 
+  let isEditing = $state(false);
+  let editingLog = $state<any>({});
+  let submitting = $state(false);
+
+  function openNew() {
+    editingLog = { date: toStartOfDayIso(fromDateYmd || today(getLocalTimeZone()).toString()).substring(0,10) };
+    isEditing = true;
+  }
+
+  function editLog(log: any) {
+    editingLog = { ...log };
+    if (editingLog.date) editingLog.date = editingLog.date.substring(0, 10);
+    isEditing = true;
+  }
+
+  async function handleSave() {
+    submitting = true;
+    try {
+      // Mock Save function since backend mutation SaveFixedAssetServiceLog doesn't exist yet
+      await new Promise(r => setTimeout(r, 800));
+      Toast.success("Service log saved successfully (Mocked)");
+      isEditing = false;
+    } catch (e) {
+      Toast.error("Failed to save service log");
+    } finally {
+      submitting = false;
+    }
+  }
+
   let dateFilterReady = false;
   $effect(() => {
     const from = fromDateYmd ? toStartOfDayIso(fromDateYmd) : null;
@@ -181,12 +215,17 @@
       bind:searchQuery={list.searchQuery.value}
       mobileCardTitleKey="description"
       mobileCardSubtitleKey="date"
+      onRowClick={editLog}
       showFilters={true}
       bind:filterRules
       {onFilterRulesChange}
     >
       {#snippet actions()}
         <div class="flex items-center gap-2">
+          <Button size="sm" class="gap-2" onclick={openNew}>
+            <Icon name="plus" class="size-4" />
+            Add Service Log
+          </Button>
           <div class="w-[260px]">
             <DatePicker
               bind:value={dateRange}
@@ -216,3 +255,58 @@
     </DataGrid>
   </main>
 </div>
+
+<Dialog open={isEditing} onOpenChange={(o) => isEditing = o}>
+  <DialogContent class="sm:max-w-2xl">
+    <DialogHeader>
+      <DialogTitle>{editingLog.no ? "Edit Service Log" : "New Service Log"}</DialogTitle>
+    </DialogHeader>
+
+    <div class="grid gap-6 py-4 md:grid-cols-2">
+      <div class="space-y-2">
+        <Label>Asset</Label>
+        <MasterSelect type="fixedAssets" bind:value={editingLog.assetNo} />
+      </div>
+
+      <div class="space-y-2">
+        <Label for="date">Date</Label>
+        <Input id="date" type="date" bind:value={editingLog.date} />
+      </div>
+
+      <div class="col-span-full space-y-2">
+        <Label for="desc">Description</Label>
+        <Input id="desc" bind:value={editingLog.description} />
+      </div>
+
+      <div class="space-y-2">
+        <Label>Vendor / Technician</Label>
+        <MasterSelect type="vendors" bind:value={editingLog.vendorNo} />
+      </div>
+
+      <div class="space-y-2">
+        <Label for="amount">Amount</Label>
+        <Input id="amount" type="number" bind:value={editingLog.amount} />
+      </div>
+
+      <div class="space-y-2">
+        <Label>Location</Label>
+        <MasterSelect type="respCenters" bind:value={editingLog.location} />
+      </div>
+
+      <div class="space-y-2">
+        <Label>Reported By</Label>
+        <MasterSelect type="payrollEmployees" bind:value={editingLog.employee} />
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onclick={() => isEditing = false}>Cancel</Button>
+      <Button disabled={submitting} onclick={handleSave}>
+        {#if submitting}
+          <Icon name="loader-2" class="mr-2 size-4 animate-spin" />
+        {/if}
+        {editingLog.no ? "Update Log" : "Save Log"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>

@@ -153,8 +153,16 @@ public interface ISalesService
     Task SanitizeSalesInvoiceHeaderMobileNumbersAsync(ITenantScope scope, CancellationToken ct = default);
 
     /// <summary>
+    /// Syncs Mobile No_ field in Claim &amp; Failure Posted table from Sales Invoice Header table,
+    /// matching [Claim &amp; Failure Posted].[Invoice No_] to [Sales Invoice Header].[No_].
+    /// Fills all empty mobile number fields in the claim table.
+    /// </summary>
+    Task<int> SyncClaimPostedMobileNumbersAsync(ITenantScope scope, CancellationToken ct = default);
+
+    /// <summary>
     /// Fetches unique mobile numbers from table SalesInvoiceHeader and creates records under CrmContacts,
     /// only creating if the mobile number is not already present under CrmContacts.
     /// </summary>
     Task<int> ImportUniqueCrmContactsFromInvoicesAsync(ITenantScope scope, CancellationToken ct = default);
 }
+

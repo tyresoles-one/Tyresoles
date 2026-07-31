@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "Temporary diagnostic script to test backend API endpoints for login, allocation, and query of CRM agent contacts.",
+  "updatedAt": "2026-06-20T09:51:01.858461300Z"
+}

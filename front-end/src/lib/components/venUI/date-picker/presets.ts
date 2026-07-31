@@ -61,6 +61,18 @@ export const range = {
         const start = new CalendarDate(d.year, startMonth, 1);
         return { label: 'Last Quarter', value: { start, end: endOfMonth(start.add({ months: 2 })) } };
     },
+    thisHalfYear: (ref?: CalendarDate): PresetEntry => {
+        const d = getRef(ref);
+        const startMonth = d.month <= 6 ? 1 : 7;
+        const start = new CalendarDate(d.year, startMonth, 1);
+        return { label: 'This Half Year', value: { start, end: endOfMonth(start.add({ months: 5 })) } };
+    },
+    lastHalfYear: (ref?: CalendarDate): PresetEntry => {
+        const prev = getRef(ref).subtract({ months: 6 });
+        const startMonth = prev.month <= 6 ? 1 : 7;
+        const start = new CalendarDate(prev.year, startMonth, 1);
+        return { label: 'Last Half Year', value: { start, end: endOfMonth(start.add({ months: 5 })) } };
+    },
     thisFinYear: (ref?: CalendarDate): PresetEntry => {
         const d = getRef(ref);
         const startYear = d.month >= 4 ? d.year : d.year - 1;

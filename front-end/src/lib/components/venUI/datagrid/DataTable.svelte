@@ -6,13 +6,15 @@
 		table,
 		items,
 		loadingMore, 
-		onRowClick 
+		onRowClick,
+		cell
 	}: { 
 		table: Table<any>,
 		/** Current page rows from the parent list (SmartPagination, etc.). */
 		items: any[],
 		loadingMore: boolean, 
-		onRowClick?: (item: any) => void 
+		onRowClick?: (item: any) => void,
+		cell?: import("svelte").Snippet<[{ column: any; row: any; getValue: () => any; renderDefault: () => string }]>
 	} = $props();
 
 	function getPlainCellValue(col: Column<any>, original: any): unknown {
@@ -156,7 +158,16 @@
 					>
 						{#each table.getVisibleLeafColumns() as col}
 							<td class={bodyCellClass(col)}>
-								{renderBodyCell(col, original, rowIndex)}
+								{#if cell}
+									{@render cell({
+										column: col,
+										row: original,
+										getValue: () => getPlainCellValue(col, original),
+										renderDefault: () => renderBodyCell(col, original, rowIndex)
+									})}
+								{:else}
+									{renderBodyCell(col, original, rowIndex)}
+								{/if}
 							</td>
 						{/each}
 					</tr>

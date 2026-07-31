@@ -1,10 +1,8 @@
 <script lang="ts">
     import { getUser } from "$lib/stores/auth";
     import Header from "./Header.svelte";
-    import SalesTiles from "./SalesTiles.svelte";
     import { WeeklyEventDashboardWidget } from "$lib/components/venUI/calendar-view";
     import { fade } from "svelte/transition";
-    import SalesChart from "./SalesChart.svelte";
   
     const user = getUser();
   </script>

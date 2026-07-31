@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "CommonJS version of test_api script to avoid ESM import resolution issues.",
+  "updatedAt": "2026-06-20T11:20:47.480942500Z"
+}

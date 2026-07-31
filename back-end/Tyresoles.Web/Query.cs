@@ -4,6 +4,7 @@ using Dataverse.NavLive;
 using HotChocolate;
 using HotChocolate.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tyresoles.Data;
 using Tyresoles.Data.Features.Admin.Session;
@@ -24,6 +25,7 @@ using Tyresoles.Sql.Abstractions;
 using Tyresoles.Sql.GraphQL;
 using Tyresoles.Web.GraphQL;
 using Tyresoles.Web.Features.VpnInstaller;
+using Tyresoles.Web.Features.Downloads;
 using Tyresoles.Data.Features.Crm;
 using Tyresoles.Data.Features.Crm.Models;
 using Tyresoles.Data.Features.Crm.Entities;
@@ -48,22 +50,96 @@ public class Query
         return type switch
         {
             CrmMasterType.ContactType => db.CrmContactTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.ContactCategory => db.CrmContactCategories.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.Source => db.CrmSources.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.Stage => db.CrmStages.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.Priority => db.CrmPriorities.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.ActivityType => db.CrmActivityTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
-            CrmMasterType.ActivityOutcome => db.CrmActivityOutcomes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.ActivityOutcome => db.CrmActivityOutcomes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name, ParentId = x.ActivityTypeId, IsPositive = x.IsPositive }),
+            CrmMasterType.EntityType => db.CrmEntityTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.VehicleType => db.CrmFleetVehicleTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.VehicleMake => db.CrmFleetVehicleMakes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name, ParentId = x.ParentId }),
+            CrmMasterType.VehicleModel => db.CrmFleetVehicleModels.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name, ParentId = x.ParentId }),
+            CrmMasterType.Application => db.CrmFleetApplications.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
         };
     }
 
     [Authorize]
     [GraphQLName("getCrmContacts")]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 1000)]
     [UseFiltering]
     [UseSorting]
     public IQueryable<CrmContact> GetCrmContacts([Service] CrmDbContext db)
     {
         return db.CrmContacts;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactProducts")]
+    public async Task<List<string>> GetCrmContactProducts(string? respCenter, [Service] CrmDbContext db, CancellationToken ct)
+    {
+        var query = db.CrmContacts.Where(c => c.IsActive && !string.IsNullOrWhiteSpace(c.Products));
+        
+        if (!string.IsNullOrWhiteSpace(respCenter))
+        {
+            query = query.Where(c => c.RespCenter == respCenter);
+        }
+
+        var products = await query.Select(c => c.Products).ToListAsync(ct);
+
+        var distinctProducts = new HashSet<string>();
+        foreach (var pList in products)
+        {
+            if (string.IsNullOrWhiteSpace(pList)) continue;
+            var parts = pList.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                distinctProducts.Add(part);
+            }
+        }
+        return distinctProducts.OrderBy(x => x).ToList();
+    }
+
+    public class CrmContactLookups
+    {
+        public List<string> States { get; set; } = new();
+        public List<string> Cities { get; set; } = new();
+        public List<string> Tags { get; set; } = new();
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactLookups")]
+    public async Task<CrmContactLookups> GetCrmContactLookups(string? respCenter, [Service] CrmDbContext db, CancellationToken ct)
+    {
+        var query = db.CrmContacts.Where(c => c.IsActive);
+        
+        if (!string.IsNullOrWhiteSpace(respCenter))
+        {
+            query = query.Where(c => c.RespCenter == respCenter);
+        }
+
+        var states = await query.Where(c => !string.IsNullOrWhiteSpace(c.State)).Select(c => c.State!).Distinct().ToListAsync(ct);
+        var cities = await query.Where(c => !string.IsNullOrWhiteSpace(c.City)).Select(c => c.City!).Distinct().ToListAsync(ct);
+        var tagsRaw = await query.Where(c => !string.IsNullOrWhiteSpace(c.Tags)).Select(c => c.Tags!).ToListAsync(ct);
+
+        var distinctTags = new HashSet<string>();
+        foreach (var tList in tagsRaw)
+        {
+            if (string.IsNullOrWhiteSpace(tList)) continue;
+            var parts = tList.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                distinctTags.Add(part);
+            }
+        }
+
+        return new CrmContactLookups
+        {
+            States = states.OrderBy(x => x).ToList(),
+            Cities = cities.OrderBy(x => x).ToList(),
+            Tags = distinctTags.OrderBy(x => x).ToList()
+        };
     }
 
     [Authorize]
@@ -74,6 +150,580 @@ public class Query
         CancellationToken ct)
     {
         return await db.CrmContacts.FindAsync(new object[] { id }, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmCallLogs")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmCallLog> GetCrmCallLogs(
+        Guid contactId,
+        [Service] CrmDbContext db)
+    {
+        return db.CrmCallLogs.Where(x => x.ContactId == contactId);
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactFleetDetails")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmContactFleetDetail> GetCrmContactFleetDetails(
+        Guid contactId,
+        [Service] CrmDbContext db)
+    {
+        return db.CrmContactFleetDetails.Where(x => x.ContactId == contactId);
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmCallReminders")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmCallReminder> GetCrmCallReminders(
+        Guid contactId,
+        bool includeCompleted,
+        [Service] CrmDbContext db)
+    {
+        var q = db.CrmCallReminders.Where(x => x.ContactId == contactId);
+        if (!includeCompleted)
+        {
+            q = q.Where(x => !x.IsCompleted);
+        }
+        return q;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmAgentContacts")]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 1000)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmAgentContact> GetCrmAgentContacts([Service] CrmDbContext db)
+    {
+        return db.CrmAgentContacts;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmAgentSummaryReport")]
+    public async Task<List<CrmAgentSummaryDto>> GetCrmAgentSummaryReport(
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        var allocations = await db.CrmAgentContacts
+            .GroupBy(x => x.AgentUsername)
+            .Select(g => new CrmAgentSummaryDto
+            {
+                AgentUsername = g.Key,
+                TotalAllocated = g.Count(),
+                ActiveAllocated = g.Count(x => x.DeallocatedAt == null),
+                TotalCalls = g.Sum(x => x.CallCount)
+            })
+            .ToListAsync(ct);
+
+        return allocations;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmMyCallingSummary")]
+    public async Task<List<CrmMyCallingSummaryDto>> GetCrmMyCallingSummary(
+        DateTime? date,
+        [Service] CrmDbContext db,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken ct)
+    {
+        var callerUserId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+
+        var targetDate = date?.Date ?? DateTime.UtcNow.Date;
+        var nextDate = targetDate.AddDays(1);
+
+        var summaries = await db.CrmCallLogs
+            .Where(x => x.CreatedBy == callerUserId && x.CallDate >= targetDate && x.CallDate < nextDate)
+            .GroupBy(x => x.Outcome)
+            .Select(g => new CrmMyCallingSummaryDto
+            {
+                Outcome = g.Key,
+                Count = g.Count()
+            })
+            .ToListAsync(ct);
+
+        return summaries;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmSettings")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmSetting> GetCrmSettings([Service] CrmDbContext db)
+    {
+        return db.CrmSettings;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmSetting")]
+    public async Task<CrmSetting?> GetCrmSetting(
+        string key,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        return await db.CrmSettings.FindAsync(new object[] { key }, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmWhatsappImages")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmWhatsappImage> GetCrmWhatsappImages([Service] CrmDbContext db)
+    {
+        return db.CrmWhatsappImages;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmWhatsappTemplates")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmWhatsappTemplate> GetCrmWhatsappTemplates([Service] CrmDbContext db)
+    {
+        return db.CrmWhatsappTemplates;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmProducts")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmProduct> GetCrmProducts([Service] CrmDbContext db)
+    {
+        return db.CrmProducts;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmProductPrice")]
+    public async Task<decimal?> GetCrmProductPrice(
+        string itemNo,
+        string? respCenter,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(itemNo)) return null;
+
+        var items = itemNo.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (items.Length == 0) return null;
+
+        var products = await db.CrmProducts
+            .Where(p => items.Contains(p.Code))
+            .ToListAsync(ct);
+
+        if (products.Count == 0) return null;
+
+        if (!string.IsNullOrWhiteSpace(respCenter))
+        {
+            var rcTrimmed = respCenter.Trim().ToLower();
+            var matchedProduct = products.FirstOrDefault(p =>
+                !string.IsNullOrWhiteSpace(p.RespCenters) &&
+                p.RespCenters.Split(',').Select(rc => rc.Trim().ToLower()).Contains(rcTrimmed));
+
+            if (matchedProduct != null) return matchedProduct.FinalPrice;
+        }
+
+        var defaultProduct = products.FirstOrDefault(p => string.IsNullOrWhiteSpace(p.RespCenters)) ?? products[0];
+        return defaultProduct.FinalPrice;
+    }
+
+    public class CrmSalesPriceRow
+    {
+        public decimal UnitPrice { get; set; }
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmCustomerItemPrice")]
+    public async Task<decimal?> GetCrmCustomerItemPrice(
+        string itemNo,
+        string salesCode,
+        [Service] IDataverseDataService dataService,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(itemNo) || string.IsNullOrWhiteSpace(salesCode))
+        {
+            return null;
+        }
+
+        var items = itemNo.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (items.Length == 0) return null;
+
+        using var scope = dataService.ForTenant("NavLive");
+        var tableName = scope.GetQualifiedTableName("Sales Price", false);
+        var today = DateTime.UtcNow.Date;
+
+        var itemParams = new List<string>();
+        var parameters = new Dictionary<string, object>
+        {
+            { "salesCode", salesCode.Trim() },
+            { "today", today }
+        };
+
+        for (int i = 0; i < items.Length; i++)
+        {
+            var pName = $"item{i}";
+            itemParams.Add($"@{pName}");
+            parameters[pName] = items[i];
+        }
+
+        var itemInClause = string.Join(", ", itemParams);
+
+        var sql = $@"
+            SELECT TOP 1 [Unit Price] AS UnitPrice
+            FROM {tableName}
+            WHERE [Item No_] IN ({itemInClause})
+              AND ([Sales Code] = @salesCode OR [Sales Type] = 2)
+              AND ([Starting Date] IS NULL OR [Starting Date] <= @today OR YEAR([Starting Date]) <= 1753)
+              AND ([Ending Date] IS NULL OR [Ending Date] >= @today OR YEAR([Ending Date]) <= 1753 OR YEAR([Ending Date]) = 1)
+              AND [Unit Price] > 0
+            ORDER BY CASE WHEN [Sales Code] = @salesCode THEN 0 ELSE 1 END, [Starting Date] DESC";
+
+        try
+        {
+            var prices = await scope.RawQueryToArrayAsync<CrmSalesPriceRow>(sql, parameters, ct).ConfigureAwait(false);
+            if (prices.Length > 0)
+            {
+                var priceWithGst = prices[0].UnitPrice * 1.18m;
+                return Math.Ceiling(priceWithGst);
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GetCrmCustomerItemPrice Error]: {ex.Message}");
+            return null;
+        }
+    }
+
+
+    [Authorize]
+    [GraphQLName("getUpcomingCrmReminders")]
+    public async Task<List<CrmCallReminder>> GetUpcomingCrmReminders(
+        DateTime? untilUtc,
+        [Service] CrmDbContext db,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken ct)
+    {
+        var callerUserId = httpContextAccessor.HttpContext?.User?.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub") ?? "";
+        
+        var targetDate = untilUtc ?? DateTime.UtcNow.AddHours(24);
+        
+        return await db.CrmCallReminders
+            .Where(x => !x.IsCompleted && x.ReminderDate <= targetDate && x.CreatedBy == callerUserId)
+            .OrderBy(x => x.ReminderDate)
+            .ToListAsync(ct);
+    }
+
+    private static List<string> Extract10DigitMobiles(params string?[] inputs)
+    {
+        var result = new HashSet<string>();
+        foreach (var input in inputs)
+        {
+            if (string.IsNullOrWhiteSpace(input)) continue;
+            var parts = input.Split(new[] { ',', ';', '/', ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                var digits = new string(part.Where(char.IsDigit).ToArray());
+                if (digits.Length >= 10)
+                {
+                    var mobile = digits.Substring(digits.Length - 10);
+                    if (mobile[0] >= '6' && mobile[0] <= '9')
+                    {
+                        result.Add(mobile);
+                    }
+                }
+            }
+        }
+        return result.ToList();
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactInvoices")]
+    public async Task<List<CrmContactInvoiceDto>> GetCrmContactInvoices(
+        Guid contactId,
+        [Service] CrmDbContext db,
+        [Service] IDataverseDataService dataService,
+        CancellationToken ct)
+    {
+        var contact = await db.CrmContacts.FindAsync(new object[] { contactId }, ct);
+        if (contact == null)
+        {
+            return new List<CrmContactInvoiceDto>();
+        }
+
+        var mobileNos = Extract10DigitMobiles(contact.MobileNo, contact.MobileNo2);
+        var customerNos = (contact.ERPCustomerNos ?? "")
+            .Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        if (mobileNos.Count == 0 && customerNos.Count == 0)
+        {
+            return new List<CrmContactInvoiceDto>();
+        }
+
+        using var scope = dataService.ForTenant("NavLive");
+
+        (string sql, Dictionary<string, object> parameters) BuildInClause(string quotedColumn, string paramPrefix, IReadOnlyList<string> values)
+        {
+            if (values == null || values.Count == 0)
+                return ("1=0", new Dictionary<string, object>());
+            var dict = new Dictionary<string, object>();
+            var names = new List<string>();
+            for (int i = 0; i < values.Count; i++)
+            {
+                var key = "@" + paramPrefix + i;
+                names.Add(key);
+                dict[key] = values[i];
+            }
+            return ($"{quotedColumn} IN ({string.Join(", ", names)})", dict);
+        }
+
+        // Fetch headers matching contact's mobile numbers, or falling back to customer numbers if no mobile number exists
+        string sqlHeadersFilter;
+        Dictionary<string, object> prmsHeadersFilter;
+
+        if (mobileNos.Count > 0)
+        {
+            var clauses = new List<string>();
+            prmsHeadersFilter = new Dictionary<string, object>();
+            for (int i = 0; i < mobileNos.Count; i++)
+            {
+                var paramKey = "@m" + i;
+                clauses.Add($"[Mobile No_] LIKE {paramKey}");
+                prmsHeadersFilter[paramKey] = "%" + mobileNos[i] + "%";
+            }
+            sqlHeadersFilter = "(" + string.Join(" OR ", clauses) + ")";
+        }
+        else
+        {
+            (sqlHeadersFilter, prmsHeadersFilter) = BuildInClause("[Sell-to Customer No_]", "c", customerNos);
+        }
+
+        var qryHeaders = scope.Query<SalesInvoiceHeader>()
+            .Where(sqlHeadersFilter, prmsHeadersFilter)
+            .OrderByDescending(h => h.PostingDate)
+            .Take(50);
+        
+        var headers = await scope.ToArrayAsync(qryHeaders, ct).ConfigureAwait(false);
+        if (headers.Length == 0)
+        {
+            return new List<CrmContactInvoiceDto>();
+        }
+
+        var docNos = headers.Select(h => h.No).ToArray();
+        var (docNoSql, docNoPrms) = BuildInClause("[Document No_]", "doc", docNos);
+        
+        // Fetch all lines for these invoices
+        var qryLines = scope.Query<SalesInvoiceLine>()
+            .Where(docNoSql, docNoPrms)
+            .Where(l => l.Quantity > 0 && l.No != "9400");
+        
+        var lines = await scope.ToArrayAsync(qryLines, ct).ConfigureAwait(false);
+
+        // Group lines by DocumentNo to compile items description, quantity sum, amountToCustomer sum
+        var linesGrouped = lines.GroupBy(l => l.DocumentNo).ToDictionary(
+            g => g.Key,
+            g => {
+                var itemsList = g
+                    .Where(l => l.ItemCategoryCode == "ECOMILE" || l.ItemCategoryCode == "ECOMLE" || l.ItemCategoryCode == "RETD")
+                    .GroupBy(l => new { l.No, l.ItemCategoryCode })
+                    .OrderBy(ig => ig.Key.No)
+                    .Select(ig => {
+                        var no = ig.Key.No;
+                        var cat = ig.Key.ItemCategoryCode;
+                        var qty = ig.Sum(l => l.Quantity);
+                        if (string.Equals(cat, "ECOMLE", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(cat, "ECOMILE", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(cat, "RETD", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return $"{no} ({qty.ToString("0.##")})";
+                        }
+                        return no;
+                    })
+                    .ToList();
+
+                return new {
+                    Items = string.Join(", ", itemsList),
+                    Qty = g
+                        .Where(l => l.ItemCategoryCode == "ECOMLE" || l.ItemCategoryCode == "RETD")
+                        .Sum(l => l.Quantity),
+                    AmountToCustomer = g.Sum(l => l.AmountToCustomer)
+                };
+            }
+        );
+
+        var result = headers.Select(h => {
+            linesGrouped.TryGetValue(h.No, out var lineSummary);
+            return new CrmContactInvoiceDto
+            {
+                No = h.No,
+                Date = h.PostingDate,
+                Items = lineSummary?.Items ?? string.Empty,
+                CustomerName = h.SellToCustomerName,
+                Qty = lineSummary?.Qty ?? 0,
+                AmountToCustomer = lineSummary?.AmountToCustomer ?? 0
+            };
+        })
+        .OrderByDescending(x => x.Date)
+        .ToList();
+
+        return result;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmContactClaims")]
+    public async Task<List<CrmContactClaimDto>> GetCrmContactClaims(
+        Guid contactId,
+        [Service] CrmDbContext db,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        CancellationToken ct)
+    {
+        var contact = await db.CrmContacts.FindAsync(new object[] { contactId }, ct);
+        if (contact == null)
+        {
+            return new List<CrmContactClaimDto>();
+        }
+
+        var mobileNos = Extract10DigitMobiles(contact.MobileNo, contact.MobileNo2);
+        var customerNos = (contact.ERPCustomerNos ?? "")
+            .Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        if (mobileNos.Count == 0 && customerNos.Count == 0)
+        {
+            return new List<CrmContactClaimDto>();
+        }
+
+        using var scope = dataService.ForTenant("NavLive");
+
+        // Sync mobile numbers in Claim & Failure Posted table if missing
+        await salesService.SyncClaimPostedMobileNumbersAsync(scope, ct).ConfigureAwait(false);
+
+        (string sql, Dictionary<string, object> parameters) BuildInClause(string quotedColumn, string paramPrefix, IReadOnlyList<string> values)
+        {
+            if (values == null || values.Count == 0)
+                return ("1=0", new Dictionary<string, object>());
+            var dict = new Dictionary<string, object>();
+            var names = new List<string>();
+            for (int i = 0; i < values.Count; i++)
+            {
+                var key = "@" + paramPrefix + i;
+                names.Add(key);
+                dict[key] = values[i];
+            }
+            return ($"{quotedColumn} IN ({string.Join(", ", names)})", dict);
+        }
+
+        string sqlClaimsFilter;
+        var prmsClaimsFilter = new Dictionary<string, object>();
+
+        if (mobileNos.Count > 0)
+        {
+            var mobileClauses = new List<string>();
+            for (int i = 0; i < mobileNos.Count; i++)
+            {
+                var paramKey = "@m" + i;
+                mobileClauses.Add($"[Mobile No_] LIKE {paramKey}");
+                prmsClaimsFilter[paramKey] = "%" + mobileNos[i] + "%";
+            }
+            var mobileFilterStr = "(" + string.Join(" OR ", mobileClauses) + ")";
+
+            // Fetch docNos from SalesInvoiceHeader matching the mobile number as well
+            var qryHeaders = scope.Query<SalesInvoiceHeader>()
+                .Where(mobileFilterStr, prmsClaimsFilter)
+                .OrderByDescending(h => h.PostingDate)
+                .Take(200);
+
+            var headers = await scope.ToArrayAsync(qryHeaders, ct).ConfigureAwait(false);
+            var docNos = headers.Select(h => h.No).Where(no => !string.IsNullOrEmpty(no)).ToArray();
+
+            if (docNos.Length > 0)
+            {
+                var (docSql, docPrms) = BuildInClause("[Invoice No_]", "doc", docNos);
+                foreach (var kvp in docPrms) prmsClaimsFilter[kvp.Key] = kvp.Value;
+                sqlClaimsFilter = $"({mobileFilterStr} OR ({docSql}))";
+            }
+            else
+            {
+                sqlClaimsFilter = mobileFilterStr;
+            }
+        }
+        else if (customerNos.Count > 0)
+        {
+            (sqlClaimsFilter, prmsClaimsFilter) = BuildInClause("[Customer No_]", "c", customerNos);
+        }
+        else
+        {
+            return new List<CrmContactClaimDto>();
+        }
+
+        var qryClaims = scope.Query<ClaimFailurePosted>()
+            .Where(sqlClaimsFilter, prmsClaimsFilter)
+            .Where(c => c.Type == 0)
+            .OrderByDescending(c => c.PostingDate)
+            .Take(50);
+
+        var claims = await scope.ToArrayAsync(qryClaims, ct).ConfigureAwait(false);
+        if (claims.Length == 0)
+        {
+            return new List<CrmContactClaimDto>();
+        }
+
+        var claimNos = claims.Select(c => c.No).Distinct().ToArray();
+        var (claimNosSql, claimNosPrms) = BuildInClause("[Document No_]", "doc", claimNos);
+
+        var qrySettlements = scope.Query<ClaimFailureSettlement>()
+            .Where(claimNosSql, claimNosPrms);
+
+        var settlements = await scope.ToArrayAsync(qrySettlements, ct).ConfigureAwait(false);
+
+        var settlementsMap = settlements
+            .GroupBy(s => s.DocumentNo)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        string GetDecisionText(int decision) => decision switch
+        {
+            1 => "Retread",
+            2 => "Repair",
+            3 => "Reject",
+            4 => "Issue Credit Note",
+            5 => "Recomanded to use",
+            6 => "Casing Replaced",
+            7 => "Ecomile Replaced",
+            _ => ""
+        };
+
+        var result = claims.Select(c =>
+        {
+            settlementsMap.TryGetValue(c.No, out var list);
+            var settlement = list?.FirstOrDefault(s => s.LineNo == c.LineNo) ?? list?.FirstOrDefault();
+
+            var decisionVal = settlement?.Decision ?? c.Decision;
+            var compAmt = settlement?.CompensationAmount ?? c.CompensationAmount;
+            var faultDesc = !string.IsNullOrWhiteSpace(settlement?.FaultDescription) 
+                ? settlement.FaultDescription 
+                : c.FaultDescription;
+
+            return new CrmContactClaimDto
+            {
+                No = c.No,
+                Date = c.PostingDate,
+                ItemNo = c.ItemNo,
+                SerialNo = c.SerialNo,
+                Make = c.Make,
+                FaultDescription = faultDesc ?? "",
+                Decision = GetDecisionText(decisionVal),
+                CompensationAmount = compAmt,
+                MobileNo = c.MobileNo
+            };
+        })
+        .OrderByDescending(x => x.Date)
+        .ToList();
+
+        return result;
     }
 
     /// <summary>Get Drive Sync user configuration for the specified user or the caller.</summary>
@@ -957,6 +1607,19 @@ public class Query
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return purchaseService.GetItemCategories(scope);
     }
+    [Authorize]
+    [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Dataverse.NavLive.CustomerPriceGroup> GetCustomerPriceGroups(
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForTenant("NavLive");
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return scope.Query<Dataverse.NavLive.CustomerPriceGroup>().AsQueryable(scope);
+    }
 
     [Authorize]
     [UsePaging(IncludeTotalCount = true, MaxPageSize = 250)]
@@ -1173,6 +1836,19 @@ public class Query
             FileName = o.FileName,
             IsZipArchive = o.IsZipArchive,
             ZipEntryName = o.ZipEntryName,
+        };
+    }
+
+    /// <summary>Get all configured downloads for client applications. Requires authentication.</summary>
+    [Authorize]
+    [GraphQLName("downloadsConfig")]
+    public DownloadsConfig GetDownloadsConfig(
+        [Service] IOptionsSnapshot<DownloadsOptions> options)
+    {
+        var o = options.Value;
+        return new DownloadsConfig
+        {
+            Items = o.Items ?? new List<DownloadItem>()
         };
     }
 
@@ -1623,3 +2299,39 @@ public sealed class DriveSyncAdminStatus
     public DateTime LastCheckedUtc { get; set; }
 }
 
+public sealed class CrmContactInvoiceDto
+{
+    public string No { get; set; } = "";
+    public DateTime? Date { get; set; }
+    public string Items { get; set; } = "";
+    public string? CustomerName { get; set; }
+    public decimal Qty { get; set; }
+    public decimal AmountToCustomer { get; set; }
+}
+
+public sealed class CrmContactClaimDto
+{
+    public string No { get; set; } = "";
+    public DateTime? Date { get; set; }
+    public string ItemNo { get; set; } = "";
+    public string SerialNo { get; set; } = "";
+    public string Make { get; set; } = "";
+    public string FaultDescription { get; set; } = "";
+    public string Decision { get; set; } = "";
+    public decimal CompensationAmount { get; set; }
+    public string MobileNo { get; set; } = "";
+}
+
+public sealed class CrmAgentSummaryDto
+{
+    public string AgentUsername { get; set; } = "";
+    public int TotalAllocated { get; set; }
+    public int ActiveAllocated { get; set; }
+    public int TotalCalls { get; set; }
+}
+
+public sealed class CrmMyCallingSummaryDto
+{
+    public string Outcome { get; set; } = "";
+    public int Count { get; set; }
+}

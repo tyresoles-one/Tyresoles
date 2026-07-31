@@ -148,200 +148,232 @@
 
 <!-- ── Template ──────────────────────────────────────────────────── -->
 
-{#if status === "available"}
-  <div class="update-banner" role="alert">
-    <div class="update-banner-content">
-      <div class="update-info">
+{#if status !== "idle" && status !== "checking"}
+  <div class="update-overlay" role="dialog" aria-modal="true">
+    <div class="update-modal">
+      {#if status === "available"}
         <span class="update-icon">🚀</span>
-        <div>
-          <strong>Update v{updateVersion} available</strong>
-          {#if updateNotes}
+        <h2>Update Required</h2>
+        <p class="update-msg">A new version (v{updateVersion}) of Tyresoles is available. You must update to continue using the application.</p>
+        {#if updateNotes}
+          <div class="update-notes-container">
+            <strong>What's New:</strong>
             <p class="update-notes">{updateNotes}</p>
-          {/if}
-        </div>
-      </div>
-      <div class="update-actions">
+          </div>
+        {/if}
         <button class="btn-update" onclick={downloadAndInstall}>
           Update Now
         </button>
-        <button class="btn-dismiss" onclick={dismiss} aria-label="Dismiss">
-          ✕
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+      {/if}
 
-{#if status === "downloading"}
-  <div class="update-banner downloading" role="alert">
-    <div class="update-banner-content">
-      <div class="update-info">
-        <span class="update-icon">⬇️</span>
-        <div>
-          <strong>Downloading update…</strong>
+      {#if status === "downloading"}
+        <span class="update-icon anim-bounce">⬇️</span>
+        <h2>Installing Update</h2>
+        <p class="update-msg">Downloading and preparing v{updateVersion}. Please wait, the app will automatically restart.</p>
+        <div class="progress-container">
+          <div class="progress-bar-track">
+            <div
+              class="progress-bar-fill"
+              style="width: {downloadProgress}%"
+            ></div>
+          </div>
           <span class="progress-text">{downloadProgress}%</span>
         </div>
-      </div>
-      <div class="progress-bar-track">
-        <div
-          class="progress-bar-fill"
-          style="width: {downloadProgress}%"
-        ></div>
-      </div>
-    </div>
-  </div>
-{/if}
+      {/if}
 
-{#if status === "error"}
-  <div class="update-banner error" role="alert">
-    <div class="update-banner-content">
-      <div class="update-info">
+      {#if status === "error"}
         <span class="update-icon">⚠️</span>
-        <div>
-          <strong>Update failed</strong>
-          <p class="update-notes">{errorMessage}</p>
+        <h2>Update Failed</h2>
+        <p class="update-msg">{errorMessage}</p>
+        <div class="update-actions">
+          {#if retryCount < MAX_RETRIES}
+            <button class="btn-update" onclick={retry}>
+              Retry ({retryCount}/{MAX_RETRIES})
+            </button>
+          {:else}
+            <p class="error-support-msg">Please restart the app or contact support if the problem persists.</p>
+          {/if}
         </div>
-      </div>
-      <div class="update-actions">
-        {#if retryCount < MAX_RETRIES}
-          <button class="btn-update" onclick={retry}>
-            Retry ({retryCount}/{MAX_RETRIES})
-          </button>
-        {/if}
-        <button class="btn-dismiss" onclick={dismiss} aria-label="Dismiss">
-          ✕
-        </button>
-      </div>
+      {/if}
     </div>
   </div>
 {/if}
 
 <!-- ── Styles ────────────────────────────────────────────────────── -->
 <style>
-  .update-banner {
+  .update-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 9999;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    bottom: 0;
+    z-index: 999999;
+    background: rgba(15, 23, 42, 0.85); /* Slate 900 with opacity */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .update-modal {
+    width: 100%;
+    max-width: 480px;
+    background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2); /* Subtle blue border */
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    text-align: center;
     color: #f1f5f9;
-    border-bottom: 2px solid #3b82f6;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-    animation: slideDown 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .update-banner.downloading {
-    border-bottom-color: #22c55e;
-  }
-
-  .update-banner.error {
-    border-bottom-color: #ef4444;
-  }
-
-  .update-banner-content {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 12px 20px;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-  }
-
-  .update-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 200px;
+    animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .update-icon {
-    font-size: 1.3rem;
-    flex-shrink: 0;
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: inline-block;
+  }
+
+  .anim-bounce {
+    animation: bounce 2s infinite;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    letter-spacing: -0.025em;
+    background: linear-gradient(to right, #60a5fa, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .update-msg {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #94a3b8;
+    margin: 0 0 24px 0;
+  }
+
+  .update-notes-container {
+    width: 100%;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    text-align: left;
+    box-sizing: border-box;
+  }
+
+  .update-notes-container strong {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .update-notes {
-    margin: 2px 0 0;
-    font-size: 0.8rem;
-    opacity: 0.75;
-    line-height: 1.3;
-    max-width: 400px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    margin: 8px 0 0 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: #94a3b8;
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
   }
 
   .update-actions {
+    width: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
   }
 
   .btn-update {
-    padding: 6px 18px;
-    background: #3b82f6;
-    color: #fff;
+    width: 100%;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #ffffff;
     border: none;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: 8px;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    transition: all 0.25s ease;
   }
+
   .btn-update:hover {
-    background: #2563eb;
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+    transform: translateY(-1px);
   }
+
   .btn-update:active {
-    transform: scale(0.97);
+    transform: translateY(1px);
   }
 
-  .btn-dismiss {
-    padding: 4px 8px;
-    background: transparent;
-    color: #94a3b8;
-    border: 1px solid #334155;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: color 0.2s, border-color 0.2s;
-  }
-  .btn-dismiss:hover {
-    color: #f1f5f9;
-    border-color: #64748b;
-  }
-
-  .progress-text {
-    font-size: 0.8rem;
-    opacity: 0.7;
-    margin-left: 6px;
+  .progress-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
   }
 
   .progress-bar-track {
     width: 100%;
-    height: 4px;
-    background: #1e293b;
-    border-radius: 2px;
+    height: 6px;
+    background: rgba(30, 41, 59, 0.8);
+    border-radius: 3px;
     overflow: hidden;
   }
 
   .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #22c55e, #4ade80);
-    border-radius: 2px;
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    border-radius: 3px;
+    transition: width 0.15s ease-out;
   }
 
-  @keyframes slideDown {
+  .progress-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #60a5fa;
+  }
+
+  .error-support-msg {
+    font-size: 0.85rem;
+    color: #f87171;
+    margin: 8px 0 0 0;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes scaleIn {
     from {
-      transform: translateY(-100%);
       opacity: 0;
+      transform: scale(0.95);
     }
     to {
-      transform: translateY(0);
       opacity: 1;
+      transform: scale(1);
     }
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
 </style>

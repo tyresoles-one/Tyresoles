@@ -19,6 +19,7 @@ mutation RefreshToken($token: String!, $refreshToken: String!) {
       workDate
       avatar
       userSpecialToken
+      dashboards
     }
     locations {
       code

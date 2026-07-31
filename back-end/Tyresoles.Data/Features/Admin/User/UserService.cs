@@ -205,7 +205,10 @@ public sealed class UserService : IUserService
         var user = firstRow.User;
         if (user == null)
             return new LoginResult { Success = false, Message = "Invalid username.", User = null };
-                
+
+        if(user.State == 1)
+            return new LoginResult { Success = false, Message = "User account disabled.", User = null };
+
         bool isValidPassword = false;
 
         if ((password.Length <= 4))

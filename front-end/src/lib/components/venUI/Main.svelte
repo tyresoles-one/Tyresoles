@@ -82,6 +82,12 @@
           },
           {
             type: "item",
+            label: "Downloads",
+            icon: "download",
+            onClick: () => goto("/downloads"),
+          },
+          {
+            type: "item",
             label: "Set Password",
             icon: "lock",
             onClick: () => goto("/change-password"),

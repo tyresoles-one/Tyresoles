@@ -601,7 +601,7 @@
                             {/if}
                           </button>
                           <button class="nea-action-reject-admin" onclick={() => rejectRequest(req.id)} disabled={actionLoading !== null}>
-                            <Icon name="x-circle" class="w-4 h-4" />
+                            <Icon name="circle-x" class="w-4 h-4" />
                             Reject
                           </button>
                         </div>

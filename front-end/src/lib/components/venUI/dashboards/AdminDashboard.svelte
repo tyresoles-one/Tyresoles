@@ -1,8 +1,7 @@
 <script lang="ts">
   import { authStore, getUser } from '$lib/stores/auth';
   import Header from './Header.svelte';
-  import SalesTiles from './SalesTiles.svelte';
-  import SalesChart from './SalesChart.svelte';
+  import SalesOverview from './SalesOverview.svelte';
   import { WeeklyEventDashboardWidget } from '$lib/components/venUI/calendar-view';
   import { Icon } from '$lib/components/venUI/icon';
   import { goto } from '$app/navigation';
@@ -16,11 +15,10 @@
     
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         <div class="xl:col-span-12">
-            <SalesTiles />
+            <SalesOverview class="h-full min-h-[500px]" />
         </div>
 
         <div class="xl:col-span-8 flex flex-col gap-6">
-            <SalesChart class="h-full min-h-[500px]" />
             <WeeklyEventDashboardWidget />
         </div>
 

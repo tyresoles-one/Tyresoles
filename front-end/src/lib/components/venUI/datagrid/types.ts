@@ -52,6 +52,9 @@ export interface DataGridProps<TData extends RowData> {
 	/** Render hook for table global actions at top */
 	actions?: import("svelte").Snippet;
 
+	/** Custom cell renderer snippet */
+	cell?: import("svelte").Snippet<[{ column: any; row: TData; getValue: () => any; renderDefault: () => string }]>;
+
 	/** Shows/Hides generic multi filter button */
 	showFilters?: boolean;
 

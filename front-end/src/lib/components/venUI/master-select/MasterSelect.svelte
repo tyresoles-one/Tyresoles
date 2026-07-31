@@ -45,6 +45,8 @@
 		respCenterOverride?: string | string[] | null;
 		/** For `masterType="vendors"`, limit to these vendor categories (e.g. casing procurement). Default: all (`[]`). */
 		vendorCategories?: string[];
+		/** For `masterType="items"`, limit to these item category codes. */
+		itemCategoriesFilter?: string[];
 		/** Required for `masterType="purchaseItems"` — Hot Chocolate field `purchaseItemNos` (C# `GetPurchaseItemNos`) / legacy ItemNos. */
 		purchaseItemParam?: FetchParamsInput | null;
 		/** Required for `production*` master types — maps to Query.cs `ProductionFetchParams param`. */
@@ -71,6 +73,7 @@
 		singleSelect = false,
 		respCenterOverride = undefined,
 		vendorCategories,
+		itemCategoriesFilter,
 		purchaseItemParam = null,
 		productionFetchParam = null,
 		groupCategoriesType = 1,
@@ -201,6 +204,20 @@
 			const name = `${n.firstName ?? ''} ${n.lastName ?? ''}`.trim();
 			return { label: name ? `${value} - ${name}` : value, value };
 		}
+		if (masterType === 'customerPriceGroups') {
+			const n = node as { code?: string | null; fromDate?: string | null; toDate?: string | null; description?: string | null };
+			const value = n.code ?? '';
+			// Format Navision dates
+			const fDate = n.fromDate && !n.fromDate.startsWith('1753-01-01') ? new Date(n.fromDate).toLocaleDateString() : '';
+			const tDate = n.toDate && !n.toDate.startsWith('1753-01-01') ? new Date(n.toDate).toLocaleDateString() : '';
+			
+			let name = n.description ?? '';
+			if (fDate && tDate) name = `${fDate} - ${tDate}`;
+			else if (fDate) name = fDate;
+			
+			return { label: name ? `${value} - ${name}` : value, value };
+		}
+		
 		const valueKey = getValueKey(masterType);
 		const raw = valueKey === 'no' ? (node as { no?: string | null }).no : (node as { code?: string | null }).code;
 		const value = raw ?? '';
@@ -208,7 +225,7 @@
 			node.name ??
 			(node as { description?: string | null }).description ??
 			'';
-		return { label: name ? `${value} - ${name}` : value, value };
+		return { label: name ? `${value} - ${name}` : value, value, meta: node as Record<string, unknown> };
 	}
 
 	function applyProductionFilter() {
@@ -413,6 +430,22 @@
 				variables.ecoMgr = user.userId ?? undefined;
 			}
 		}
+		if (masterType === 'customerPriceGroups') {
+			variables.where = variables.where || {};
+			variables.where.type = { eq: 0 };
+			variables.where.toDate = { lte: '1753-01-02' };
+			if (respCenterOverride) {
+				const arr = Array.isArray(respCenterOverride) ? respCenterOverride : [respCenterOverride];
+				if (arr.length > 0) {
+					// CustomerPriceGroup RespCenterFilter can contain multiple resp centers or match exactly.
+					variables.where.or = arr.map((c) => ({ respCenterFilter: { contains: c } }));
+				}
+			}
+		}
+		if (masterType === 'items' && itemCategoriesFilter && itemCategoriesFilter.length > 0) {
+			variables.where = variables.where || {};
+			variables.where.itemCategoryCode = { in: itemCategoriesFilter };
+		}
 
 		if (append) loadingMore = true;
 		else loading = true;
@@ -438,6 +471,7 @@
 				hsnSacs?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				inventoryPostingGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 				items?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
+				customerPriceGroups?: { nodes: unknown[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
 			}>(query, { variables, skipLoading: true, skipCache: true });
 			if (!result.success || !result.data) return;
 			const conn =
@@ -460,7 +494,8 @@
 				result.data.gstGroups ??
 				result.data.hsnSacs ??
 				result.data.inventoryPostingGroups ??
-				result.data.items;
+				result.data.items ??
+				result.data.customerPriceGroups;
 			if (!conn?.nodes) return;
 			const newOptions = (conn.nodes as Record<string, unknown>[]).map((n) =>
 				nodeToOption(n as { code?: string | null; no?: string | null; name?: string | null })
@@ -643,13 +678,14 @@
 			<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 		</Popover.Trigger>
 		<Popover.Content
-			class="min-w-[200px] p-0 max-w-[calc(100vw-2rem)] w-(--bits-popover-anchor-width)"
+			class="min-w-[200px] p-0 max-w-[calc(100vw-2rem)] w-[var(--bits-popover-anchor-width)]"
+			style="max-height: 250px;"
 			align="start"
 			sideOffset={4}
 		>
-			<Command.Root shouldFilter={false} class="flex flex-col max-h-[min(80vh,400px)]">
+			<Command.Root shouldFilter={false} class="flex flex-col h-full">
 				<Command.Input placeholder="Search..." bind:value={searchQuery} />
-				<Command.List class="overflow-x-hidden overflow-y-auto flex-1 max-h-none min-h-[120px]">
+				<Command.List class="overflow-x-hidden overflow-y-auto flex-1 max-h-[200px]">
 					{#if loading}
 						<div class="flex items-center justify-center py-8 text-muted-foreground">
 							<Loader2 class="size-5 animate-spin" />

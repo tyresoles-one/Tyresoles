@@ -1,9 +1,11 @@
 query GetProductionItemNos($param: FetchParamsInput!) {
-  productionItemNos(param: $param) {
-    code
-    minRate
-    maxRate
-    category
+  purchaseItemNos(param: $param) {
+    nodes {
+      code
+      minRate
+      maxRate
+      category
+    }
   }
 }
 

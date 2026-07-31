@@ -146,8 +146,7 @@
                         props: {
                             fieldName: 'respCenter',
                             masterType: 'respCenters',
-                            label: 'Resp. Center',
-                            respCenterType: 'Sale',
+                            label: 'Resp. Center',                            
                             singleSelect: true
                         },
                         required: true,

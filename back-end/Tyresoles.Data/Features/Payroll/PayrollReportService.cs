@@ -49,8 +49,8 @@ public sealed partial class PayrollReportService : IPayrollReportService
         new() { Id = 17, Name = "CL Encashment", ShowNos = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
         new() { Id = 18, Name = "Leave Encashment", ShowNos = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
         new() { Id = 19, Name = "Mediclaim Encashment", ShowNos = true, DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
-        new() { Id = 20, Name = "Mandays", DatePreset = "thisMonth,lastMonth,thisYear", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
-        new() { Id = 21, Name = "Mandays (WO/Ab)", DatePreset = "thisMonth,lastMonth,thisYear", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
+        new() { Id = 20, Name = "Mandays", DatePreset = "thisHalfYear,lastHalfYear", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
+        new() { Id = 21, Name = "Mandays (WO/Ab)", DatePreset = "thisHalfYear,lastHalfYear", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
         new() { Id = 22, Name = "Employee Grade", ShowNos = true, ShowType = true, TypeOptions = new List<string> { "Active", "Inactive", "Terminated" } },
         new() { Id = 23, Name = "Labour Welfare Fund", DatePreset = "thisMonth,lastMonth,thisYear", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
         new() { Id = 24, Name = "Employee Gratuity", DatePreset = "thisMonth,lastMonth", OutputFormats = "pdf,excel", RequiredFields="dateRange"  },
@@ -425,10 +425,22 @@ public sealed partial class PayrollReportService : IPayrollReportService
                 columnRecords.Add((clmName, "C. A.", recos.Sum(r => r.CA), colors[colorIndex]));
                 columnRecords.Add((clmName, "Incentive", recos.Sum(r => r.Incentive), colors[colorIndex]));
                 columnRecords.Add((clmName, "Prod. Incentive", recos.Sum(r => r.ProdInc), colors[colorIndex]));
+                columnRecords.Add((clmName, "Trav. Allowance", recos.Sum(r => r.TravAllowance), colors[colorIndex]));
+                columnRecords.Add((clmName, "Tel. Allowance", recos.Sum(r => r.TelAllowance), colors[colorIndex]));
+                columnRecords.Add((clmName, "Depu. Allowance", recos.Sum(r => r.DeputAllowance), colors[colorIndex]));
+                columnRecords.Add((clmName, "Ch. Ed. Allowance", recos.Sum(r => r.ChildEdAllowance), colors[colorIndex]));
+                columnRecords.Add((clmName, "Out station All.", recos.Sum(r => r.OutStationAllowance), colors[colorIndex]));
                 columnRecords.Add((clmName, "Total Earning", recos.Sum(r => r.TotalEarn), colors[colorIndex]));
                 columnRecords.Add((clmName, "P. F.", recos.Sum(r => r.PF), colors[colorIndex]));
                 columnRecords.Add((clmName, "E. S. I. C.", recos.Sum(r => r.ESIC), colors[colorIndex]));
                 columnRecords.Add((clmName, "Prof. Tax", recos.Sum(r => r.ProfTax), colors[colorIndex]));
+                columnRecords.Add((clmName, "L. I. C.", recos.Sum(r => r.LIC), colors[colorIndex]));
+                columnRecords.Add((clmName, "Soc. Share", recos.Sum(r => r.SocShare), colors[colorIndex]));
+                columnRecords.Add((clmName, "Soc. Loan", recos.Sum(r => r.SocLoan), colors[colorIndex]));
+                columnRecords.Add((clmName, "Staff Loan", recos.Sum(r => r.StaffLoan), colors[colorIndex]));
+                columnRecords.Add((clmName, "T. D. S.", recos.Sum(r => r.TDS), colors[colorIndex]));
+                columnRecords.Add((clmName, "Salary Advance", recos.Sum(r => r.SalaryAdv), colors[colorIndex]));
+                columnRecords.Add((clmName, "Labour W. Fund", recos.Sum(r => r.LWF), colors[colorIndex]));
                 columnRecords.Add((clmName, "Total Deduction", recos.Sum(r => r.TotalDeduct), colors[colorIndex]));
                 columnRecords.Add((clmName, "Total Net Pay", recos.Sum(r => r.NetPay), colors[colorIndex]));
             }
@@ -1061,7 +1073,55 @@ public sealed partial class PayrollReportService : IPayrollReportService
     {
         var records = await GetPayRecordsAsync(scope, p, ct).ConfigureAwait(false);
         if (records.Count == 0) return (rdlcName, null);
-        var rows = records.Select(rec => new { CompanyName = rec.CompanyName, LocationName = rec.LocationName, ReportName = "Mandays", EmpNo = rec.EmpNo, EmpName = rec.EmpInitials, Department = rec.Department, Section = rec.Section, WorkDays = rec.WorkDays, PresentDays = rec.PresentDays, AbsentDays = rec.AbsentDays }).ToList();
+
+        var employeeGroups = records.GroupBy(r => r.EmpNo);
+        var rows = new List<ManDaysReportRow>();
+
+        bool isWOAb = rdlcName == "ManDaysWOAb";
+        string periodTxt = $"For Period {p.From} - {p.To}";
+        string reportName = isWOAb ? "Mandays (WO/Ab)" : "Mandays";
+
+        foreach (var grp in employeeGroups)
+        {
+            var first = grp.First();
+            var row = new ManDaysReportRow
+            {
+                CompanyName = first.CompanyName,
+                LocationName = $"Location : {first.LocationName}",
+                ReportName = reportName,
+                PeriodTxt = periodTxt,
+                EmpNo = first.EmpNo,
+                EmpName = first.EmpInitials,
+                Gender = "Male" // Placeholder if gender isn't fetched
+            };
+
+            foreach (var rec in grp)
+            {
+                decimal qty = isWOAb 
+                    ? (rec.WeeklyOff + rec.PaidHolidays) 
+                    : (rec.WorkDays - rec.WeeklyOff - rec.PaidHolidays - rec.AbsentDays - rec.PLDays - rec.CLDays - rec.SLDays);
+
+                decimal ab = rec.AbsentDays;
+
+                switch (rec.Date.Month)
+                {
+                    case 1: row.Jan += qty; if (isWOAb) row.JanA += ab; break;
+                    case 2: row.Feb += qty; if (isWOAb) row.FebA += ab; break;
+                    case 3: row.Mar += qty; if (isWOAb) row.MarA += ab; break;
+                    case 4: row.Apr += qty; if (isWOAb) row.AprA += ab; break;
+                    case 5: row.May += qty; if (isWOAb) row.MayA += ab; break;
+                    case 6: row.Jun += qty; if (isWOAb) row.JunA += ab; break;
+                    case 7: row.Jul += qty; if (isWOAb) row.JulA += ab; break;
+                    case 8: row.Aug += qty; if (isWOAb) row.AugA += ab; break;
+                    case 9: row.Sep += qty; if (isWOAb) row.SepA += ab; break;
+                    case 10: row.Oct += qty; if (isWOAb) row.OctA += ab; break;
+                    case 11: row.Nov += qty; if (isWOAb) row.NovA += ab; break;
+                    case 12: row.Dec += qty; if (isWOAb) row.DecA += ab; break;
+                }
+            }
+            rows.Add(row);
+        }
+
         return (rdlcName, ToDataTable(rows));
     }
 
@@ -1168,6 +1228,9 @@ SELECT
   e.[Last Work Date (ESIC)] AS ESICLastWorkDate,
   sr.[Basic], sr.[Dearness Allowance] AS DA, sr.[House Rent Allowance] AS HRA, sr.[Conv Alllowance] AS CA,
   sr.[Prod_ Incentive] AS ProdInc, sr.[Incentive], sr.[Total Earnings] AS TotalEarn, sr.[Salary Advance] AS SalaryAdv,
+  sr.[Attendance Bonus] AS AttBonus, sr.[Telephone Allowance] AS TelAllowance, sr.[Travelling Allowance] AS TravAllowance,
+  sr.[Depution Allowance] AS DeputAllowance, sr.[Child Ed_ Allowance] AS ChildEdAllowance, sr.[Outstation Allowance] AS OutStationAllowance,
+  sr.[Petrol Allowance] AS PetrolAllowance, sr.[Special Allowance] AS SpecialAllowance,
   sr.[Soc_ Share Amount] AS SocShare, sr.[Soc_ Loan Repay Amount] AS SocLoan, sr.[ESIC], sr.[Staff Loan Repay Amount] AS StaffLoan,
   sr.[Provident Fund] AS PF, sr.[Life Insurance Premium] AS LIC, sr.[Professional Tax] AS ProfTax, sr.[TDS], sr.[Labour Welfare Fund] AS LWF,
   sr.[Total Deductions] AS TotalDeduct, sr.[Net Pay] AS NetPay, CAST(sr.[Hold Salary] AS BIT) AS IsHold,

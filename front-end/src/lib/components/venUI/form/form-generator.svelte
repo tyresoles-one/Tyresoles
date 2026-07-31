@@ -162,6 +162,8 @@
               presets={node.presets}
               presetKeys={node.presetKeys}
               workdate={node.workdate}
+              pastYears={node.pastYears}
+              futureYears={node.futureYears}
               aria-invalid={!!error}
               onValueChange={(val: any) => {
                 form.setValue(node.name, val);

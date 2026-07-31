@@ -68,7 +68,7 @@ export async function getDriveSyncConfigQuery(): Promise<DriveSyncUserConfig | n
 			allowedExtensionsJson?: string | null;
 		} | null;
 	}>(
-		`query { getDriveSyncConfig(targetUserId: null) {
+		`query GetDriveSyncConfig { getDriveSyncConfig(targetUserId: null) {
       isActive
       targetFolderId
       quotaBytes
@@ -91,7 +91,7 @@ export async function requestDriveSyncUploadCredentials(
 	const data = await gql<{
 		requestDriveSyncUploadCredentials: DriveSyncUploadCredentials;
 	}>(
-		`mutation ($bytes: Long!) {
+		`mutation RequestDriveSyncUploadCredentials($bytes: Long!) {
       requestDriveSyncUploadCredentials(requestedUploadBytes: $bytes) {
         accessToken
         expiresAtUtc
@@ -139,7 +139,7 @@ export async function prepareDriveSyncUploadSession(
 
 export async function getDriveSyncBackupFiles(): Promise<DriveSyncBackupFileInfo[]> {
 	const data = await gql<{ getDriveSyncBackupFiles: DriveSyncBackupFileInfo[] }>(
-		`query {
+		`query GetDriveSyncBackupFiles {
       getDriveSyncBackupFiles {
         id
         name

@@ -48,7 +48,7 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "perMachine",
+        "installMode": "currentUser",
         "languages": [
           "English"
         ]
@@ -59,7 +59,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU4ODkwODQ2NkZERTQxRjgKUldUNFFkNXZSZ2lKV0l0eHJoRDhNOGovbzJOMHYwSFNaMjZTM2ZwR3FOSHdPeHdKZTdpODl2MUkK",
       "endpoints": [
-        "http://app.tyresoles.net/updates/update.json"
+        "https://app.tyresoles.in/updates/update.json"
       ],
       "dangerousInsecureTransportProtocol": true,
       "windows": {

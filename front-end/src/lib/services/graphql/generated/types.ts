@@ -56,6 +56,20 @@ export type AccountTransactionSortInput = {
   type?: InputMaybe<SortEnumType>;
 };
 
+export type AllocateAgentContactsInput = {
+  areas?: InputMaybe<Array<Scalars['String']['input']>>;
+  coolDownDays?: InputMaybe<Scalars['Int']['input']>;
+  products?: InputMaybe<Array<Scalars['String']['input']>>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type AllocateAgentContactsPayload = {
+  __typename: 'AllocateAgentContactsPayload';
+  allocatedContacts: Array<CrmAgentContact>;
+  message: Maybe<Scalars['String']['output']>;
+  success: Scalars['Boolean']['output'];
+};
+
 export type Area = {
   __typename: 'Area';
   code: Maybe<Scalars['String']['output']>;
@@ -95,6 +109,11 @@ export type AreaSortInput = {
 export type AttendeeInput = {
   isRequired: Scalars['Boolean']['input'];
   userId: Scalars['String']['input'];
+};
+
+export type BooleanOperationFilterInput = {
+  eq?: InputMaybe<Scalars['Boolean']['input']>;
+  neq?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type BuyerDetail = {
@@ -197,6 +216,7 @@ export type CasingItem = {
   __typename: 'CasingItem';
   category: Scalars['String']['output'];
   code: Scalars['String']['output'];
+  isActive: Scalars['Boolean']['output'];
   maxRate: Scalars['String']['output'];
   minRate: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -206,6 +226,7 @@ export type CasingItemFilterInput = {
   and?: InputMaybe<Array<CasingItemFilterInput>>;
   category?: InputMaybe<StringOperationFilterInput>;
   code?: InputMaybe<StringOperationFilterInput>;
+  isActive?: InputMaybe<BooleanOperationFilterInput>;
   maxRate?: InputMaybe<StringOperationFilterInput>;
   minRate?: InputMaybe<StringOperationFilterInput>;
   name?: InputMaybe<StringOperationFilterInput>;
@@ -215,6 +236,7 @@ export type CasingItemFilterInput = {
 export type CasingItemInput = {
   category: Scalars['String']['input'];
   code: Scalars['String']['input'];
+  isActive: Scalars['Boolean']['input'];
   maxRate: Scalars['String']['input'];
   minRate: Scalars['String']['input'];
   name: Scalars['String']['input'];
@@ -223,6 +245,7 @@ export type CasingItemInput = {
 export type CasingItemSortInput = {
   category?: InputMaybe<SortEnumType>;
   code?: InputMaybe<SortEnumType>;
+  isActive?: InputMaybe<SortEnumType>;
   maxRate?: InputMaybe<SortEnumType>;
   minRate?: InputMaybe<SortEnumType>;
   name?: InputMaybe<SortEnumType>;
@@ -238,6 +261,15 @@ export type CodeName = {
   __typename: 'CodeName';
   code: Scalars['String']['output'];
   name: Scalars['String']['output'];
+};
+
+/** Information about the offset pagination. */
+export type CollectionSegmentInfo = {
+  __typename: 'CollectionSegmentInfo';
+  /** Indicates whether more items exist following the set defined by the clients arguments. */
+  hasNextPage: Scalars['Boolean']['output'];
+  /** Indicates whether more items exist prior the set defined by the clients arguments. */
+  hasPreviousPage: Scalars['Boolean']['output'];
 };
 
 export type CreateDealerResult = {
@@ -265,6 +297,427 @@ export type CreateEventInput = {
   timeZoneId?: InputMaybe<Scalars['String']['input']>;
   title: Scalars['String']['input'];
   visibility?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type CrmAgentContact = {
+  __typename: 'CrmAgentContact';
+  agentUsername: Scalars['String']['output'];
+  allocatedAt: Scalars['DateTime']['output'];
+  callCount: Scalars['Int']['output'];
+  contact: Maybe<CrmContact>;
+  contactId: Scalars['UUID']['output'];
+  deallocatedAt: Maybe<Scalars['DateTime']['output']>;
+  deallocatedBy: Maybe<Scalars['String']['output']>;
+  id: Scalars['UUID']['output'];
+  lastCallDate: Maybe<Scalars['DateTime']['output']>;
+  lastCallNotes: Maybe<Scalars['String']['output']>;
+  lastCallOutcome: Maybe<Scalars['String']['output']>;
+};
+
+export type CrmAgentContactFilterInput = {
+  agentUsername?: InputMaybe<StringOperationFilterInput>;
+  allocatedAt?: InputMaybe<DateTimeOperationFilterInput>;
+  and?: InputMaybe<Array<CrmAgentContactFilterInput>>;
+  callCount?: InputMaybe<IntOperationFilterInput>;
+  contact?: InputMaybe<CrmContactFilterInput>;
+  contactId?: InputMaybe<UuidOperationFilterInput>;
+  deallocatedAt?: InputMaybe<DateTimeOperationFilterInput>;
+  deallocatedBy?: InputMaybe<StringOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  lastCallDate?: InputMaybe<DateTimeOperationFilterInput>;
+  lastCallNotes?: InputMaybe<StringOperationFilterInput>;
+  lastCallOutcome?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmAgentContactFilterInput>>;
+};
+
+export type CrmAgentContactSortInput = {
+  agentUsername?: InputMaybe<SortEnumType>;
+  allocatedAt?: InputMaybe<SortEnumType>;
+  callCount?: InputMaybe<SortEnumType>;
+  contact?: InputMaybe<CrmContactSortInput>;
+  contactId?: InputMaybe<SortEnumType>;
+  deallocatedAt?: InputMaybe<SortEnumType>;
+  deallocatedBy?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  lastCallDate?: InputMaybe<SortEnumType>;
+  lastCallNotes?: InputMaybe<SortEnumType>;
+  lastCallOutcome?: InputMaybe<SortEnumType>;
+};
+
+export type CrmAgentSummaryDto = {
+  __typename: 'CrmAgentSummaryDto';
+  activeAllocated: Scalars['Int']['output'];
+  agentUsername: Scalars['String']['output'];
+  totalAllocated: Scalars['Int']['output'];
+  totalCalls: Scalars['Int']['output'];
+};
+
+export type CrmCallLog = {
+  __typename: 'CrmCallLog';
+  callDate: Scalars['DateTime']['output'];
+  contactId: Scalars['UUID']['output'];
+  createdBy: Scalars['String']['output'];
+  id: Scalars['UUID']['output'];
+  notes: Maybe<Scalars['String']['output']>;
+  outcome: Scalars['String']['output'];
+};
+
+export type CrmCallLogFilterInput = {
+  and?: InputMaybe<Array<CrmCallLogFilterInput>>;
+  callDate?: InputMaybe<DateTimeOperationFilterInput>;
+  contactId?: InputMaybe<UuidOperationFilterInput>;
+  createdBy?: InputMaybe<StringOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  notes?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmCallLogFilterInput>>;
+  outcome?: InputMaybe<StringOperationFilterInput>;
+};
+
+export type CrmCallLogSortInput = {
+  callDate?: InputMaybe<SortEnumType>;
+  contactId?: InputMaybe<SortEnumType>;
+  createdBy?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  notes?: InputMaybe<SortEnumType>;
+  outcome?: InputMaybe<SortEnumType>;
+};
+
+export type CrmCallReminder = {
+  __typename: 'CrmCallReminder';
+  contactId: Scalars['UUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  createdBy: Scalars['String']['output'];
+  id: Scalars['UUID']['output'];
+  isCompleted: Scalars['Boolean']['output'];
+  notes: Maybe<Scalars['String']['output']>;
+  reminderDate: Scalars['DateTime']['output'];
+};
+
+export type CrmCallReminderFilterInput = {
+  and?: InputMaybe<Array<CrmCallReminderFilterInput>>;
+  contactId?: InputMaybe<UuidOperationFilterInput>;
+  createdAt?: InputMaybe<DateTimeOperationFilterInput>;
+  createdBy?: InputMaybe<StringOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  isCompleted?: InputMaybe<BooleanOperationFilterInput>;
+  notes?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmCallReminderFilterInput>>;
+  reminderDate?: InputMaybe<DateTimeOperationFilterInput>;
+};
+
+export type CrmCallReminderSortInput = {
+  contactId?: InputMaybe<SortEnumType>;
+  createdAt?: InputMaybe<SortEnumType>;
+  createdBy?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  isCompleted?: InputMaybe<SortEnumType>;
+  notes?: InputMaybe<SortEnumType>;
+  reminderDate?: InputMaybe<SortEnumType>;
+};
+
+export type CrmContact = {
+  __typename: 'CrmContact';
+  address: Maybe<Scalars['String']['output']>;
+  city: Maybe<Scalars['String']['output']>;
+  companyName: Maybe<Scalars['String']['output']>;
+  contactCategory: Maybe<Scalars['String']['output']>;
+  contactType: Maybe<Scalars['String']['output']>;
+  createdBy: Maybe<Scalars['String']['output']>;
+  emailIds: Maybe<Scalars['String']['output']>;
+  erpAreaCodes: Maybe<Scalars['String']['output']>;
+  erpCustomerNos: Maybe<Scalars['String']['output']>;
+  fullName: Scalars['String']['output'];
+  id: Scalars['UUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  isDecisionMaker: Scalars['Boolean']['output'];
+  lastCallDate: Maybe<Scalars['DateTime']['output']>;
+  lastCallOutcome: Maybe<Scalars['String']['output']>;
+  mobileNo: Maybe<Scalars['String']['output']>;
+  mobileNo2: Maybe<Scalars['String']['output']>;
+  products: Maybe<Scalars['String']['output']>;
+  respCenter: Maybe<Scalars['String']['output']>;
+  state: Maybe<Scalars['String']['output']>;
+  tags: Maybe<Scalars['String']['output']>;
+};
+
+export type CrmContactClaimDto = {
+  __typename: 'CrmContactClaimDto';
+  compensationAmount: Scalars['Decimal']['output'];
+  date: Maybe<Scalars['DateTime']['output']>;
+  decision: Scalars['String']['output'];
+  faultDescription: Scalars['String']['output'];
+  itemNo: Scalars['String']['output'];
+  make: Scalars['String']['output'];
+  no: Scalars['String']['output'];
+  serialNo: Scalars['String']['output'];
+};
+
+export type CrmContactFilterInput = {
+  address?: InputMaybe<StringOperationFilterInput>;
+  and?: InputMaybe<Array<CrmContactFilterInput>>;
+  city?: InputMaybe<StringOperationFilterInput>;
+  companyName?: InputMaybe<StringOperationFilterInput>;
+  contactCategory?: InputMaybe<StringOperationFilterInput>;
+  contactType?: InputMaybe<StringOperationFilterInput>;
+  createdBy?: InputMaybe<StringOperationFilterInput>;
+  emailIds?: InputMaybe<StringOperationFilterInput>;
+  erpAreaCodes?: InputMaybe<StringOperationFilterInput>;
+  erpCustomerNos?: InputMaybe<StringOperationFilterInput>;
+  fullName?: InputMaybe<StringOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  isActive?: InputMaybe<BooleanOperationFilterInput>;
+  isDecisionMaker?: InputMaybe<BooleanOperationFilterInput>;
+  lastCallDate?: InputMaybe<DateTimeOperationFilterInput>;
+  lastCallOutcome?: InputMaybe<StringOperationFilterInput>;
+  mobileNo?: InputMaybe<StringOperationFilterInput>;
+  mobileNo2?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmContactFilterInput>>;
+  products?: InputMaybe<StringOperationFilterInput>;
+  respCenter?: InputMaybe<StringOperationFilterInput>;
+  state?: InputMaybe<StringOperationFilterInput>;
+  tags?: InputMaybe<StringOperationFilterInput>;
+};
+
+export type CrmContactFleetDetail = {
+  __typename: 'CrmContactFleetDetail';
+  application: Maybe<Scalars['String']['output']>;
+  contactId: Scalars['UUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  createdBy: Scalars['String']['output'];
+  id: Scalars['UUID']['output'];
+  make: Maybe<Scalars['String']['output']>;
+  model: Maybe<Scalars['String']['output']>;
+  quantity: Scalars['Int']['output'];
+  tyreSize: Maybe<Scalars['String']['output']>;
+  vehicleType: Scalars['String']['output'];
+};
+
+export type CrmContactFleetDetailFilterInput = {
+  and?: InputMaybe<Array<CrmContactFleetDetailFilterInput>>;
+  application?: InputMaybe<StringOperationFilterInput>;
+  contactId?: InputMaybe<UuidOperationFilterInput>;
+  createdAt?: InputMaybe<DateTimeOperationFilterInput>;
+  createdBy?: InputMaybe<StringOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  make?: InputMaybe<StringOperationFilterInput>;
+  model?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmContactFleetDetailFilterInput>>;
+  quantity?: InputMaybe<IntOperationFilterInput>;
+  tyreSize?: InputMaybe<StringOperationFilterInput>;
+  vehicleType?: InputMaybe<StringOperationFilterInput>;
+};
+
+export type CrmContactFleetDetailInput = {
+  application?: InputMaybe<Scalars['String']['input']>;
+  contactId: Scalars['UUID']['input'];
+  id?: InputMaybe<Scalars['UUID']['input']>;
+  make?: InputMaybe<Scalars['String']['input']>;
+  model?: InputMaybe<Scalars['String']['input']>;
+  quantity: Scalars['Int']['input'];
+  tyreSize?: InputMaybe<Scalars['String']['input']>;
+  vehicleType: Scalars['String']['input'];
+};
+
+export type CrmContactFleetDetailSortInput = {
+  application?: InputMaybe<SortEnumType>;
+  contactId?: InputMaybe<SortEnumType>;
+  createdAt?: InputMaybe<SortEnumType>;
+  createdBy?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  make?: InputMaybe<SortEnumType>;
+  model?: InputMaybe<SortEnumType>;
+  quantity?: InputMaybe<SortEnumType>;
+  tyreSize?: InputMaybe<SortEnumType>;
+  vehicleType?: InputMaybe<SortEnumType>;
+};
+
+export type CrmContactInput = {
+  address?: InputMaybe<Scalars['String']['input']>;
+  city?: InputMaybe<Scalars['String']['input']>;
+  companyName?: InputMaybe<Scalars['String']['input']>;
+  contactCategory?: InputMaybe<Scalars['String']['input']>;
+  contactType?: InputMaybe<Scalars['String']['input']>;
+  createdBy?: InputMaybe<Scalars['String']['input']>;
+  emailIds?: InputMaybe<Scalars['String']['input']>;
+  erpAreaCodes?: InputMaybe<Scalars['String']['input']>;
+  erpCustomerNos?: InputMaybe<Scalars['String']['input']>;
+  fullName: Scalars['String']['input'];
+  id?: InputMaybe<Scalars['UUID']['input']>;
+  isActive: Scalars['Boolean']['input'];
+  isDecisionMaker: Scalars['Boolean']['input'];
+  mobileNo?: InputMaybe<Scalars['String']['input']>;
+  mobileNo2?: InputMaybe<Scalars['String']['input']>;
+  products?: InputMaybe<Scalars['String']['input']>;
+  respCenter?: InputMaybe<Scalars['String']['input']>;
+  state?: InputMaybe<Scalars['String']['input']>;
+  tags?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type CrmContactInvoiceDto = {
+  __typename: 'CrmContactInvoiceDto';
+  amountToCustomer: Scalars['Decimal']['output'];
+  date: Maybe<Scalars['DateTime']['output']>;
+  items: Scalars['String']['output'];
+  no: Scalars['String']['output'];
+  qty: Scalars['Decimal']['output'];
+};
+
+export type CrmContactSortInput = {
+  address?: InputMaybe<SortEnumType>;
+  city?: InputMaybe<SortEnumType>;
+  companyName?: InputMaybe<SortEnumType>;
+  contactCategory?: InputMaybe<SortEnumType>;
+  contactType?: InputMaybe<SortEnumType>;
+  createdBy?: InputMaybe<SortEnumType>;
+  emailIds?: InputMaybe<SortEnumType>;
+  erpAreaCodes?: InputMaybe<SortEnumType>;
+  erpCustomerNos?: InputMaybe<SortEnumType>;
+  fullName?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  isActive?: InputMaybe<SortEnumType>;
+  isDecisionMaker?: InputMaybe<SortEnumType>;
+  lastCallDate?: InputMaybe<SortEnumType>;
+  lastCallOutcome?: InputMaybe<SortEnumType>;
+  mobileNo?: InputMaybe<SortEnumType>;
+  mobileNo2?: InputMaybe<SortEnumType>;
+  products?: InputMaybe<SortEnumType>;
+  respCenter?: InputMaybe<SortEnumType>;
+  state?: InputMaybe<SortEnumType>;
+  tags?: InputMaybe<SortEnumType>;
+};
+
+export type CrmMasterItem = {
+  __typename: 'CrmMasterItem';
+  id: Scalars['Int']['output'];
+  isPositive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  parentId: Maybe<Scalars['Int']['output']>;
+};
+
+export type CrmMasterItemFilterInput = {
+  and?: InputMaybe<Array<CrmMasterItemFilterInput>>;
+  id?: InputMaybe<IntOperationFilterInput>;
+  isPositive?: InputMaybe<BooleanOperationFilterInput>;
+  name?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmMasterItemFilterInput>>;
+  parentId?: InputMaybe<IntOperationFilterInput>;
+};
+
+export type CrmMasterItemSortInput = {
+  id?: InputMaybe<SortEnumType>;
+  isPositive?: InputMaybe<SortEnumType>;
+  name?: InputMaybe<SortEnumType>;
+  parentId?: InputMaybe<SortEnumType>;
+};
+
+export enum CrmMasterType {
+  ActivityOutcome = 'ACTIVITY_OUTCOME',
+  ActivityType = 'ACTIVITY_TYPE',
+  Application = 'APPLICATION',
+  ContactCategory = 'CONTACT_CATEGORY',
+  ContactType = 'CONTACT_TYPE',
+  EntityType = 'ENTITY_TYPE',
+  Priority = 'PRIORITY',
+  Source = 'SOURCE',
+  Stage = 'STAGE',
+  VehicleMake = 'VEHICLE_MAKE',
+  VehicleModel = 'VEHICLE_MODEL',
+  VehicleType = 'VEHICLE_TYPE'
+}
+
+export type CrmMyCallingSummaryDto = {
+  __typename: 'CrmMyCallingSummaryDto';
+  count: Scalars['Int']['output'];
+  outcome: Scalars['String']['output'];
+};
+
+export type CrmSetting = {
+  __typename: 'CrmSetting';
+  description: Maybe<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type CrmSettingFilterInput = {
+  and?: InputMaybe<Array<CrmSettingFilterInput>>;
+  description?: InputMaybe<StringOperationFilterInput>;
+  key?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmSettingFilterInput>>;
+  value?: InputMaybe<StringOperationFilterInput>;
+};
+
+export type CrmSettingSortInput = {
+  description?: InputMaybe<SortEnumType>;
+  key?: InputMaybe<SortEnumType>;
+  value?: InputMaybe<SortEnumType>;
+};
+
+export type CrmWhatsappImage = {
+  __typename: 'CrmWhatsappImage';
+  base64Data: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['UUID']['output'];
+  imageUrl: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+};
+
+export type CrmWhatsappImageFilterInput = {
+  and?: InputMaybe<Array<CrmWhatsappImageFilterInput>>;
+  base64Data?: InputMaybe<StringOperationFilterInput>;
+  createdAt?: InputMaybe<DateTimeOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  imageUrl?: InputMaybe<StringOperationFilterInput>;
+  name?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmWhatsappImageFilterInput>>;
+};
+
+export type CrmWhatsappImageInput = {
+  base64Data?: InputMaybe<Scalars['String']['input']>;
+  id?: InputMaybe<Scalars['UUID']['input']>;
+  imageUrl?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+};
+
+export type CrmWhatsappImageSortInput = {
+  base64Data?: InputMaybe<SortEnumType>;
+  createdAt?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  imageUrl?: InputMaybe<SortEnumType>;
+  name?: InputMaybe<SortEnumType>;
+};
+
+export type CrmWhatsappTemplate = {
+  __typename: 'CrmWhatsappTemplate';
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['UUID']['output'];
+  language: Scalars['String']['output'];
+  messageText: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type CrmWhatsappTemplateFilterInput = {
+  and?: InputMaybe<Array<CrmWhatsappTemplateFilterInput>>;
+  createdAt?: InputMaybe<DateTimeOperationFilterInput>;
+  id?: InputMaybe<UuidOperationFilterInput>;
+  language?: InputMaybe<StringOperationFilterInput>;
+  messageText?: InputMaybe<StringOperationFilterInput>;
+  name?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<CrmWhatsappTemplateFilterInput>>;
+};
+
+export type CrmWhatsappTemplateInput = {
+  id?: InputMaybe<Scalars['UUID']['input']>;
+  language: Scalars['String']['input'];
+  messageText: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CrmWhatsappTemplateSortInput = {
+  createdAt?: InputMaybe<SortEnumType>;
+  id?: InputMaybe<SortEnumType>;
+  language?: InputMaybe<SortEnumType>;
+  messageText?: InputMaybe<SortEnumType>;
+  name?: InputMaybe<SortEnumType>;
 };
 
 export type Customer = {
@@ -680,6 +1133,87 @@ export type DocumentDto = {
   no: Maybe<Scalars['String']['output']>;
 };
 
+export type DownloadItem = {
+  __typename: 'DownloadItem';
+  description: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  path: Scalars['String']['output'];
+};
+
+export type DownloadsConfig = {
+  __typename: 'DownloadsConfig';
+  items: Array<DownloadItem>;
+};
+
+export type DriveSyncAdminStatus = {
+  __typename: 'DriveSyncAdminStatus';
+  folderValidated: Maybe<Scalars['Boolean']['output']>;
+  folderValidationError: Maybe<Scalars['String']['output']>;
+  isActive: Scalars['Boolean']['output'];
+  isUserFound: Scalars['Boolean']['output'];
+  lastCheckedUtc: Scalars['DateTime']['output'];
+  latestBackupError: Maybe<Scalars['String']['output']>;
+  latestBackupUtc: Maybe<Scalars['DateTime']['output']>;
+  quotaBytes: Scalars['Long']['output'];
+  targetFolderId: Scalars['String']['output'];
+  usageError: Maybe<Scalars['String']['output']>;
+  usedBytes: Scalars['Long']['output'];
+  userId: Scalars['String']['output'];
+};
+
+export type DriveSyncBackupFileInfo = {
+  __typename: 'DriveSyncBackupFileInfo';
+  id: Scalars['String']['output'];
+  mimeType: Maybe<Scalars['String']['output']>;
+  modifiedTimeUtc: Maybe<Scalars['DateTime']['output']>;
+  name: Scalars['String']['output'];
+  size: Maybe<Scalars['Long']['output']>;
+};
+
+export type DriveSyncOAuthStatus = {
+  __typename: 'DriveSyncOAuthStatus';
+  accessTokenExpiryUtc: Maybe<Scalars['DateTime']['output']>;
+  googleAccountEmail: Maybe<Scalars['String']['output']>;
+  hasAccessToken: Scalars['Boolean']['output'];
+  hasRefreshToken: Scalars['Boolean']['output'];
+  isAccessTokenExpired: Scalars['Boolean']['output'];
+  isConfigured: Scalars['Boolean']['output'];
+  updatedAtUtc: Maybe<Scalars['DateTime']['output']>;
+  updatedByUserId: Maybe<Scalars['String']['output']>;
+};
+
+export type DriveSyncUploadCredentials = {
+  __typename: 'DriveSyncUploadCredentials';
+  accessToken: Scalars['String']['output'];
+  expiresAtUtc: Scalars['DateTime']['output'];
+  folderId: Scalars['String']['output'];
+};
+
+export type DriveSyncUserConfig = {
+  __typename: 'DriveSyncUserConfig';
+  allowedExtensionsJson: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['UUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  quotaBytes: Scalars['Long']['output'];
+  targetFolderId: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  usedBytes: Scalars['Long']['output'];
+  userId: Scalars['String']['output'];
+};
+
+export type DriveSyncUserConfigInput = {
+  allowedExtensionsJson?: InputMaybe<Scalars['String']['input']>;
+  createdAt: Scalars['DateTime']['input'];
+  id: Scalars['UUID']['input'];
+  isActive: Scalars['Boolean']['input'];
+  quotaBytes: Scalars['Long']['input'];
+  targetFolderId: Scalars['String']['input'];
+  updatedAt: Scalars['DateTime']['input'];
+  usedBytes: Scalars['Long']['input'];
+  userId: Scalars['String']['input'];
+};
+
 export type EInvoiceCandidate = {
   __typename: 'EInvoiceCandidate';
   address1: Scalars['String']['output'];
@@ -1068,6 +1602,16 @@ export type EmployeeSortInput = {
   unionMembershipNo?: InputMaybe<SortEnumType>;
 };
 
+/** A segment of a collection. */
+export type EmployeesCollectionSegment = {
+  __typename: 'EmployeesCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<Employee>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
+};
+
 export type EntityBalance = {
   __typename: 'EntityBalance';
   balance: Scalars['Decimal']['output'];
@@ -1222,6 +1766,7 @@ export type FixedAsset = {
   no: Scalars['String']['output'];
   responsibilityCenter: Scalars['String']['output'];
   responsibleEmployee: Scalars['String']['output'];
+  responsibleEmployeeInitials: Scalars['String']['output'];
   serialNo: Scalars['String']['output'];
   vendorNo: Scalars['String']['output'];
 };
@@ -1237,6 +1782,7 @@ export type FixedAssetFilterInput = {
   or?: InputMaybe<Array<FixedAssetFilterInput>>;
   responsibilityCenter?: InputMaybe<StringOperationFilterInput>;
   responsibleEmployee?: InputMaybe<StringOperationFilterInput>;
+  responsibleEmployeeInitials?: InputMaybe<StringOperationFilterInput>;
   serialNo?: InputMaybe<StringOperationFilterInput>;
   vendorNo?: InputMaybe<StringOperationFilterInput>;
 };
@@ -1250,6 +1796,7 @@ export type FixedAssetInput = {
   no: Scalars['String']['input'];
   responsibilityCenter: Scalars['String']['input'];
   responsibleEmployee: Scalars['String']['input'];
+  responsibleEmployeeInitials: Scalars['String']['input'];
   serialNo: Scalars['String']['input'];
   vendorNo: Scalars['String']['input'];
 };
@@ -1257,23 +1804,27 @@ export type FixedAssetInput = {
 export type FixedAssetServiceLog = {
   __typename: 'FixedAssetServiceLog';
   amount: Scalars['Decimal']['output'];
+  class: Maybe<Scalars['String']['output']>;
   date: Scalars['DateTime']['output'];
-  description: Scalars['String']['output'];
-  employee: Scalars['String']['output'];
-  location: Scalars['String']['output'];
-  subClass: Scalars['String']['output'];
-  vendorName: Scalars['String']['output'];
-  vendorNo: Scalars['String']['output'];
+  description: Maybe<Scalars['String']['output']>;
+  employee: Maybe<Scalars['String']['output']>;
+  location: Maybe<Scalars['String']['output']>;
+  respCenter: Maybe<Scalars['String']['output']>;
+  subClass: Maybe<Scalars['String']['output']>;
+  vendorName: Maybe<Scalars['String']['output']>;
+  vendorNo: Maybe<Scalars['String']['output']>;
 };
 
 export type FixedAssetServiceLogFilterInput = {
   amount?: InputMaybe<DecimalOperationFilterInput>;
   and?: InputMaybe<Array<FixedAssetServiceLogFilterInput>>;
+  class?: InputMaybe<StringOperationFilterInput>;
   date?: InputMaybe<DateTimeOperationFilterInput>;
   description?: InputMaybe<StringOperationFilterInput>;
   employee?: InputMaybe<StringOperationFilterInput>;
   location?: InputMaybe<StringOperationFilterInput>;
   or?: InputMaybe<Array<FixedAssetServiceLogFilterInput>>;
+  respCenter?: InputMaybe<StringOperationFilterInput>;
   subClass?: InputMaybe<StringOperationFilterInput>;
   vendorName?: InputMaybe<StringOperationFilterInput>;
   vendorNo?: InputMaybe<StringOperationFilterInput>;
@@ -1281,10 +1832,12 @@ export type FixedAssetServiceLogFilterInput = {
 
 export type FixedAssetServiceLogSortInput = {
   amount?: InputMaybe<SortEnumType>;
+  class?: InputMaybe<SortEnumType>;
   date?: InputMaybe<SortEnumType>;
   description?: InputMaybe<SortEnumType>;
   employee?: InputMaybe<SortEnumType>;
   location?: InputMaybe<SortEnumType>;
+  respCenter?: InputMaybe<SortEnumType>;
   subClass?: InputMaybe<SortEnumType>;
   vendorName?: InputMaybe<SortEnumType>;
   vendorNo?: InputMaybe<SortEnumType>;
@@ -1321,6 +1874,7 @@ export type FixedAssetSortInput = {
   no?: InputMaybe<SortEnumType>;
   responsibilityCenter?: InputMaybe<SortEnumType>;
   responsibleEmployee?: InputMaybe<SortEnumType>;
+  responsibleEmployeeInitials?: InputMaybe<SortEnumType>;
   serialNo?: InputMaybe<SortEnumType>;
   vendorNo?: InputMaybe<SortEnumType>;
 };
@@ -1462,6 +2016,26 @@ export type GenProductPostingGroupsEdge = {
   cursor: Scalars['String']['output'];
   /** The item at the end of the edge. */
   node: GenProductPostingGroup;
+};
+
+/** A segment of a collection. */
+export type GetCrmAgentContactsCollectionSegment = {
+  __typename: 'GetCrmAgentContactsCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<CrmAgentContact>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
+};
+
+/** A segment of a collection. */
+export type GetCrmContactsCollectionSegment = {
+  __typename: 'GetCrmContactsCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<CrmContact>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
 };
 
 /** A connection to a list of items. */
@@ -1772,6 +2346,7 @@ export type LoginResult = {
   locations: Maybe<Array<UserLocation>>;
   menus: Maybe<Array<Menu>>;
   message: Maybe<Scalars['String']['output']>;
+  refreshToken: Maybe<Scalars['String']['output']>;
   requirePasswordChange: Scalars['Boolean']['output'];
   requirePasswordChangeReason: Maybe<Scalars['String']['output']>;
   success: Scalars['Boolean']['output'];
@@ -1782,6 +2357,7 @@ export type LoginResult = {
 export type LoginUser = {
   __typename: 'LoginUser';
   avatar: Scalars['Int']['output'];
+  dashboards: Scalars['String']['output'];
   department: Scalars['String']['output'];
   entityCode: Scalars['String']['output'];
   entityType: Scalars['String']['output'];
@@ -1793,7 +2369,6 @@ export type LoginUser = {
   userSpecialToken: Scalars['String']['output'];
   userType: Scalars['String']['output'];
   workDate: Scalars['DateTime']['output'];
-  dashboards: Scalars['String']['output'];
 };
 
 export type Menu = {
@@ -1815,19 +2390,36 @@ export type MenuItem = {
 
 export type Mutation = {
   __typename: 'Mutation';
+  allocateAgentContacts: AllocateAgentContactsPayload;
   changePassword: ChangePasswordResult;
+  completeCrmReminder: MutationResult;
   createCalendarEvent: Maybe<CalendarEventDto>;
+  createCrmMasterItem: CrmMasterItem;
   createDealer: CreateDealerResult;
   createProductionVendor: Scalars['String']['output'];
+  deallocateCrmContact: MutationResult;
+  deallocateCrmContacts: MutationResult;
+  deallocateUnattendedAgentContacts: MutationResult;
   deleteCalendarEvent: Scalars['Boolean']['output'];
+  deleteCrmCallReminder: Scalars['Boolean']['output'];
+  deleteCrmContact: Scalars['Boolean']['output'];
+  deleteCrmContactFleetDetail: Scalars['Boolean']['output'];
+  deleteCrmMasterItem: Scalars['Boolean']['output'];
+  deleteCrmReminder: MutationResult;
+  deleteCrmWhatsappImage: Scalars['Boolean']['output'];
+  deleteCrmWhatsappTemplate: Scalars['Boolean']['output'];
+  deleteProductionProcurementConfig: MutationResult;
   deleteProductionProcurementOrder: Scalars['Int']['output'];
   deleteProductionProcurementOrderLine: Scalars['Int']['output'];
   forgotPassword: ChangePasswordResult;
   generateProductionGRAs: Scalars['String']['output'];
+  importCrmContactsFromInvoices: MutationResult;
   insertProductionCasingItems: MutationResult;
+  insertProductionProcurementConfig: MutationResult;
   insertProductionProcurementOrderLine: Scalars['Int']['output'];
   killSession: KillSessionResult;
   killSessionsByUser: KillSessionsByUserResult;
+  logCrmCall: MutationResult;
   login: LoginResult;
   markAllNotificationsAsRead: Scalars['Boolean']['output'];
   markNotificationAsRead: Scalars['Boolean']['output'];
@@ -1841,9 +2433,20 @@ export type Mutation = {
   newProductionProcShipNo: Scalars['String']['output'];
   newProductionProcurementOrder: Scalars['String']['output'];
   printDocuments: Maybe<Scalars['String']['output']>;
+  provisionDriveSyncBackupFolder: DriveSyncUserConfig;
+  rectifyCustLedgers: MutationResult;
+  refreshToken: LoginResult;
+  requestDriveSyncUploadCredentials: DriveSyncUploadCredentials;
   resetPassword: ResetPasswordResult;
   respondToInvite: Scalars['Boolean']['output'];
+  sanitizeSalesInvoiceHeaderMobileNumbers: MutationResult;
+  saveCrmContact: CrmContact;
+  saveCrmContactFleetDetail: CrmContactFleetDetail;
+  saveCrmSetting: MutationResult;
+  saveCrmWhatsappImage: CrmWhatsappImage;
+  saveCrmWhatsappTemplate: CrmWhatsappTemplate;
   saveDealer: MutationResult;
+  saveDriveSyncConfig: DriveSyncUserConfig;
   saveFixedAsset: MutationResult;
   saveVehicle: MutationResult;
   setNotificationPreference: Scalars['Boolean']['output'];
@@ -1851,17 +2454,31 @@ export type Mutation = {
   shareCalendar: Scalars['Boolean']['output'];
   snoozeReminder: Scalars['Boolean']['output'];
   toggleCalendarTaskStatus: Scalars['Boolean']['output'];
+  undoCrmCall: MutationResult;
   updateCalendarEvent: Maybe<CalendarEventDto>;
+  updateCrmMasterItem: Maybe<CrmMasterItem>;
   updateEcomileNewNumberLine: Scalars['Int']['output'];
   updateProductionCasing: MutationResult;
+  updateProductionCasingItems: MutationResult;
   updateProductionProcOrdLineDispatch: Scalars['Int']['output'];
   updateProductionProcOrdLineDispatchSingle: Scalars['Int']['output'];
   updateProductionProcOrdLineDrop: Scalars['Int']['output'];
   updateProductionProcOrdLineReceipt: Scalars['Int']['output'];
   updateProductionProcOrdLineRemove: Scalars['Int']['output'];
+  updateProductionProcurementConfig: MutationResult;
   updateProductionProcurementOrder: Scalars['Int']['output'];
   updateProductionProcurementOrderLine: Scalars['Int']['output'];
   updateProductionVendor: MutationResult;
+  updateUserDetails: SetProfileResult;
+  updateUserPermissions: MutationResult;
+  updateUserPostingSetup: MutationResult;
+  updateUserResponsibilityCenters: MutationResult;
+  wipeCrmCallingRecordsTemporary: MutationResult;
+};
+
+
+export type MutationAllocateAgentContactsArgs = {
+  input?: InputMaybe<AllocateAgentContactsInput>;
 };
 
 
@@ -1873,8 +2490,21 @@ export type MutationChangePasswordArgs = {
 };
 
 
+export type MutationCompleteCrmReminderArgs = {
+  reminderId: Scalars['UUID']['input'];
+};
+
+
 export type MutationCreateCalendarEventArgs = {
   input: CreateEventInput;
+};
+
+
+export type MutationCreateCrmMasterItemArgs = {
+  isPositive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  parentId?: InputMaybe<Scalars['Int']['input']>;
+  type: CrmMasterType;
 };
 
 
@@ -1888,11 +2518,67 @@ export type MutationCreateProductionVendorArgs = {
 };
 
 
+export type MutationDeallocateCrmContactArgs = {
+  contactId: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeallocateCrmContactsArgs = {
+  contactIds: Array<Scalars['UUID']['input']>;
+};
+
+
+export type MutationDeallocateUnattendedAgentContactsArgs = {
+  agentUsername: Scalars['String']['input'];
+};
+
+
 export type MutationDeleteCalendarEventArgs = {
   deleteScope?: Scalars['Int']['input'];
   eventId: Scalars['UUID']['input'];
   occurrenceStartUtc?: InputMaybe<Scalars['DateTime']['input']>;
   soft?: Scalars['Boolean']['input'];
+};
+
+
+export type MutationDeleteCrmCallReminderArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteCrmContactArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteCrmContactFleetDetailArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteCrmMasterItemArgs = {
+  id: Scalars['Int']['input'];
+  type: CrmMasterType;
+};
+
+
+export type MutationDeleteCrmReminderArgs = {
+  reminderId: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteCrmWhatsappImageArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteCrmWhatsappTemplateArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type MutationDeleteProductionProcurementConfigArgs = {
+  key: ProcurementConfigDtoInput;
 };
 
 
@@ -1923,6 +2609,11 @@ export type MutationInsertProductionCasingItemsArgs = {
 };
 
 
+export type MutationInsertProductionProcurementConfigArgs = {
+  row: ProcurementConfigDtoInput;
+};
+
+
 export type MutationInsertProductionProcurementOrderLineArgs = {
   order: OrderLineInput;
 };
@@ -1935,6 +2626,16 @@ export type MutationKillSessionArgs = {
 
 export type MutationKillSessionsByUserArgs = {
   userId: Scalars['String']['input'];
+};
+
+
+export type MutationLogCrmCallArgs = {
+  contactId: Scalars['UUID']['input'];
+  contactIsActive?: InputMaybe<Scalars['Boolean']['input']>;
+  followUpDate?: InputMaybe<Scalars['DateTime']['input']>;
+  followUpNotes?: InputMaybe<Scalars['String']['input']>;
+  notes?: InputMaybe<Scalars['String']['input']>;
+  outcome: Scalars['String']['input'];
 };
 
 
@@ -2006,6 +2707,24 @@ export type MutationPrintDocumentsArgs = {
 };
 
 
+export type MutationProvisionDriveSyncBackupFolderArgs = {
+  folderName?: InputMaybe<Scalars['String']['input']>;
+  replaceExisting: Scalars['Boolean']['input'];
+  targetUserId: Scalars['String']['input'];
+};
+
+
+export type MutationRefreshTokenArgs = {
+  refreshToken: Scalars['String']['input'];
+  token: Scalars['String']['input'];
+};
+
+
+export type MutationRequestDriveSyncUploadCredentialsArgs = {
+  requestedUploadBytes: Scalars['Long']['input'];
+};
+
+
 export type MutationResetPasswordArgs = {
   userId: Scalars['String']['input'];
 };
@@ -2017,8 +2736,40 @@ export type MutationRespondToInviteArgs = {
 };
 
 
+export type MutationSaveCrmContactArgs = {
+  input: CrmContactInput;
+};
+
+
+export type MutationSaveCrmContactFleetDetailArgs = {
+  input: CrmContactFleetDetailInput;
+};
+
+
+export type MutationSaveCrmSettingArgs = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+
+export type MutationSaveCrmWhatsappImageArgs = {
+  input: CrmWhatsappImageInput;
+};
+
+
+export type MutationSaveCrmWhatsappTemplateArgs = {
+  input: CrmWhatsappTemplateInput;
+};
+
+
 export type MutationSaveDealerArgs = {
   input: SaveDealerInput;
+};
+
+
+export type MutationSaveDriveSyncConfigArgs = {
+  input: DriveSyncUserConfigInput;
 };
 
 
@@ -2061,11 +2812,25 @@ export type MutationToggleCalendarTaskStatusArgs = {
 };
 
 
+export type MutationUndoCrmCallArgs = {
+  callLogId: Scalars['UUID']['input'];
+};
+
+
 export type MutationUpdateCalendarEventArgs = {
   eventId: Scalars['UUID']['input'];
   input: UpdateEventInput;
   occurrenceStartUtc?: InputMaybe<Scalars['DateTime']['input']>;
   updateScope?: Scalars['Int']['input'];
+};
+
+
+export type MutationUpdateCrmMasterItemArgs = {
+  id: Scalars['Int']['input'];
+  isPositive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  parentId?: InputMaybe<Scalars['Int']['input']>;
+  type: CrmMasterType;
 };
 
 
@@ -2076,6 +2841,11 @@ export type MutationUpdateEcomileNewNumberLineArgs = {
 
 export type MutationUpdateProductionCasingArgs = {
   param: FetchParamsInput;
+};
+
+
+export type MutationUpdateProductionCasingItemsArgs = {
+  casingItems: Array<CasingItemInput>;
 };
 
 
@@ -2104,6 +2874,12 @@ export type MutationUpdateProductionProcOrdLineRemoveArgs = {
 };
 
 
+export type MutationUpdateProductionProcurementConfigArgs = {
+  original: ProcurementConfigDtoInput;
+  updated: ProcurementConfigDtoInput;
+};
+
+
 export type MutationUpdateProductionProcurementOrderArgs = {
   order: OrderInfoInput;
 };
@@ -2116,6 +2892,30 @@ export type MutationUpdateProductionProcurementOrderLineArgs = {
 
 export type MutationUpdateProductionVendorArgs = {
   param: VendorModelInput;
+};
+
+
+export type MutationUpdateUserDetailsArgs = {
+  details: ProfileUpdateInput;
+  userName: Scalars['String']['input'];
+};
+
+
+export type MutationUpdateUserPermissionsArgs = {
+  permissions: Array<UserPermissionInput>;
+  userName: Scalars['String']['input'];
+};
+
+
+export type MutationUpdateUserPostingSetupArgs = {
+  assignments: Array<UserPostingSetupInput>;
+  userName: Scalars['String']['input'];
+};
+
+
+export type MutationUpdateUserResponsibilityCentersArgs = {
+  assignments: Array<UserRespCenterInput>;
+  userName: Scalars['String']['input'];
 };
 
 export type MutationResult = {
@@ -2314,6 +3114,11 @@ export type NavEditApprovalDto = {
   statusLabel: Scalars['String']['output'];
 };
 
+export type NavEditAuthValueInput = {
+  key: Scalars['String']['input'];
+  value?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type NavEditRequestDto = {
   __typename: 'NavEditRequestDto';
   adminRemark: Maybe<Scalars['String']['output']>;
@@ -2386,6 +3191,12 @@ export type Notification = {
   userId: Scalars['String']['output'];
 };
 
+export type NotificationFeedResult = {
+  __typename: 'NotificationFeedResult';
+  notifications: Array<Notification>;
+  serverTimeUtc: Scalars['DateTime']['output'];
+};
+
 export type NotificationPreferenceDto = {
   __typename: 'NotificationPreferenceDto';
   channel: Scalars['Int']['output'];
@@ -2399,6 +3210,12 @@ export type NotificationPreferenceDtoInput = {
   defaultMinutesBefore: Scalars['Int']['input'];
   emailEnabled: Scalars['Boolean']['input'];
   pushEnabled: Scalars['Boolean']['input'];
+};
+
+export type NotificationPushPayload = {
+  __typename: 'NotificationPushPayload';
+  notification: Notification;
+  serverTimeUtc: Scalars['DateTime']['output'];
 };
 
 export enum NotificationType {
@@ -2562,6 +3379,88 @@ export type PayrollEmployeesEdge = {
   node: Employee;
 };
 
+export type PermissionSet = {
+  __typename: 'PermissionSet';
+  action: Maybe<Scalars['String']['output']>;
+  displayName: Maybe<Scalars['String']['output']>;
+  erpApp: Scalars['Byte']['output'];
+  icon: Maybe<Scalars['String']['output']>;
+  iconType: Maybe<Scalars['String']['output']>;
+  menuGroup: Maybe<Scalars['String']['output']>;
+  mobileApp: Scalars['Byte']['output'];
+  name: Maybe<Scalars['String']['output']>;
+  order: Scalars['Int']['output'];
+  parentMenu: Maybe<Scalars['String']['output']>;
+  parentMenuIcon: Maybe<Scalars['String']['output']>;
+  platform: Scalars['Int']['output'];
+  profileID: Maybe<Scalars['String']['output']>;
+  roleID: Maybe<Scalars['String']['output']>;
+  subMenu: Maybe<Scalars['String']['output']>;
+  subMenuIcon: Maybe<Scalars['String']['output']>;
+  transferable: Scalars['Byte']['output'];
+  type: Scalars['Int']['output'];
+  userGroup: Maybe<Scalars['String']['output']>;
+  webApp: Scalars['Byte']['output'];
+};
+
+export type PermissionSetFilterInput = {
+  action?: InputMaybe<StringOperationFilterInput>;
+  and?: InputMaybe<Array<PermissionSetFilterInput>>;
+  displayName?: InputMaybe<StringOperationFilterInput>;
+  erpApp?: InputMaybe<ByteOperationFilterInput>;
+  icon?: InputMaybe<StringOperationFilterInput>;
+  iconType?: InputMaybe<StringOperationFilterInput>;
+  menuGroup?: InputMaybe<StringOperationFilterInput>;
+  mobileApp?: InputMaybe<ByteOperationFilterInput>;
+  name?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<PermissionSetFilterInput>>;
+  order?: InputMaybe<IntOperationFilterInput>;
+  parentMenu?: InputMaybe<StringOperationFilterInput>;
+  parentMenuIcon?: InputMaybe<StringOperationFilterInput>;
+  platform?: InputMaybe<IntOperationFilterInput>;
+  profileID?: InputMaybe<StringOperationFilterInput>;
+  roleID?: InputMaybe<StringOperationFilterInput>;
+  subMenu?: InputMaybe<StringOperationFilterInput>;
+  subMenuIcon?: InputMaybe<StringOperationFilterInput>;
+  transferable?: InputMaybe<ByteOperationFilterInput>;
+  type?: InputMaybe<IntOperationFilterInput>;
+  userGroup?: InputMaybe<StringOperationFilterInput>;
+  webApp?: InputMaybe<ByteOperationFilterInput>;
+};
+
+export type PermissionSetSortInput = {
+  action?: InputMaybe<SortEnumType>;
+  displayName?: InputMaybe<SortEnumType>;
+  erpApp?: InputMaybe<SortEnumType>;
+  icon?: InputMaybe<SortEnumType>;
+  iconType?: InputMaybe<SortEnumType>;
+  menuGroup?: InputMaybe<SortEnumType>;
+  mobileApp?: InputMaybe<SortEnumType>;
+  name?: InputMaybe<SortEnumType>;
+  order?: InputMaybe<SortEnumType>;
+  parentMenu?: InputMaybe<SortEnumType>;
+  parentMenuIcon?: InputMaybe<SortEnumType>;
+  platform?: InputMaybe<SortEnumType>;
+  profileID?: InputMaybe<SortEnumType>;
+  roleID?: InputMaybe<SortEnumType>;
+  subMenu?: InputMaybe<SortEnumType>;
+  subMenuIcon?: InputMaybe<SortEnumType>;
+  transferable?: InputMaybe<SortEnumType>;
+  type?: InputMaybe<SortEnumType>;
+  userGroup?: InputMaybe<SortEnumType>;
+  webApp?: InputMaybe<SortEnumType>;
+};
+
+/** A segment of a collection. */
+export type PermissionSetsCollectionSegment = {
+  __typename: 'PermissionSetsCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<PermissionSet>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
+};
+
 export type PostCode = {
   __typename: 'PostCode';
   city: Maybe<Scalars['String']['output']>;
@@ -2612,6 +3511,25 @@ export type PostCodesEdge = {
   cursor: Scalars['String']['output'];
   /** The item at the end of the edge. */
   node: PostCode;
+};
+
+export type ProcurementConfigDto = {
+  __typename: 'ProcurementConfigDto';
+  fromDate: Scalars['DateTime']['output'];
+  itemNo: Scalars['String']['output'];
+  market: Scalars['String']['output'];
+  qty: Scalars['Int']['output'];
+  toDate: Scalars['DateTime']['output'];
+  type: Scalars['Int']['output'];
+};
+
+export type ProcurementConfigDtoInput = {
+  fromDate: Scalars['DateTime']['input'];
+  itemNo: Scalars['String']['input'];
+  market: Scalars['String']['input'];
+  qty: Scalars['Int']['input'];
+  toDate: Scalars['DateTime']['input'];
+  type: Scalars['Int']['input'];
 };
 
 export type ProcurementNewNumberingDto = {
@@ -2839,11 +3757,20 @@ export type ProfileResult = {
 };
 
 export type ProfileUpdateInput = {
+  allowAllMasters?: InputMaybe<Scalars['Byte']['input']>;
+  authenticationEmail?: InputMaybe<Scalars['String']['input']>;
   avatar?: InputMaybe<Scalars['Int']['input']>;
+  backupAllowedFileTypes?: InputMaybe<Scalars['String']['input']>;
+  backupGDriveFolderID?: InputMaybe<Scalars['String']['input']>;
+  backupStorageQuotaGB?: InputMaybe<Scalars['Decimal']['input']>;
+  canRunErp?: InputMaybe<Scalars['Byte']['input']>;
+  canRunOldErp?: InputMaybe<Scalars['Byte']['input']>;
   email?: InputMaybe<Scalars['String']['input']>;
   fullName?: InputMaybe<Scalars['String']['input']>;
   mobileNo?: InputMaybe<Scalars['String']['input']>;
   securityPIN?: InputMaybe<Scalars['Int']['input']>;
+  state?: InputMaybe<Scalars['Int']['input']>;
+  userType?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type PurchaseHeader = {
@@ -4472,7 +5399,10 @@ export type PurchaseLineSortInput = {
 
 export type Query = {
   __typename: 'Query';
+  casingItems: Array<CasingItem>;
   dealerByCode: SalespersonPurchaser;
+  downloadsConfig: DownloadsConfig;
+  employees: Maybe<EmployeesCollectionSegment>;
   exportCalendarIcs: Scalars['String']['output'];
   faClasses: Maybe<FaClassesConnection>;
   faSubclasses: Maybe<FaSubclassesConnection>;
@@ -4482,14 +5412,35 @@ export type Query = {
   getCalendarAuditLog: Array<CalendarAuditLogEntryDto>;
   getCalendarConflicts: Array<CalendarEventDto>;
   getCalendarEventById: Maybe<CalendarEventDto>;
+  getCrmAgentContacts: Maybe<GetCrmAgentContactsCollectionSegment>;
+  getCrmAgentSummaryReport: Array<CrmAgentSummaryDto>;
+  getCrmCallLogs: Array<CrmCallLog>;
+  getCrmCallReminders: Array<CrmCallReminder>;
+  getCrmContactById: Maybe<CrmContact>;
+  getCrmContactClaims: Array<CrmContactClaimDto>;
+  getCrmContactFleetDetails: Array<CrmContactFleetDetail>;
+  getCrmContactInvoices: Array<CrmContactInvoiceDto>;
+  getCrmContactProducts: Array<Scalars['String']['output']>;
+  getCrmContacts: Maybe<GetCrmContactsCollectionSegment>;
+  getCrmMasterItems: Array<CrmMasterItem>;
+  getCrmMyCallingSummary: Array<CrmMyCallingSummaryDto>;
+  getCrmSetting: Maybe<CrmSetting>;
+  getCrmSettings: Array<CrmSetting>;
+  getCrmWhatsappImages: Array<CrmWhatsappImage>;
+  getCrmWhatsappTemplates: Array<CrmWhatsappTemplate>;
+  getDriveSyncAdminStatuses: Array<DriveSyncAdminStatus>;
+  getDriveSyncBackupFiles: Array<DriveSyncBackupFileInfo>;
+  getDriveSyncConfig: Maybe<DriveSyncUserConfig>;
+  getDriveSyncOAuthStatus: DriveSyncOAuthStatus;
   getEventTypes: Array<EventTypeDto>;
   getFreeBusy: Array<FreeBusyDto>;
   getMyCalendarEvents: Array<CalendarEventDto>;
   getMyDocuments: Array<DocumentDto>;
   getNotificationPreference: Maybe<NotificationPreferenceDto>;
-  getNotifications: Array<Notification>;
+  getNotifications: NotificationFeedResult;
   getSharedCalendars: Array<CalendarShareDto>;
   getUnreadNotificationCount: Scalars['Int']['output'];
+  getUpcomingCrmReminders: Array<CrmCallReminder>;
   getUpcomingReminders: Array<CalendarEventDto>;
   glAccounts: Maybe<GlAccountsConnection>;
   groupCategories: Array<GroupCategory>;
@@ -4519,6 +5470,7 @@ export type Query = {
   navEditRequestTypeById: Maybe<NavEditRequestType>;
   navEditRequestTypes: Array<NavEditRequestType>;
   payrollEmployees: Maybe<PayrollEmployeesConnection>;
+  permissionSets: Maybe<PermissionSetsCollectionSegment>;
   postCodes: Maybe<PostCodesConnection>;
   procurementNewNumberingPaged: Maybe<ProcurementNewNumberingPagedConnection>;
   procurementOrderLines: Maybe<ProcurementOrderLinesConnection>;
@@ -4527,10 +5479,10 @@ export type Query = {
   productionEcomileLastNewNumber: Scalars['String']['output'];
   productionEcomileProcurementTiles: Array<Tile>;
   productionInspectorCodeNames: Array<CodeName>;
-  productionItemNos: Array<CasingItem>;
   productionMakeSubMake: Array<CodeName>;
   productionMakes: Array<CodeName>;
   productionProcMarkets: Array<Scalars['String']['output']>;
+  productionProcurementConfigs: Array<ProcurementConfigDto>;
   productionProcurementDispatchOrders: Array<DispatchOrder>;
   productionProcurementInspection: Array<CodeName>;
   productionProcurementMarkets: Array<CodeName>;
@@ -4544,19 +5496,32 @@ export type Query = {
   profile: Maybe<ProfileResult>;
   purchaseItemNos: Maybe<PurchaseItemNosConnection>;
   reportSalesMeta: Array<ReportMeta>;
+  reportsByCategory: Array<ReportMeta>;
+  responsibilityCenters: Maybe<ResponsibilityCentersCollectionSegment>;
   salesInvLinesForInvoice: Array<EInvoiceCandidate>;
   searchUsers: Array<UserSearchResult>;
   sessions: Array<SessionInfo>;
   states: Maybe<StatesConnection>;
   unitOfMeasures: Maybe<UnitOfMeasuresConnection>;
   user: Maybe<UserDetail>;
+  userDetail: Maybe<ProfileResult>;
+  users: Maybe<UsersCollectionSegment>;
   vendorByCode: Vendor;
   version: Scalars['String']['output'];
+  vpnInstallerConfig: VpnInstallerConfig;
 };
 
 
 export type QueryDealerByCodeArgs = {
   code: Scalars['String']['input'];
+};
+
+
+export type QueryEmployeesArgs = {
+  order?: InputMaybe<Array<EmployeeSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<EmployeeFilterInput>;
 };
 
 
@@ -4590,8 +5555,10 @@ export type QueryFixedAssetServiceLogsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   before?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  fromDate?: InputMaybe<Scalars['DateTime']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   order?: InputMaybe<Array<FixedAssetServiceLogSortInput>>;
+  toDate?: InputMaybe<Scalars['DateTime']['input']>;
   where?: InputMaybe<FixedAssetServiceLogFilterInput>;
 };
 
@@ -4635,6 +5602,112 @@ export type QueryGetCalendarEventByIdArgs = {
 };
 
 
+export type QueryGetCrmAgentContactsArgs = {
+  order?: InputMaybe<Array<CrmAgentContactSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<CrmAgentContactFilterInput>;
+};
+
+
+export type QueryGetCrmCallLogsArgs = {
+  contactId: Scalars['UUID']['input'];
+  order?: InputMaybe<Array<CrmCallLogSortInput>>;
+  where?: InputMaybe<CrmCallLogFilterInput>;
+};
+
+
+export type QueryGetCrmCallRemindersArgs = {
+  contactId: Scalars['UUID']['input'];
+  includeCompleted: Scalars['Boolean']['input'];
+  order?: InputMaybe<Array<CrmCallReminderSortInput>>;
+  where?: InputMaybe<CrmCallReminderFilterInput>;
+};
+
+
+export type QueryGetCrmContactByIdArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type QueryGetCrmContactClaimsArgs = {
+  contactId: Scalars['UUID']['input'];
+};
+
+
+export type QueryGetCrmContactFleetDetailsArgs = {
+  contactId: Scalars['UUID']['input'];
+  order?: InputMaybe<Array<CrmContactFleetDetailSortInput>>;
+  where?: InputMaybe<CrmContactFleetDetailFilterInput>;
+};
+
+
+export type QueryGetCrmContactInvoicesArgs = {
+  contactId: Scalars['UUID']['input'];
+};
+
+
+export type QueryGetCrmContactProductsArgs = {
+  respCenter?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryGetCrmContactsArgs = {
+  order?: InputMaybe<Array<CrmContactSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<CrmContactFilterInput>;
+};
+
+
+export type QueryGetCrmMasterItemsArgs = {
+  order?: InputMaybe<Array<CrmMasterItemSortInput>>;
+  type: CrmMasterType;
+  where?: InputMaybe<CrmMasterItemFilterInput>;
+};
+
+
+export type QueryGetCrmMyCallingSummaryArgs = {
+  date?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+export type QueryGetCrmSettingArgs = {
+  key: Scalars['String']['input'];
+};
+
+
+export type QueryGetCrmSettingsArgs = {
+  order?: InputMaybe<Array<CrmSettingSortInput>>;
+  where?: InputMaybe<CrmSettingFilterInput>;
+};
+
+
+export type QueryGetCrmWhatsappImagesArgs = {
+  order?: InputMaybe<Array<CrmWhatsappImageSortInput>>;
+  where?: InputMaybe<CrmWhatsappImageFilterInput>;
+};
+
+
+export type QueryGetCrmWhatsappTemplatesArgs = {
+  order?: InputMaybe<Array<CrmWhatsappTemplateSortInput>>;
+  where?: InputMaybe<CrmWhatsappTemplateFilterInput>;
+};
+
+
+export type QueryGetDriveSyncAdminStatusesArgs = {
+  includeFolderValidation: Scalars['Boolean']['input'];
+  includeLatestBackup: Scalars['Boolean']['input'];
+  includeUsage: Scalars['Boolean']['input'];
+  userIds: Array<Scalars['String']['input']>;
+};
+
+
+export type QueryGetDriveSyncConfigArgs = {
+  targetUserId?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryGetFreeBusyArgs = {
   fromUtc: Scalars['DateTime']['input'];
   toUtc: Scalars['DateTime']['input'];
@@ -4659,6 +5732,11 @@ export type QueryGetMyDocumentsArgs = {
 
 export type QueryGetNotificationsArgs = {
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryGetUpcomingCrmRemindersArgs = {
+  untilUtc?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 
@@ -4748,7 +5826,7 @@ export type QueryMyAreasArgs = {
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   order?: InputMaybe<Array<AreaSortInput>>;
-  respCenter?: InputMaybe<Scalars['String']['input']>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
   where?: InputMaybe<AreaFilterInput>;
 };
 
@@ -4784,7 +5862,7 @@ export type QueryMyDealersArgs = {
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   order?: InputMaybe<Array<SalespersonPurchaserSortInput>>;
-  respCenter?: InputMaybe<Scalars['String']['input']>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
   where?: InputMaybe<SalespersonPurchaserFilterInput>;
 };
 
@@ -4798,7 +5876,7 @@ export type QueryMyRegionsArgs = {
   first?: InputMaybe<Scalars['Int']['input']>;
   last?: InputMaybe<Scalars['Int']['input']>;
   order?: InputMaybe<Array<TerritorySortInput>>;
-  respCenter?: InputMaybe<Scalars['String']['input']>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
   where?: InputMaybe<TerritoryFilterInput>;
 };
 
@@ -4866,6 +5944,7 @@ export type QueryNavEditGetRecordArgs = {
 
 
 export type QueryNavEditLookupRecordsArgs = {
+  authValues?: InputMaybe<Array<NavEditAuthValueInput>>;
   requestTypeId: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
@@ -4900,6 +5979,14 @@ export type QueryPayrollEmployeesArgs = {
   order?: InputMaybe<Array<EmployeeSortInput>>;
   param: ReportFetchParamInput;
   where?: InputMaybe<EmployeeFilterInput>;
+};
+
+
+export type QueryPermissionSetsArgs = {
+  order?: InputMaybe<Array<PermissionSetSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<PermissionSetFilterInput>;
 };
 
 
@@ -4980,11 +6067,6 @@ export type QueryProductionEcomileProcurementTilesArgs = {
 
 
 export type QueryProductionInspectorCodeNamesArgs = {
-  param: FetchParamsInput;
-};
-
-
-export type QueryProductionItemNosArgs = {
   param: FetchParamsInput;
 };
 
@@ -5075,6 +6157,19 @@ export type QueryReportSalesMetaArgs = {
 };
 
 
+export type QueryReportsByCategoryArgs = {
+  category: Scalars['String']['input'];
+};
+
+
+export type QueryResponsibilityCentersArgs = {
+  order?: InputMaybe<Array<ResponsibilityCenterSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<ResponsibilityCenterFilterInput>;
+};
+
+
 export type QuerySearchUsersArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
@@ -5108,6 +6203,20 @@ export type QueryUnitOfMeasuresArgs = {
 
 export type QueryUserArgs = {
   username: Scalars['String']['input'];
+};
+
+
+export type QueryUserDetailArgs = {
+  userId: Scalars['String']['input'];
+};
+
+
+export type QueryUsersArgs = {
+  duplicateMobileOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  order?: InputMaybe<Array<UserSortInput>>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<UserFilterInput>;
 };
 
 
@@ -5203,6 +6312,14 @@ export type ResetPasswordResult = {
   newPassword: Maybe<Scalars['String']['output']>;
   success: Scalars['Boolean']['output'];
 };
+
+export enum RespCenterUserSetupType {
+  Customer = 'CUSTOMER',
+  Employee = 'EMPLOYEE',
+  None = 'NONE',
+  Partner = 'PARTNER',
+  PartnerGroup = 'PARTNER_GROUP'
+}
 
 export type ResponsibilityCenter = {
   __typename: 'ResponsibilityCenter';
@@ -5707,6 +6824,16 @@ export type ResponsibilityCenterSortInput = {
   yearlyBonus?: InputMaybe<SortEnumType>;
 };
 
+/** A segment of a collection. */
+export type ResponsibilityCentersCollectionSegment = {
+  __typename: 'ResponsibilityCentersCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<ResponsibilityCenter>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
+};
+
 export type SalesReportParamsInput = {
   areas?: InputMaybe<Array<Scalars['String']['input']>>;
   customers?: InputMaybe<Scalars['String']['input']>;
@@ -5885,7 +7012,11 @@ export type SessionInfo = {
   entityCode: Scalars['String']['output'];
   entityType: Scalars['String']['output'];
   expiresAtUtc: Scalars['DateTime']['output'];
+  ipAddress: Maybe<Scalars['String']['output']>;
+  refreshToken: Maybe<Scalars['String']['output']>;
+  refreshTokenExpiresAtUtc: Maybe<Scalars['DateTime']['output']>;
   sessionId: Scalars['String']['output'];
+  userAgent: Maybe<Scalars['String']['output']>;
   userId: Scalars['String']['output'];
   userSecurityId: Scalars['UUID']['output'];
   userType: Scalars['String']['output'];
@@ -6039,7 +7170,7 @@ export type SubMenu = {
 
 export type Subscription = {
   __typename: 'Subscription';
-  onNotification: Notification;
+  onNotification: NotificationPushPayload;
 };
 
 
@@ -6165,11 +7296,92 @@ export type UpdateEventInput = {
   visibility?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type User = {
+  __typename: 'User';
+  allowAllMasters: Scalars['Byte']['output'];
+  authenticationEmail: Maybe<Scalars['String']['output']>;
+  avatar: Scalars['Int']['output'];
+  backupAllowedFileTypes: Maybe<Scalars['String']['output']>;
+  backupGDriveFolderID: Maybe<Scalars['String']['output']>;
+  backupStorageQuotaGB: Scalars['Decimal']['output'];
+  canRunERP: Scalars['Byte']['output'];
+  canRunOldERP: Scalars['Byte']['output'];
+  changePassword: Scalars['Byte']['output'];
+  dashboards: Maybe<Scalars['String']['output']>;
+  doNotCheckRecordStatus: Scalars['Byte']['output'];
+  emails: Maybe<Scalars['String']['output']>;
+  encryptedPassword: Maybe<Scalars['String']['output']>;
+  expiryDate: Maybe<Scalars['DateTime']['output']>;
+  fullName: Maybe<Scalars['String']['output']>;
+  killAllSessions: Scalars['Byte']['output'];
+  languageID: Maybe<Scalars['String']['output']>;
+  licenseType: Scalars['Int']['output'];
+  mobileNo: Maybe<Scalars['String']['output']>;
+  navConfigName: Maybe<Scalars['String']['output']>;
+  notificationToken: Maybe<Scalars['String']['output']>;
+  passwordChangedDate: Maybe<Scalars['DateTime']['output']>;
+  rdpPassword: Maybe<Scalars['String']['output']>;
+  role: Maybe<Scalars['String']['output']>;
+  salt: Maybe<Scalars['String']['output']>;
+  securityPin: Scalars['Int']['output'];
+  state: Scalars['Int']['output'];
+  tauriConfig: Maybe<Array<Scalars['Byte']['output']>>;
+  userName: Maybe<Scalars['String']['output']>;
+  userSecurityID: Scalars['UUID']['output'];
+  userType: Maybe<Scalars['String']['output']>;
+  vpnPassword: Maybe<Scalars['String']['output']>;
+  vpnUserID: Maybe<Scalars['String']['output']>;
+  widgets: Maybe<Scalars['String']['output']>;
+  windowsSecurityID: Maybe<Scalars['String']['output']>;
+};
+
 export type UserDetail = {
   __typename: 'UserDetail';
+  allowAllMasters: Scalars['Int']['output'];
+  authenticationEmail: Scalars['String']['output'];
+  backupAllowedFileTypes: Scalars['String']['output'];
+  backupGDriveFolderID: Scalars['String']['output'];
+  backupStorageQuotaGB: Scalars['Decimal']['output'];
+  canRunERP: Scalars['Int']['output'];
+  canRunOldERP: Scalars['Int']['output'];
   fullName: Scalars['String']['output'];
+  mobileNo: Scalars['String']['output'];
   navConfigName: Maybe<Scalars['String']['output']>;
+  permissions: Array<UserDetailPermissionRow>;
+  postingSetup: Array<UserDetailPostingRow>;
   rdpPassword: Maybe<Scalars['String']['output']>;
+  respCenterSetup: Array<UserDetailRespCenterRow>;
+  state: Scalars['Int']['output'];
+  userId: Scalars['String']['output'];
+  userType: Scalars['String']['output'];
+  vpnPassword: Maybe<Scalars['String']['output']>;
+  vpnUserId: Maybe<Scalars['String']['output']>;
+};
+
+export type UserDetailPermissionRow = {
+  __typename: 'UserDetailPermissionRow';
+  assignerName: Scalars['String']['output'];
+  companyName: Scalars['String']['output'];
+  homePath: Scalars['Int']['output'];
+  roleExipryDate: Scalars['String']['output'];
+  roleId: Scalars['String']['output'];
+  roleName: Scalars['String']['output'];
+  values: Scalars['String']['output'];
+};
+
+export type UserDetailPostingRow = {
+  __typename: 'UserDetailPostingRow';
+  allowPostingFrom: Scalars['String']['output'];
+  allowPostingTo: Scalars['String']['output'];
+  responsibilityCenter: Scalars['String']['output'];
+};
+
+export type UserDetailRespCenterRow = {
+  __typename: 'UserDetailRespCenterRow';
+  code: Scalars['String']['output'];
+  respCenter: Scalars['String']['output'];
+  respDefault: Scalars['Int']['output'];
+  type: Scalars['Int']['output'];
   userId: Scalars['String']['output'];
 };
 
@@ -6179,6 +7391,46 @@ export type UserEntity = {
   location: Scalars['String']['output'];
   name: Scalars['String']['output'];
   title: Scalars['String']['output'];
+};
+
+export type UserFilterInput = {
+  allowAllMasters?: InputMaybe<ByteOperationFilterInput>;
+  and?: InputMaybe<Array<UserFilterInput>>;
+  authenticationEmail?: InputMaybe<StringOperationFilterInput>;
+  avatar?: InputMaybe<IntOperationFilterInput>;
+  backupAllowedFileTypes?: InputMaybe<StringOperationFilterInput>;
+  backupGDriveFolderID?: InputMaybe<StringOperationFilterInput>;
+  backupStorageQuotaGB?: InputMaybe<DecimalOperationFilterInput>;
+  canRunERP?: InputMaybe<ByteOperationFilterInput>;
+  canRunOldERP?: InputMaybe<ByteOperationFilterInput>;
+  changePassword?: InputMaybe<ByteOperationFilterInput>;
+  dashboards?: InputMaybe<StringOperationFilterInput>;
+  doNotCheckRecordStatus?: InputMaybe<ByteOperationFilterInput>;
+  emails?: InputMaybe<StringOperationFilterInput>;
+  encryptedPassword?: InputMaybe<StringOperationFilterInput>;
+  expiryDate?: InputMaybe<DateTimeOperationFilterInput>;
+  fullName?: InputMaybe<StringOperationFilterInput>;
+  killAllSessions?: InputMaybe<ByteOperationFilterInput>;
+  languageID?: InputMaybe<StringOperationFilterInput>;
+  licenseType?: InputMaybe<IntOperationFilterInput>;
+  mobileNo?: InputMaybe<StringOperationFilterInput>;
+  navConfigName?: InputMaybe<StringOperationFilterInput>;
+  notificationToken?: InputMaybe<StringOperationFilterInput>;
+  or?: InputMaybe<Array<UserFilterInput>>;
+  passwordChangedDate?: InputMaybe<DateTimeOperationFilterInput>;
+  rdpPassword?: InputMaybe<StringOperationFilterInput>;
+  role?: InputMaybe<StringOperationFilterInput>;
+  salt?: InputMaybe<StringOperationFilterInput>;
+  securityPin?: InputMaybe<IntOperationFilterInput>;
+  state?: InputMaybe<IntOperationFilterInput>;
+  tauriConfig?: InputMaybe<ListByteOperationFilterInput>;
+  userName?: InputMaybe<StringOperationFilterInput>;
+  userSecurityID?: InputMaybe<UuidOperationFilterInput>;
+  userType?: InputMaybe<StringOperationFilterInput>;
+  vpnPassword?: InputMaybe<StringOperationFilterInput>;
+  vpnUserID?: InputMaybe<StringOperationFilterInput>;
+  widgets?: InputMaybe<StringOperationFilterInput>;
+  windowsSecurityID?: InputMaybe<StringOperationFilterInput>;
 };
 
 export type UserLocation = {
@@ -6191,12 +7443,78 @@ export type UserLocation = {
   sale: Scalars['Byte']['output'];
 };
 
+export type UserPermissionInput = {
+  homePath: Scalars['Byte']['input'];
+  roleId: Scalars['String']['input'];
+  values: Scalars['String']['input'];
+};
+
+export type UserPostingSetupInput = {
+  allowPostingFrom?: InputMaybe<Scalars['DateTime']['input']>;
+  allowPostingTo?: InputMaybe<Scalars['DateTime']['input']>;
+  responsibilityCenter: Scalars['String']['input'];
+};
+
+export type UserRespCenterInput = {
+  code: Scalars['String']['input'];
+  default: Scalars['Byte']['input'];
+  respCenter: Scalars['String']['input'];
+  type: RespCenterUserSetupType;
+};
+
 export type UserSearchResult = {
   __typename: 'UserSearchResult';
   avatar: Maybe<Scalars['Int']['output']>;
   fullName: Scalars['String']['output'];
   userId: Scalars['String']['output'];
   userType: Scalars['String']['output'];
+};
+
+export type UserSortInput = {
+  allowAllMasters?: InputMaybe<SortEnumType>;
+  authenticationEmail?: InputMaybe<SortEnumType>;
+  avatar?: InputMaybe<SortEnumType>;
+  backupAllowedFileTypes?: InputMaybe<SortEnumType>;
+  backupGDriveFolderID?: InputMaybe<SortEnumType>;
+  backupStorageQuotaGB?: InputMaybe<SortEnumType>;
+  canRunERP?: InputMaybe<SortEnumType>;
+  canRunOldERP?: InputMaybe<SortEnumType>;
+  changePassword?: InputMaybe<SortEnumType>;
+  dashboards?: InputMaybe<SortEnumType>;
+  doNotCheckRecordStatus?: InputMaybe<SortEnumType>;
+  emails?: InputMaybe<SortEnumType>;
+  encryptedPassword?: InputMaybe<SortEnumType>;
+  expiryDate?: InputMaybe<SortEnumType>;
+  fullName?: InputMaybe<SortEnumType>;
+  killAllSessions?: InputMaybe<SortEnumType>;
+  languageID?: InputMaybe<SortEnumType>;
+  licenseType?: InputMaybe<SortEnumType>;
+  mobileNo?: InputMaybe<SortEnumType>;
+  navConfigName?: InputMaybe<SortEnumType>;
+  notificationToken?: InputMaybe<SortEnumType>;
+  passwordChangedDate?: InputMaybe<SortEnumType>;
+  rdpPassword?: InputMaybe<SortEnumType>;
+  role?: InputMaybe<SortEnumType>;
+  salt?: InputMaybe<SortEnumType>;
+  securityPin?: InputMaybe<SortEnumType>;
+  state?: InputMaybe<SortEnumType>;
+  userName?: InputMaybe<SortEnumType>;
+  userSecurityID?: InputMaybe<SortEnumType>;
+  userType?: InputMaybe<SortEnumType>;
+  vpnPassword?: InputMaybe<SortEnumType>;
+  vpnUserID?: InputMaybe<SortEnumType>;
+  widgets?: InputMaybe<SortEnumType>;
+  windowsSecurityID?: InputMaybe<SortEnumType>;
+};
+
+/** A segment of a collection. */
+export type UsersCollectionSegment = {
+  __typename: 'UsersCollectionSegment';
+  /** A flattened list of the items. */
+  items: Maybe<Array<User>>;
+  /** Information to aid in pagination. */
+  pageInfo: CollectionSegmentInfo;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type UuidOperationFilterInput = {
@@ -6645,6 +7963,32 @@ export type VendorSortInput = {
   vendorType?: InputMaybe<SortEnumType>;
 };
 
+export type VpnInstallerConfig = {
+  __typename: 'VpnInstallerConfig';
+  downloadUrl: Scalars['String']['output'];
+  fileName: Maybe<Scalars['String']['output']>;
+  isZipArchive: Scalars['Boolean']['output'];
+  sha256Hex: Maybe<Scalars['String']['output']>;
+  zipEntryName: Maybe<Scalars['String']['output']>;
+};
+
+export type GetDriveSyncConfigQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetDriveSyncConfigQuery = { __typename: 'Query', getDriveSyncConfig: { __typename: 'DriveSyncUserConfig', isActive: boolean, targetFolderId: string, quotaBytes: unknown, allowedExtensionsJson: string | null } | null };
+
+export type RequestDriveSyncUploadCredentialsMutationVariables = Exact<{
+  bytes: Scalars['Long']['input'];
+}>;
+
+
+export type RequestDriveSyncUploadCredentialsMutation = { __typename: 'Mutation', requestDriveSyncUploadCredentials: { __typename: 'DriveSyncUploadCredentials', accessToken: string, expiresAtUtc: string, folderId: string } };
+
+export type GetDriveSyncBackupFilesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetDriveSyncBackupFilesQuery = { __typename: 'Query', getDriveSyncBackupFiles: Array<{ __typename: 'DriveSyncBackupFileInfo', id: string, name: string, size: unknown | null, mimeType: string | null, modifiedTimeUtc: string | null }> };
+
 export type GetSessionsQueryVariables = Exact<{
   userId?: InputMaybe<Scalars['String']['input']>;
 }>;
@@ -6692,7 +8036,15 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename: 'Mutation', login: { __typename: 'LoginResult', success: boolean, message: string | null, token: string | null, requirePasswordChange: boolean, requirePasswordChangeReason: string | null, user: { __typename: 'LoginUser', userId: string, userSecurityId: unknown, fullName: string, userType: string, title: string, entityType: string, entityCode: string, department: string, respCenter: string, workDate: string, avatar: number, userSpecialToken: string, dashboards: string } | null, locations: Array<{ __typename: 'UserLocation', code: string, name: string, sale: unknown, purchase: unknown, production: unknown, payroll: unknown }> | null, menus: Array<{ __typename: 'Menu', label: string, icon: string, subMenus: Array<{ __typename: 'SubMenu', label: string, icon: string, items: Array<{ __typename: 'MenuItem', code: string, label: string, icon: string, action: string, order: number, options: string }> }> }> | null } };
+export type LoginMutation = { __typename: 'Mutation', login: { __typename: 'LoginResult', success: boolean, message: string | null, token: string | null, refreshToken: string | null, requirePasswordChange: boolean, requirePasswordChangeReason: string | null, user: { __typename: 'LoginUser', userId: string, userSecurityId: unknown, fullName: string, userType: string, title: string, entityType: string, entityCode: string, department: string, respCenter: string, workDate: string, avatar: number, userSpecialToken: string, dashboards: string } | null, locations: Array<{ __typename: 'UserLocation', code: string, name: string, sale: unknown, purchase: unknown, production: unknown, payroll: unknown }> | null, menus: Array<{ __typename: 'Menu', label: string, icon: string, subMenus: Array<{ __typename: 'SubMenu', label: string, icon: string, items: Array<{ __typename: 'MenuItem', code: string, label: string, icon: string, action: string, order: number, options: string }> }> }> | null } };
+
+export type RefreshTokenMutationVariables = Exact<{
+  token: Scalars['String']['input'];
+  refreshToken: Scalars['String']['input'];
+}>;
+
+
+export type RefreshTokenMutation = { __typename: 'Mutation', refreshToken: { __typename: 'LoginResult', success: boolean, message: string | null, token: string | null, refreshToken: string | null, requirePasswordChange: boolean, requirePasswordChangeReason: string | null, user: { __typename: 'LoginUser', userId: string, userSecurityId: unknown, fullName: string, userType: string, title: string, entityType: string, entityCode: string, department: string, respCenter: string, workDate: string, avatar: number, userSpecialToken: string, dashboards: string } | null, locations: Array<{ __typename: 'UserLocation', code: string, name: string, sale: unknown, purchase: unknown, production: unknown, payroll: unknown }> | null, menus: Array<{ __typename: 'Menu', label: string, icon: string, subMenus: Array<{ __typename: 'SubMenu', label: string, icon: string, items: Array<{ __typename: 'MenuItem', code: string, label: string, icon: string, action: string, order: number, options: string }> }> }> | null } };
 
 export type CreateCalendarEventMutationVariables = Exact<{
   input: CreateEventInput;
@@ -6742,7 +8094,7 @@ export type GetNotificationsQueryVariables = Exact<{
 }>;
 
 
-export type GetNotificationsQuery = { __typename: 'Query', notifications: Array<{ __typename: 'Notification', id: unknown, userId: string, title: string, message: string, type: NotificationType, link: string | null, isRead: boolean, createdAt: string }> };
+export type GetNotificationsQuery = { __typename: 'Query', getNotifications: { __typename: 'NotificationFeedResult', serverTimeUtc: string, notifications: Array<{ __typename: 'Notification', id: unknown, userId: string, title: string, message: string, type: NotificationType, link: string | null, isRead: boolean, createdAt: string }> } };
 
 export type GetUnreadNotificationCountQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -6766,7 +8118,7 @@ export type OnNotificationSubscriptionVariables = Exact<{
 }>;
 
 
-export type OnNotificationSubscription = { __typename: 'Subscription', onNotification: { __typename: 'Notification', id: unknown, userId: string, title: string, message: string, type: NotificationType, link: string | null, isRead: boolean, createdAt: string } };
+export type OnNotificationSubscription = { __typename: 'Subscription', onNotification: { __typename: 'NotificationPushPayload', serverTimeUtc: string, notification: { __typename: 'Notification', id: unknown, userId: string, title: string, message: string, type: NotificationType, link: string | null, isRead: boolean, createdAt: string } } };
 
 export type SnoozeReminderMutationVariables = Exact<{
   reminderId: Scalars['UUID']['input'];
@@ -6809,13 +8161,13 @@ export type GetMyBalanceQueryVariables = Exact<{
 }>;
 
 
-export type GetMyBalanceQuery = { __typename: 'Query', myBalance: Array<{ __typename: 'EntityBalance', code: string, balance: unknown, product: string }> };
+export type GetMyBalanceQuery = { __typename: 'Query', myBalance: Array<{ __typename: 'EntityBalance', code: string, balance: unknown }> };
 
 export type GetMyAreasQueryVariables = Exact<{
   entityType?: InputMaybe<Scalars['String']['input']>;
   entityCode?: InputMaybe<Scalars['String']['input']>;
   department?: InputMaybe<Scalars['String']['input']>;
-  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   where?: InputMaybe<AreaFilterInput>;
@@ -6841,7 +8193,7 @@ export type GetDealersQueryVariables = Exact<{
   entityType?: InputMaybe<Scalars['String']['input']>;
   entityCode?: InputMaybe<Scalars['String']['input']>;
   department?: InputMaybe<Scalars['String']['input']>;
-  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   where?: InputMaybe<SalespersonPurchaserFilterInput>;
@@ -6855,7 +8207,7 @@ export type GetMyRegionsQueryVariables = Exact<{
   entityType?: InputMaybe<Scalars['String']['input']>;
   entityCode?: InputMaybe<Scalars['String']['input']>;
   department?: InputMaybe<Scalars['String']['input']>;
-  respCenters?: InputMaybe<Array<Scalars['String']['input']>>;
+  respCenters?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   where?: InputMaybe<TerritoryFilterInput>;
@@ -6931,6 +8283,7 @@ export type NavEditLookupRecordsQueryVariables = Exact<{
   requestTypeId: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
+  authValues?: InputMaybe<Array<NavEditAuthValueInput> | NavEditAuthValueInput>;
 }>;
 
 
@@ -7040,7 +8393,7 @@ export type GetProductionItemNosQueryVariables = Exact<{
 }>;
 
 
-export type GetProductionItemNosQuery = { __typename: 'Query', productionItemNos: Array<{ __typename: 'CasingItem', code: string, minRate: string, maxRate: string, category: string }> };
+export type GetProductionItemNosQuery = { __typename: 'Query', purchaseItemNos: { __typename: 'PurchaseItemNosConnection', nodes: Array<{ __typename: 'CasingItem', code: string, minRate: string, maxRate: string, category: string }> | null } | null };
 
 export type GetProductionMakesQueryVariables = Exact<{
   param: FetchParamsInput;
@@ -7403,63 +8756,103 @@ export type GetRespCenterMockQuery = { __typename: 'Query' };
 export type GetUsersQueryVariables = Exact<{
   skip?: InputMaybe<Scalars['Int']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
-  where?: InputMaybe<Scalars['String']['input']>;
-  order?: InputMaybe<Scalars['String']['input']>;
+  where?: InputMaybe<UserFilterInput>;
+  order?: InputMaybe<Array<UserSortInput> | UserSortInput>;
+  duplicateMobileOnly?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 
-export type GetUsersQuery = { __typename: 'Query', user: { __typename: 'UserDetail', userId: string } | null };
+export type GetUsersQuery = { __typename: 'Query', users: { __typename: 'UsersCollectionSegment', totalCount: number, items: Array<{ __typename: 'User', userSecurityID: unknown, userName: string | null, fullName: string | null, userType: string | null, mobileNo: string | null, authenticationEmail: string | null, state: number, avatar: number }> | null } | null };
+
+export type GetDriveSyncAdminStatusesQueryVariables = Exact<{
+  userIds: Array<Scalars['String']['input']> | Scalars['String']['input'];
+  includeFolderValidation: Scalars['Boolean']['input'];
+  includeUsage: Scalars['Boolean']['input'];
+  includeLatestBackup: Scalars['Boolean']['input'];
+}>;
+
+
+export type GetDriveSyncAdminStatusesQuery = { __typename: 'Query', getDriveSyncAdminStatuses: Array<{ __typename: 'DriveSyncAdminStatus', userId: string, isUserFound: boolean, isActive: boolean, targetFolderId: string, folderValidated: boolean | null, folderValidationError: string | null, quotaBytes: unknown, usedBytes: unknown, usageError: string | null, latestBackupUtc: string | null, latestBackupError: string | null, lastCheckedUtc: string }> };
 
 export type GetResponsibilityCentersQueryVariables = Exact<{
-  natureOfBusiness?: InputMaybe<Array<Scalars['Int']['input']> | Scalars['Int']['input']>;
   skip?: InputMaybe<Scalars['Int']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<ResponsibilityCenterFilterInput>;
 }>;
 
 
-export type GetResponsibilityCentersQuery = { __typename: 'Query' };
+export type GetResponsibilityCentersQuery = { __typename: 'Query', responsibilityCenters: { __typename: 'ResponsibilityCentersCollectionSegment', totalCount: number, items: Array<{ __typename: 'ResponsibilityCenter', code: string | null, name: string | null }> | null } | null };
 
 export type GetEmployeesQueryVariables = Exact<{
   skip?: InputMaybe<Scalars['Int']['input']>;
   take?: InputMaybe<Scalars['Int']['input']>;
+  where?: InputMaybe<EmployeeFilterInput>;
 }>;
 
 
-export type GetEmployeesQuery = { __typename: 'Query' };
+export type GetEmployeesQuery = { __typename: 'Query', employees: { __typename: 'EmployeesCollectionSegment', totalCount: number, items: Array<{ __typename: 'Employee', no: string | null, firstName: string | null, lastName: string | null }> | null } | null };
 
 export type GetPermissionSetsQueryVariables = Exact<{
   take?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 
-export type GetPermissionSetsQuery = { __typename: 'Query' };
+export type GetPermissionSetsQuery = { __typename: 'Query', permissionSets: { __typename: 'PermissionSetsCollectionSegment', totalCount: number, items: Array<{ __typename: 'PermissionSet', roleID: string | null, name: string | null }> | null } | null };
 
-export type UpdateUserPermissionsMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type UpdateUserPermissionsMutation = { __typename: 'Mutation' };
-
-export type UpdateUserResponsibilityCentersMutationVariables = Exact<{ [key: string]: never; }>;
+export type UpdateUserPermissionsMutationVariables = Exact<{
+  userName: Scalars['String']['input'];
+  permissions: Array<UserPermissionInput> | UserPermissionInput;
+}>;
 
 
-export type UpdateUserResponsibilityCentersMutation = { __typename: 'Mutation' };
+export type UpdateUserPermissionsMutation = { __typename: 'Mutation', updateUserPermissions: { __typename: 'MutationResult', success: boolean, message: string } };
 
-export type UpdateUserPostingSetupMutationVariables = Exact<{ [key: string]: never; }>;
-
-
-export type UpdateUserPostingSetupMutation = { __typename: 'Mutation' };
-
-export type UpdateUserDetailsMutationVariables = Exact<{ [key: string]: never; }>;
+export type UpdateUserResponsibilityCentersMutationVariables = Exact<{
+  userName: Scalars['String']['input'];
+  assignments: Array<UserRespCenterInput> | UserRespCenterInput;
+}>;
 
 
-export type UpdateUserDetailsMutation = { __typename: 'Mutation' };
+export type UpdateUserResponsibilityCentersMutation = { __typename: 'Mutation', updateUserResponsibilityCenters: { __typename: 'MutationResult', success: boolean, message: string } };
+
+export type UpdateUserPostingSetupMutationVariables = Exact<{
+  userName: Scalars['String']['input'];
+  assignments: Array<UserPostingSetupInput> | UserPostingSetupInput;
+}>;
+
+
+export type UpdateUserPostingSetupMutation = { __typename: 'Mutation', updateUserPostingSetup: { __typename: 'MutationResult', success: boolean, message: string } };
+
+export type UpdateUserDetailsMutationVariables = Exact<{
+  userName: Scalars['String']['input'];
+  details: ProfileUpdateInput;
+}>;
+
+
+export type UpdateUserDetailsMutation = { __typename: 'Mutation', updateUserDetails: { __typename: 'SetProfileResult', success: boolean, message: string } };
+
+export type ProvisionDriveSyncBackupFolderMutationVariables = Exact<{
+  targetUserId: Scalars['String']['input'];
+  folderName?: InputMaybe<Scalars['String']['input']>;
+  replaceExisting: Scalars['Boolean']['input'];
+}>;
+
+
+export type ProvisionDriveSyncBackupFolderMutation = { __typename: 'Mutation', provisionDriveSyncBackupFolder: { __typename: 'DriveSyncUserConfig', userId: string, targetFolderId: string, isActive: boolean } };
 
 export type GetReportsQueryVariables = Exact<{
   category: Scalars['String']['input'];
 }>;
 
 
-export type GetReportsQuery = { __typename: 'Query' };
+export type GetReportsQuery = { __typename: 'Query', reports: Array<{ __typename: 'ReportMeta', id: number, name: string }> };
+
+export type GetUserDetailQueryVariables = Exact<{
+  username: Scalars['String']['input'];
+}>;
+
+
+export type GetUserDetailQuery = { __typename: 'Query', user: { __typename: 'UserDetail', userId: string, fullName: string, userType: string, mobileNo: string, authenticationEmail: string, state: number, canRunERP: number, canRunOldERP: number, allowAllMasters: number, backupStorageQuotaGB: unknown, backupAllowedFileTypes: string, backupGDriveFolderID: string, respCenterSetup: Array<{ __typename: 'UserDetailRespCenterRow', userId: string, respCenter: string, respDefault: number, type: number, code: string }>, postingSetup: Array<{ __typename: 'UserDetailPostingRow', responsibilityCenter: string, allowPostingFrom: string, allowPostingTo: string }>, permissions: Array<{ __typename: 'UserDetailPermissionRow', roleId: string, roleName: string, companyName: string, assignerName: string, roleExipryDate: string, values: string, homePath: number }> } | null };
 
 export type GetDealerByCodeQueryVariables = Exact<{
   code: Scalars['String']['input'];
@@ -7476,6 +8869,36 @@ export type SaveDealerMutationVariables = Exact<{
 export type SaveDealerMutation = { __typename: 'Mutation', saveDealer: { __typename: 'MutationResult', success: boolean, message: string } };
 
 
+export const GetDriveSyncConfigDocument = gql`
+    query GetDriveSyncConfig {
+  getDriveSyncConfig(targetUserId: null) {
+    isActive
+    targetFolderId
+    quotaBytes
+    allowedExtensionsJson
+  }
+}
+    `;
+export const RequestDriveSyncUploadCredentialsDocument = gql`
+    mutation RequestDriveSyncUploadCredentials($bytes: Long!) {
+  requestDriveSyncUploadCredentials(requestedUploadBytes: $bytes) {
+    accessToken
+    expiresAtUtc
+    folderId
+  }
+}
+    `;
+export const GetDriveSyncBackupFilesDocument = gql`
+    query GetDriveSyncBackupFiles {
+  getDriveSyncBackupFiles {
+    id
+    name
+    size
+    mimeType
+    modifiedTimeUtc
+  }
+}
+    `;
 export const GetSessionsDocument = gql`
     query GetSessions($userId: String) {
   sessions(userId: $userId) {
@@ -7537,6 +8960,58 @@ export const LoginDocument = gql`
     success
     message
     token
+    refreshToken
+    requirePasswordChange
+    requirePasswordChangeReason
+    user {
+      userId
+      userSecurityId
+      fullName
+      userType
+      title
+      entityType
+      entityCode
+      department
+      respCenter
+      workDate
+      avatar
+      userSpecialToken
+      dashboards
+    }
+    locations {
+      code
+      name
+      sale
+      purchase
+      production
+      payroll
+    }
+    menus {
+      label
+      icon
+      subMenus {
+        label
+        icon
+        items {
+          code
+          label
+          icon
+          action
+          order
+          options
+        }
+      }
+    }
+  }
+}
+    `;
+export const RefreshTokenDocument = gql`
+    mutation RefreshToken($token: String!, $refreshToken: String!) {
+  refreshToken(token: $token, refreshToken: $refreshToken) {
+    success
+    message
+    token
+    refreshToken
     requirePasswordChange
     requirePasswordChangeReason
     user {
@@ -7717,15 +9192,18 @@ export const GetUpcomingRemindersDocument = gql`
     `;
 export const GetNotificationsDocument = gql`
     query GetNotifications($limit: Int) {
-  notifications: getNotifications(limit: $limit) {
-    id
-    userId
-    title
-    message
-    type
-    link
-    isRead
-    createdAt
+  getNotifications(limit: $limit) {
+    notifications {
+      id
+      userId
+      title
+      message
+      type
+      link
+      isRead
+      createdAt
+    }
+    serverTimeUtc
   }
 }
     `;
@@ -7747,14 +9225,17 @@ export const MarkAllNotificationsAsReadDocument = gql`
 export const OnNotificationDocument = gql`
     subscription OnNotification($userId: String!) {
   onNotification(userId: $userId) {
-    id
-    userId
-    title
-    message
-    type
-    link
-    isRead
-    createdAt
+    notification {
+      id
+      userId
+      title
+      message
+      type
+      link
+      isRead
+      createdAt
+    }
+    serverTimeUtc
   }
 }
     `;
@@ -7820,7 +9301,6 @@ export const GetMyBalanceDocument = gql`
   ) {
     code
     balance
-    product
   }
 }
     `;
@@ -8068,11 +9548,12 @@ export const NavEditRequestTypeByIdDocument = gql`
 }
     `;
 export const NavEditLookupRecordsDocument = gql`
-    query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int) {
+    query NavEditLookupRecords($requestTypeId: Int!, $search: String, $take: Int, $authValues: [NavEditAuthValueInput!]) {
   navEditLookupRecords(
     requestTypeId: $requestTypeId
     search: $search
     take: $take
+    authValues: $authValues
   ) {
     key
     value
@@ -8296,11 +9777,13 @@ export const NavEditProcessRequestDocument = gql`
     `;
 export const GetProductionItemNosDocument = gql`
     query GetProductionItemNos($param: FetchParamsInput!) {
-  productionItemNos(param: $param) {
-    code
-    minRate
-    maxRate
-    category
+  purchaseItemNos(param: $param) {
+    nodes {
+      code
+      minRate
+      maxRate
+      category
+    }
   }
 }
     `;
@@ -8917,50 +10400,175 @@ export const GetRespCenterMockDocument = gql`
 }
     `;
 export const GetUsersDocument = gql`
-    query GetUsers($skip: Int, $take: Int, $where: String, $order: String) {
-  user(username: "dummy") {
+    query GetUsers($skip: Int, $take: Int, $where: UserFilterInput, $order: [UserSortInput!], $duplicateMobileOnly: Boolean) {
+  users(
+    skip: $skip
+    take: $take
+    where: $where
+    order: $order
+    duplicateMobileOnly: $duplicateMobileOnly
+  ) {
+    items {
+      userSecurityID
+      userName
+      fullName
+      userType
+      mobileNo
+      authenticationEmail
+      state
+      avatar
+    }
+    totalCount
+  }
+}
+    `;
+export const GetDriveSyncAdminStatusesDocument = gql`
+    query GetDriveSyncAdminStatuses($userIds: [String!]!, $includeFolderValidation: Boolean!, $includeUsage: Boolean!, $includeLatestBackup: Boolean!) {
+  getDriveSyncAdminStatuses(
+    userIds: $userIds
+    includeFolderValidation: $includeFolderValidation
+    includeUsage: $includeUsage
+    includeLatestBackup: $includeLatestBackup
+  ) {
     userId
+    isUserFound
+    isActive
+    targetFolderId
+    folderValidated
+    folderValidationError
+    quotaBytes
+    usedBytes
+    usageError
+    latestBackupUtc
+    latestBackupError
+    lastCheckedUtc
   }
 }
     `;
 export const GetResponsibilityCentersDocument = gql`
-    query GetResponsibilityCenters($natureOfBusiness: [Int!], $skip: Int, $take: Int) {
-  __typename
+    query GetResponsibilityCenters($skip: Int, $take: Int, $where: ResponsibilityCenterFilterInput) {
+  responsibilityCenters(skip: $skip, take: $take, where: $where) {
+    items {
+      code
+      name
+    }
+    totalCount
+  }
 }
     `;
 export const GetEmployeesDocument = gql`
-    query GetEmployees($skip: Int, $take: Int) {
-  __typename
+    query GetEmployees($skip: Int, $take: Int, $where: EmployeeFilterInput) {
+  employees(skip: $skip, take: $take, where: $where) {
+    items {
+      no
+      firstName
+      lastName
+    }
+    totalCount
+  }
 }
     `;
 export const GetPermissionSetsDocument = gql`
     query GetPermissionSets($take: Int) {
-  __typename
+  permissionSets(take: $take) {
+    items {
+      roleID
+      name
+    }
+    totalCount
+  }
 }
     `;
 export const UpdateUserPermissionsDocument = gql`
-    mutation UpdateUserPermissions {
-  __typename
+    mutation UpdateUserPermissions($userName: String!, $permissions: [UserPermissionInput!]!) {
+  updateUserPermissions(userName: $userName, permissions: $permissions) {
+    success
+    message
+  }
 }
     `;
 export const UpdateUserResponsibilityCentersDocument = gql`
-    mutation UpdateUserResponsibilityCenters {
-  __typename
+    mutation UpdateUserResponsibilityCenters($userName: String!, $assignments: [UserRespCenterInput!]!) {
+  updateUserResponsibilityCenters(userName: $userName, assignments: $assignments) {
+    success
+    message
+  }
 }
     `;
 export const UpdateUserPostingSetupDocument = gql`
-    mutation UpdateUserPostingSetup {
-  __typename
+    mutation UpdateUserPostingSetup($userName: String!, $assignments: [UserPostingSetupInput!]!) {
+  updateUserPostingSetup(userName: $userName, assignments: $assignments) {
+    success
+    message
+  }
 }
     `;
 export const UpdateUserDetailsDocument = gql`
-    mutation UpdateUserDetails {
-  __typename
+    mutation UpdateUserDetails($userName: String!, $details: ProfileUpdateInput!) {
+  updateUserDetails(userName: $userName, details: $details) {
+    success
+    message
+  }
+}
+    `;
+export const ProvisionDriveSyncBackupFolderDocument = gql`
+    mutation ProvisionDriveSyncBackupFolder($targetUserId: String!, $folderName: String, $replaceExisting: Boolean!) {
+  provisionDriveSyncBackupFolder(
+    targetUserId: $targetUserId
+    folderName: $folderName
+    replaceExisting: $replaceExisting
+  ) {
+    userId
+    targetFolderId
+    isActive
+  }
 }
     `;
 export const GetReportsDocument = gql`
     query GetReports($category: String!) {
-  __typename
+  reports: reportsByCategory(category: $category) {
+    id
+    name
+  }
+}
+    `;
+export const GetUserDetailDocument = gql`
+    query GetUserDetail($username: String!) {
+  user(username: $username) {
+    userId
+    fullName
+    userType
+    mobileNo
+    authenticationEmail
+    state
+    canRunERP
+    canRunOldERP
+    allowAllMasters
+    backupStorageQuotaGB
+    backupAllowedFileTypes
+    backupGDriveFolderID
+    respCenterSetup {
+      userId
+      respCenter
+      respDefault
+      type
+      code
+    }
+    postingSetup {
+      responsibilityCenter
+      allowPostingFrom
+      allowPostingTo
+    }
+    permissions {
+      roleId
+      roleName
+      companyName
+      assignerName
+      roleExipryDate
+      values
+      homePath
+    }
+  }
 }
     `;
 export const GetDealerByCodeDocument = gql`
@@ -9006,6 +10614,15 @@ const defaultWrapper: SdkFunctionWrapper = (action, _operationName, _operationTy
 
 export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
+    GetDriveSyncConfig(variables?: GetDriveSyncConfigQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetDriveSyncConfigQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<GetDriveSyncConfigQuery>({ document: GetDriveSyncConfigDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetDriveSyncConfig', 'query', variables);
+    },
+    RequestDriveSyncUploadCredentials(variables: RequestDriveSyncUploadCredentialsMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<RequestDriveSyncUploadCredentialsMutation> {
+      return withWrapper((wrappedRequestHeaders) => client.request<RequestDriveSyncUploadCredentialsMutation>({ document: RequestDriveSyncUploadCredentialsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'RequestDriveSyncUploadCredentials', 'mutation', variables);
+    },
+    GetDriveSyncBackupFiles(variables?: GetDriveSyncBackupFilesQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetDriveSyncBackupFilesQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<GetDriveSyncBackupFilesQuery>({ document: GetDriveSyncBackupFilesDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetDriveSyncBackupFiles', 'query', variables);
+    },
     GetSessions(variables?: GetSessionsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetSessionsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetSessionsQuery>({ document: GetSessionsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetSessions', 'query', variables);
     },
@@ -9023,6 +10640,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     Login(variables: LoginMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<LoginMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<LoginMutation>({ document: LoginDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'Login', 'mutation', variables);
+    },
+    RefreshToken(variables: RefreshTokenMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<RefreshTokenMutation> {
+      return withWrapper((wrappedRequestHeaders) => client.request<RefreshTokenMutation>({ document: RefreshTokenDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'RefreshToken', 'mutation', variables);
     },
     CreateCalendarEvent(variables: CreateCalendarEventMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<CreateCalendarEventMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<CreateCalendarEventMutation>({ document: CreateCalendarEventDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'CreateCalendarEvent', 'mutation', variables);
@@ -9291,6 +10911,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     GetUsers(variables?: GetUsersQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetUsersQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetUsersQuery>({ document: GetUsersDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetUsers', 'query', variables);
     },
+    GetDriveSyncAdminStatuses(variables: GetDriveSyncAdminStatusesQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetDriveSyncAdminStatusesQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<GetDriveSyncAdminStatusesQuery>({ document: GetDriveSyncAdminStatusesDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetDriveSyncAdminStatuses', 'query', variables);
+    },
     GetResponsibilityCenters(variables?: GetResponsibilityCentersQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetResponsibilityCentersQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetResponsibilityCentersQuery>({ document: GetResponsibilityCentersDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetResponsibilityCenters', 'query', variables);
     },
@@ -9300,20 +10923,26 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     GetPermissionSets(variables?: GetPermissionSetsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetPermissionSetsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetPermissionSetsQuery>({ document: GetPermissionSetsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetPermissionSets', 'query', variables);
     },
-    UpdateUserPermissions(variables?: UpdateUserPermissionsMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserPermissionsMutation> {
+    UpdateUserPermissions(variables: UpdateUserPermissionsMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserPermissionsMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<UpdateUserPermissionsMutation>({ document: UpdateUserPermissionsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'UpdateUserPermissions', 'mutation', variables);
     },
-    UpdateUserResponsibilityCenters(variables?: UpdateUserResponsibilityCentersMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserResponsibilityCentersMutation> {
+    UpdateUserResponsibilityCenters(variables: UpdateUserResponsibilityCentersMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserResponsibilityCentersMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<UpdateUserResponsibilityCentersMutation>({ document: UpdateUserResponsibilityCentersDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'UpdateUserResponsibilityCenters', 'mutation', variables);
     },
-    UpdateUserPostingSetup(variables?: UpdateUserPostingSetupMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserPostingSetupMutation> {
+    UpdateUserPostingSetup(variables: UpdateUserPostingSetupMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserPostingSetupMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<UpdateUserPostingSetupMutation>({ document: UpdateUserPostingSetupDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'UpdateUserPostingSetup', 'mutation', variables);
     },
-    UpdateUserDetails(variables?: UpdateUserDetailsMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserDetailsMutation> {
+    UpdateUserDetails(variables: UpdateUserDetailsMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<UpdateUserDetailsMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<UpdateUserDetailsMutation>({ document: UpdateUserDetailsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'UpdateUserDetails', 'mutation', variables);
+    },
+    ProvisionDriveSyncBackupFolder(variables: ProvisionDriveSyncBackupFolderMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<ProvisionDriveSyncBackupFolderMutation> {
+      return withWrapper((wrappedRequestHeaders) => client.request<ProvisionDriveSyncBackupFolderMutation>({ document: ProvisionDriveSyncBackupFolderDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'ProvisionDriveSyncBackupFolder', 'mutation', variables);
     },
     GetReports(variables: GetReportsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetReportsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetReportsQuery>({ document: GetReportsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetReports', 'query', variables);
+    },
+    GetUserDetail(variables: GetUserDetailQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetUserDetailQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<GetUserDetailQuery>({ document: GetUserDetailDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetUserDetail', 'query', variables);
     },
     GetDealerByCode(variables: GetDealerByCodeQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<GetDealerByCodeQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetDealerByCodeQuery>({ document: GetDealerByCodeDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'GetDealerByCode', 'query', variables);

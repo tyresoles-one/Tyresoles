@@ -215,7 +215,11 @@ public class Connector
         return result.return_value;
     });
 
-    public Task RectifyCustLedgerAsync(string customerNo) => ExecuteWithRetryAsync(client => client.RectifyCustLedgerAsync(customerNo));
+    public Task<int> RectifyCustLedgerAsync(string customerNo) => ExecuteWithRetryAsync(async client =>
+    {
+        var result = await client.RectifyCustLedgerAsync(customerNo);
+        return result.return_value;
+    });
 
     public Task SyncEcomileItemsAsync() => ExecuteWithRetryAsync(client => client.SyncEcomileRecordsAsync());
 

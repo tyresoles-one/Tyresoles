@@ -2468,7 +2468,7 @@ LEFT JOIN (
             ), 0) AS OpeningBal
         FROM {ledgerT} Ledger
         INNER JOIN {custT} Customer ON Customer.[No_] = Ledger.[Customer No_]
-        LEFT JOIN {detailedLedgerT} DetLedger ON DetLedger.[Cust_ Ledger Entry No_] = Ledger.[Entry No_]
+        LEFT JOIN {detailedLedgerT} DetLedger ON DetLedger.[Cust_ Ledger Entry No_] = Ledger.[Entry No_] AND DetLedger.[Entry Type] = 1
         LEFT JOIN {invT} Inv ON Inv.[No_] = Ledger.[Document No_]
         LEFT JOIN {crnT} Crn ON Crn.[No_] = Ledger.[Document No_]
         WHERE Ledger.[Posting Date] >= @fromDt AND Ledger.[Posting Date] <= @toDt

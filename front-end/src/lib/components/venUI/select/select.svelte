@@ -214,10 +214,11 @@
       "max-w-[calc(100vw-2rem)]",
       contentClass
     )}
+    style="max-height: min(400px, var(--bits-popover-content-available-height, 80vh));"
     align="start"
     sideOffset={4}
   >
-    <Command.Root shouldFilter={false} class="flex flex-col h-full max-h-[min(80vh,400px)]">
+    <Command.Root shouldFilter={false} class="flex flex-col h-full">
       <Command.Input placeholder={searchPlaceholder} bind:value={searchQuery} />
       <Command.List class="overflow-x-hidden overflow-y-auto flex-1 h-full max-h-none">
         <Command.Empty>{emptyText}</Command.Empty>

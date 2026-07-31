@@ -10,8 +10,8 @@
     5. Copies release files to release-artifacts\v<Version>
     6. Optionally duplicates the setup as Tyresoles_Latest_x64-setup.exe for a fixed /downloads/ URL
 
-    Use a single Windows installer type (NSIS) with auto-update. Shipping both MSI and NSIS causes duplicate
-    "Tyresoles" entries on the same PC.
+    Use a single Windows installer type (NSIS) for both initial install and auto-updates to prevent duplicate
+    installations and ensure a seamless upgrade path.
 
 .PARAMETER Version
     New version (e.g. 0.4.0). If omitted, uses the current version from tauri.conf.json.
@@ -85,7 +85,6 @@ Write-Host "Collecting artifacts to $distPath..." -ForegroundColor Cyan
 
 $bundleDir = Join-Path $projectRoot "src-tauri\target\release\bundle"
 $nsisDir = Join-Path $bundleDir "nsis"
-$msiDir = Join-Path $bundleDir "msi"
 
 $exeFile = Get-ChildItem -Path $nsisDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 
@@ -130,10 +129,7 @@ if ($StableDownloadName) {
     Write-Host "Stable download copy: $StableDownloadName" -ForegroundColor Cyan
 }
 
-$msiFile = Get-ChildItem -Path $msiDir -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($msiFile) {
-    Write-Warning "MSI found: $($msiFile.Name). Do not upload this for Tyresoles if you also ship NSIS — use one Windows installer only. Clean target\release\bundle and rebuild if bundle.targets should exclude msi."
-}
+
 
 Write-Host "`n=== RELEASE PREPARED SUCCESSFULLY ===" -ForegroundColor Green
 Write-Host "Upload everything under: $distPath"

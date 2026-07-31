@@ -36,6 +36,7 @@ using Tyresoles.Sql.Abstractions;
 using Tyresoles.Data.Features.Crm;
 using Tyresoles.Web.Features.RemoteAssist;
 using Tyresoles.Web.Features.VpnInstaller;
+using Tyresoles.Web.Features.Downloads;
 using Tyresoles.Web.Features.DriveSync;
 using Tyresoles.Web.Features.WindowsServices;
 using StackExchange.Redis;
@@ -152,6 +153,7 @@ builder.Services.AddDbContext<CalendarDbContext>(options =>
 builder.Services.AddScoped<ICalendarService, CalendarService>();
 builder.Services.Configure<RemoteAssistOptions>(builder.Configuration.GetSection(RemoteAssistOptions.SectionName));
 builder.Services.Configure<VpnInstallerOptions>(builder.Configuration.GetSection(VpnInstallerOptions.SectionName));
+builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(DownloadsOptions.SectionName));
 builder.Services.Configure<RemoteAssistIceOptions>(builder.Configuration.GetSection(RemoteAssistOptions.SectionName));
 builder.Services.AddSingleton<RemoteAssistControlGate>();
 builder.Services.AddSingleton<IRemoteAssistControlNotifier>(sp => sp.GetRequiredService<RemoteAssistControlGate>());
@@ -584,6 +586,7 @@ try
                     [RespCenter] nvarchar(max) NULL,
                     [ERPCustomerNos] nvarchar(max) NULL,
                     [ERPAreaCodes] nvarchar(max) NULL,
+                    [Products] nvarchar(max) NULL,
                     [Tags] nvarchar(max) NULL,
                     [IsActive] bit NOT NULL,
                     [CreatedBy] nvarchar(max) NULL,
@@ -595,6 +598,170 @@ try
             IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'ERPAreaCodes') IS NULL
             BEGIN
                 ALTER TABLE dbo.[CrmContact] ADD [ERPAreaCodes] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'Products') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [Products] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'LastCallDate') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [LastCallDate] datetime2 NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'LastCallOutcome') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [LastCallOutcome] nvarchar(100) NULL;
+                IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL
+                BEGIN
+                    EXEC('
+                        UPDATE c
+                        SET c.LastCallOutcome = log.Outcome
+                        FROM dbo.CrmContact c
+                        CROSS APPLY (
+                            SELECT TOP 1 l.Outcome
+                            FROM dbo.CrmCallLog l
+                            WHERE l.ContactId = c.Id
+                            ORDER BY l.CallDate DESC
+                        ) log
+                    ');
+                END
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmCallLog] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [ContactId] uniqueidentifier NOT NULL,
+                    [CallDate] datetime2 NOT NULL,
+                    [Outcome] nvarchar(100) NOT NULL,
+                    [Notes] nvarchar(max) NULL,
+                    [CreatedBy] nvarchar(128) NOT NULL,
+                    CONSTRAINT [PK_CrmCallLog] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmCallLog_CrmContact_ContactId] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmCallLog_ContactId] ON dbo.[CrmCallLog] ([ContactId]);
+            END
+
+            IF OBJECT_ID('dbo.CrmCallReminder', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmCallReminder] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [ContactId] uniqueidentifier NOT NULL,
+                    [ReminderDate] datetime2 NOT NULL,
+                    [Notes] nvarchar(max) NULL,
+                    [IsCompleted] bit NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [CreatedBy] nvarchar(128) NOT NULL,
+                    CONSTRAINT [PK_CrmCallReminder] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmCallReminder_CrmContact_ContactId] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmCallReminder_ContactId] ON dbo.[CrmCallReminder] ([ContactId]);
+                CREATE INDEX [IX_CrmCallReminder_IsCompleted] ON dbo.[CrmCallReminder] ([IsCompleted]);
+            END
+
+            IF OBJECT_ID('dbo.CrmAgentContact', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmAgentContact] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [AgentUsername] nvarchar(128) NOT NULL,
+                    [ContactId] uniqueidentifier NOT NULL,
+                    [AllocatedAt] datetime2 NOT NULL,
+                    [DeallocatedAt] datetime2 NULL,
+                    [DeallocatedBy] nvarchar(128) NULL,
+                    [LastCallOutcome] nvarchar(100) NULL,
+                    [LastCallDate] datetime2 NULL,
+                    [LastCallNotes] nvarchar(max) NULL,
+                    [CallCount] int NOT NULL DEFAULT 0,
+                    CONSTRAINT [PK_CrmAgentContact] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmAgentContact_CrmContact_ContactId] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmAgentContact_AgentUsername] ON dbo.[CrmAgentContact] ([AgentUsername]);
+                CREATE INDEX [IX_CrmAgentContact_ContactId] ON dbo.[CrmAgentContact] ([ContactId]);
+            END
+
+            IF OBJECT_ID('dbo.CrmSetting', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmSetting] (
+                    [Key] nvarchar(100) NOT NULL,
+                    [Value] nvarchar(max) NOT NULL,
+                    [Description] nvarchar(max) NULL,
+                    CONSTRAINT [PK_CrmSetting] PRIMARY KEY ([Key])
+                );
+                INSERT INTO dbo.[CrmSetting] ([Key], [Value], [Description])
+                VALUES ('ContactsPerAgent', '10', 'Maximum active allocated contacts per calling agent');
+            END
+
+            -- Migrate any pre-existing assignments from CrmContact.AssignedTo into CrmAgentContact
+            IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CrmContact' AND COLUMN_NAME = 'AssignedTo')
+            BEGIN
+                INSERT INTO dbo.[CrmAgentContact] ([Id], [AgentUsername], [ContactId], [AllocatedAt], [CallCount])
+                SELECT 
+                    NEWID(), 
+                    [AssignedTo], 
+                    [Id], 
+                    GETUTCDATE(), 
+                    0
+                FROM dbo.[CrmContact] AS c
+                WHERE c.[AssignedTo] IS NOT NULL 
+                  AND c.[AssignedTo] <> '' 
+                  AND c.[IsActive] = 1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM dbo.[CrmAgentContact] AS ac 
+                      WHERE ac.[ContactId] = c.[Id] 
+                        AND ac.[AgentUsername] = c.[AssignedTo] 
+                        AND ac.[DeallocatedAt] IS NULL
+                  );
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappImage', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappImage] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Name] nvarchar(max) NOT NULL,
+                    [ImageUrl] nvarchar(max) NULL,
+                    [Base64Data] nvarchar(max) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappImage] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF COL_LENGTH('dbo.CrmWhatsappImage', 'Products') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmWhatsappImage] ADD [Products] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappTemplate', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappTemplate] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Name] nvarchar(max) NOT NULL,
+                    [Language] nvarchar(100) NOT NULL,
+                    [MessageText] nvarchar(max) NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappTemplate] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmProduct', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmProduct] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Code] nvarchar(200) NOT NULL,
+                    [Category] nvarchar(200) NULL,
+                    [ProductGroup] nvarchar(200) NULL,
+                    [FinalPrice] decimal(18,2) NOT NULL,
+                    [RespCenters] nvarchar(max) NULL,
+                    [WhatsappImageCode] nvarchar(200) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmProduct] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF COL_LENGTH('dbo.CrmProduct', 'WhatsappImageCode') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmProduct] ADD [WhatsappImageCode] nvarchar(200) NULL;
             END
         ");
     }

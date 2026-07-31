@@ -24,9 +24,10 @@
   let menuItems = $derived.by(() => {
     const items: Array<{ name: string; icon: string; route: string }> = [];
     
-    // Add Dashboard and Sales Documents
+    // Add Dashboard, Sales Documents, and PST Indexer
     items.push({ name: "Dashboard", icon: "layout-dashboard", route: "/" });
     items.push({ name: "Sales Docs", icon: "file-stack", route: "/salesdocs" });
+    items.push({ name: "PST Indexer", icon: "search", route: "/pst-indexer" });
 
     if ($authStore.menus) {
       for (const menu of $authStore.menus) {

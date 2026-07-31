@@ -47,6 +47,7 @@ public sealed class PayRecordRow
     public decimal DeputAllowance { get; set; }
     public decimal PetrolAllowance { get; set; }
     public decimal SpecialAllowance { get; set; }
+    public decimal OutStationAllowance { get; set; }
     public bool IsHold { get; set; }
     public string BankCode { get; set; } = "";
     public string BankAccNo { get; set; } = "";
@@ -300,4 +301,42 @@ public sealed class PayTDSRow
     public string EmpId { get; set; } = "";
     public string Name { get; set; } = "";
     public decimal Gross { get; set; }
+}
+
+/// <summary>Mandays report row (ManDays, ManDaysWOAb).</summary>
+public sealed class ManDaysReportRow
+{
+    public string CompanyName { get; set; } = "";
+    public string UserName { get; set; } = "";
+    public string FilterTxt { get; set; } = "";
+    public string PeriodTxt { get; set; } = "";
+    public string ReportName { get; set; } = "";
+    public string LocationName { get; set; } = "";
+    public string EmpNo { get; set; } = "";
+    public string EmpName { get; set; } = "";
+    public string Gender { get; set; } = "";
+    public decimal Jan { get; set; }
+    public decimal Feb { get; set; }
+    public decimal Mar { get; set; }
+    public decimal Apr { get; set; }
+    public decimal May { get; set; }
+    public decimal Jun { get; set; }
+    public decimal Jul { get; set; }
+    public decimal Aug { get; set; }
+    public decimal Sep { get; set; }
+    public decimal Oct { get; set; }
+    public decimal Nov { get; set; }
+    public decimal Dec { get; set; }
+    public decimal JanA { get; set; }
+    public decimal FebA { get; set; }
+    public decimal MarA { get; set; }
+    public decimal AprA { get; set; }
+    public decimal MayA { get; set; }
+    public decimal JunA { get; set; }
+    public decimal JulA { get; set; }
+    public decimal AugA { get; set; }
+    public decimal SepA { get; set; }
+    public decimal OctA { get; set; }
+    public decimal NovA { get; set; }
+    public decimal DecA { get; set; }
 }

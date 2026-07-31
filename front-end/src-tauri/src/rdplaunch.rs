@@ -308,3 +308,118 @@ fn parse_rdp_url(rdp_url: &str) -> Result<(String, String), String> {
         Ok((s.to_string(), "3389".to_string()))
     }
 }
+
+/// Suppresses the RDP redirection warning dialog by creating the appropriate registry keys.
+/// This requires the app to be run as Administrator (elevated).
+#[tauri::command]
+pub fn suppress_rdp_warnings() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let script = "New-Item -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows NT\\Terminal Services\\Client' -Force | Out-Null; New-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows NT\\Terminal Services\\Client' -Name 'RedirectionWarningDialogVersion' -PropertyType DWord -Value 1 -Force | Out-Null";
+        
+        let args_for_elevated = format!("-NoProfile -WindowStyle Hidden -Command \"{}\"", script);
+        let ps_command = format!(
+            "Start-Process powershell -ArgumentList '{}' -Verb RunAs -Wait",
+            args_for_elevated.replace('\'', "''")
+        );
+        
+        // Use PowerShell to execute the script with elevation
+        let out = Command::new("powershell")
+            .args(&["-NoProfile", "-Command", &ps_command])
+            .output()
+            .map_err(|e| format!("Failed to execute powershell: {}", e))?;
+            
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            log::error!("[RDP] Registry fix failed: {}", err);
+            return Err(format!("Elevation cancelled or registry fix failed: {}", err));
+        }
+        
+        log::info!("[RDP] Registry fixed for RDP warnings via UAC");
+        Ok(())
+    }
+    
+    #[cfg(not(windows))]
+    {
+        Err("This command is only supported on Windows".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn get_rdp_history() -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        let script = r#"
+            Get-ItemProperty -Path "HKCU:\Software\Microsoft\Terminal Server Client\Default" -ErrorAction SilentlyContinue | Select-Object MRU0, MRU1, MRU2, MRU3, MRU4, MRU5, MRU6, MRU7, MRU8, MRU9 | ConvertTo-Json -Compress
+        "#;
+        
+        let out = Command::new("powershell")
+            .args(&["-NoProfile", "-Command", script])
+            .output()
+            .map_err(|e| format!("Failed to execute powershell: {}", e))?;
+            
+        if !out.status.success() {
+            return Ok("{}".to_string());
+        }
+        
+        let result = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if result.is_empty() {
+            Ok("{}".to_string())
+        } else {
+            Ok(result)
+        }
+    }
+    
+    #[cfg(not(windows))]
+    {
+        Err("This command is only supported on Windows".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn delete_rdp_history(keys: Vec<String>) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if keys.is_empty() {
+            return Ok(());
+        }
+        
+        // Validate keys to prevent command injection
+        let valid_keys: Vec<&String> = keys.iter().filter(|k| {
+            k.starts_with("MRU")
+        }).collect();
+        
+        if valid_keys.is_empty() {
+            return Err("No valid MRU keys provided".to_string());
+        }
+        
+        // Build the powershell command
+        let mut script = String::new();
+        for k in valid_keys.iter() {
+            // Remove from Default (MRU list)
+            script.push_str(&format!(
+                "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Terminal Server Client\\Default' -Name '{}' -ErrorAction SilentlyContinue; ",
+                k
+            ));
+        }
+        
+        let out = Command::new("powershell")
+            .args(&["-NoProfile", "-Command", &script])
+            .output()
+            .map_err(|e| format!("Failed to execute powershell: {}", e))?;
+            
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            log::error!("[RDP] Failed to delete history: {}", err);
+            return Err(format!("Failed to delete history: {}", err));
+        }
+        
+        log::info!("[RDP] Successfully deleted RDP history keys: {:?}", valid_keys);
+        Ok(())
+    }
+    
+    #[cfg(not(windows))]
+    {
+        Err("This command is only supported on Windows".to_string())
+    }
+}

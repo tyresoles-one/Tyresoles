@@ -19,6 +19,7 @@ mutation Login($username: String!, $password: String!, $platform: String) {
       workDate
       avatar
       userSpecialToken
+      dashboards
     }
     locations {
       code

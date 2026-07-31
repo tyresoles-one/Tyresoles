@@ -40,6 +40,21 @@ export const GET_MY_REGIONS = buildQuery`
   }
 ` as RequestDocument;
 
+export const GET_CUSTOMER_PRICE_GROUPS = buildQuery`
+  query GetCustomerPriceGroups(
+    $first: Int
+    $after: String
+    $where: CustomerPriceGroupFilterInput
+    $order: [CustomerPriceGroupSortInput!]
+  ) {
+    customerPriceGroups(first: $first, after: $after, where: $where, order: $order) {
+      nodes { code description fromDate toDate }
+      pageInfo { hasNextPage endCursor }
+      totalCount
+    }
+  }
+` as RequestDocument;
+
 export const GET_MY_RESP_CENTERS = buildQuery`
   query GetMyRespCenters(
     $type: String!
@@ -518,7 +533,8 @@ export type MasterType =
   | 'items'
   | 'faClasses'
   | 'faSubclasses'
-  | 'fixedAssets';
+  | 'fixedAssets'
+  | 'customerPriceGroups';
 
 export interface MasterOption {
   label: string;
@@ -589,6 +605,8 @@ export function getMasterQuery(masterType: MasterType): RequestDocument {
       return GET_FA_SUBCLASSES;
     case 'fixedAssets':
       return GET_FIXED_ASSETS;
+    case 'customerPriceGroups':
+      return GET_CUSTOMER_PRICE_GROUPS;
     default:
       return GET_MY_REGIONS;
   }
@@ -716,6 +734,7 @@ export function buildWhereFilter(
     case 'gstGroups':
     case 'hsnSacs':
     case 'inventoryPostingGroups':
+    case 'customerPriceGroups':
       return { or: [{ code: contains }, { description: contains }] };
     default:
       break;

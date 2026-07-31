@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary": "Implementation plan to transition the calling contact allocation system to use only the newly created CrmAgentContact table. Removes CrmContact.AssignedTo column references from C# entities, database schemas, and frontend editors. Migrates existing values once on startup. Updates the crm-calling page to query crmAgentContacts.",
+  "updatedAt": "2026-06-20T09:05:17.153008100Z",
+  "requestFeedback": true
+}

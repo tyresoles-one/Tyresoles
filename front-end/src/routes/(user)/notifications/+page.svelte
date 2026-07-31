@@ -32,7 +32,7 @@
       case "WARNING":
         return "triangle-alert";
       case "ERROR":
-        return "x-circle";
+        return "circle-x";
       case "SUCCESS":
         return "check-circle";
       default:

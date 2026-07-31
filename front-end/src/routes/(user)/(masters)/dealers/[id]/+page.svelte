@@ -697,7 +697,8 @@
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
-									bind:value={form.dateOfBirth}
+									pastYears={50}
+									bind:value={form.dateOfBirth}									 
 									placeholder="Select date..."
 									aria-invalid={fieldErrors.dateOfBirth ? true : undefined}
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}
@@ -707,6 +708,7 @@
 								<DatePicker
 									valueType="text"
 									valueFormat="yyyy-MM-dd"
+									pastYears={40}
 									bind:value={form.dateOfAniversary}
 									placeholder="Select date..."
 									onValueChange={() => setTimeout(triggerNextFocus, 50)}

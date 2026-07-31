@@ -821,8 +821,16 @@ namespace WebService
     public partial class RectifyCustLedger_Result
     {
         
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public int return_value;
+        
         public RectifyCustLedger_Result()
         {
+        }
+        
+        public RectifyCustLedger_Result(int return_value)
+        {
+            this.return_value = return_value;
         }
     }
     

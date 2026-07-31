@@ -962,7 +962,7 @@
       {#if rawLine.newSerialNo}
         <div class="rounded-xl border bg-amber-50 border-amber-200 shadow-sm overflow-hidden">
           <div class="flex items-center gap-3 px-5 py-3.5 border-b border-amber-200">
-            <Icon name="alert-triangle" class="size-4 text-amber-600" />
+            <Icon name="triangle-alert" class="size-4 text-amber-600" />
             <h2 class="text-sm font-semibold text-amber-800">Factory Inspection Notes</h2>
           </div>
           <ul class="m-0 grid list-none grid-cols-1 gap-4 p-5 text-sm sm:grid-cols-2">

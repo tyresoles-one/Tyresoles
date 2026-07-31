@@ -53,6 +53,8 @@
     presetsContent?: Snippet<[PresetEntry[]]>;
     fiscal?: boolean;
     workdate?: any; // Reference date for presets
+    pastYears?: number;
+    futureYears?: number;
     "aria-invalid"?: boolean | "true" | "false";
   };
 
@@ -72,6 +74,8 @@
     presetsContent,
     fiscal = false,
     workdate,
+    pastYears = 30,
+    futureYears = 10,
     "aria-invalid": ariaInvalid,
   }: Props = $props();
 
@@ -587,11 +591,12 @@
     return Array.from({ length: 12 }, (_, i) => start + i);
   }
 
-  // Year range for month/year selects (e.g. ±30 years from current view)
+  // Year range for month/year selects based on pastYears and futureYears props
   const yearSelectRange = $derived.by(() => {
     const y = viewDate.year;
-    const start = y - 30;
-    return Array.from({ length: 41 }, (_, i) => start + i);
+    const start = y - pastYears;
+    const totalYears = pastYears + futureYears + 1;
+    return Array.from({ length: totalYears }, (_, i) => start + i);
   });
 
   // --- Week Logic ---

@@ -778,6 +778,15 @@ WHERE GLEntry.[G_L Account No_] IN ('3126', '7573')
                     claimJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Vendor] as Vend on Vend.No_ = Posted.[Vendor No_] ";
                     break;
                 }
+            case "Dealer":
+                {
+                    soldGroupSql = "GROUP BY ISNULL(Dealer.[Dealership Name], 'Direct/Other'), ISNULL(Cust.Name, ''), Item.[Alternative Item No_], ILE.[Responsibility Center], ILE.Make";
+                    soldSelectSql = ", ISNULL(Dealer.[Dealership Name], 'Direct/Other') as [Level01], ISNULL(Cust.Name, '') as [Level02], Item.[Alternative Item No_] as [Level03], ILE.Make as [Level04] ";
+                    soldJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Item] as Item ON Item.No_ = ILE.[Item No_] LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Salesperson_Purchaser] as Dealer ON Dealer.Code = Cust.[Dealer Code]";
+                    claimSelectSql = "ISNULL(Dealer.[Dealership Name], 'Direct/Other') as [Level01], ISNULL(Customer.Name, '') as [Level02], Item.[Alternative Item No_] as [Level03], Posted.Make as [Level04],";
+                    claimJoinSql = "LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Customer] as Customer ON Customer.No_ = Posted.[Customer No_] LEFT JOIN [dbo].[Tyresoles (India) Pvt_ Ltd_$Salesperson_Purchaser] as Dealer ON Dealer.Code = Customer.[Dealer Code]";
+                    break;
+                }
 
         }
 
