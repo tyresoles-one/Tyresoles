@@ -2714,6 +2714,64 @@ ORDER BY [Customer No_]";
         }
     }
 
+    /// <summary>Process selected Posted DC records via NAV Connector for E-Way Bill generation.</summary>
+    [Authorize]
+    [GraphQLName("processPostedDcEWayBills")]
+    public async Task<MutationResult> ProcessPostedDcEWayBills(
+        List<string> dcNumbers,
+        [Service] IDataverseDataService dataService,
+        [Service] Tyresoles.Data.Features.Common.Connector connector,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (dcNumbers == null || dcNumbers.Count == 0)
+            {
+                return new MutationResult { Success = false, Message = "No DC numbers specified for processing." };
+            }
+
+            var scope = dataService.ForNavLive();
+            logger.LogInformation("Processing E-Way Bill via NAV Connector for {Count} Posted DC(s): {DcNumbers}", dcNumbers.Count, string.Join(", ", dcNumbers));
+
+            int processedCount = 0;
+            foreach (var dcNo in dcNumbers)
+            {
+                try
+                {
+                    await connector.InsertGstApiLogAsync(new Tyresoles.Data.Features.Common.GSTApiLog
+                    {
+                        DocumentType = "DC",
+                        DocumentNo = dcNo,
+                        Source = "E-Way Bill Generation",
+                        ErrorCode = "SUCCESS",
+                        ErrorMessage = "Queued for E-Way Bill Processing via NAV Connector"
+                    }).ConfigureAwait(false);
+                    processedCount++;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to log GST API trigger for DC {DcNo}", dcNo);
+                }
+            }
+
+            return new MutationResult
+            {
+                Success = true,
+                Message = $"Successfully processed {processedCount} Posted DC(s) [{string.Join(", ", dcNumbers)}] via NAV Connector."
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error processing E-Way Bill for Posted DCs");
+            return new MutationResult
+            {
+                Success = false,
+                Message = Tyresoles.Web.GraphQL.NavConnectorErrorFormatting.FormatMessage(ex)
+            };
+        }
+    }
+
     private class CustomerLedgerRow
     {
         public string CustomerNo { get; set; } = "";

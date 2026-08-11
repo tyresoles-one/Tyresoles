@@ -164,6 +164,30 @@ public class Query
     }
 
     [Authorize]
+    [GraphQLName("getAllCrmCallLogs")]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 1000)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmCallLog> GetAllCrmCallLogs(
+        [Service] CrmDbContext db)
+    {
+        return db.CrmCallLogs;
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmCallLogUsers")]
+    public async Task<List<string>> GetCrmCallLogUsers([Service] CrmDbContext db, CancellationToken ct)
+    {
+        var agentsFromLogs = await db.CrmCallLogs.Select(x => x.CreatedBy).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToListAsync(ct);
+        var agentsFromAllocations = await db.CrmAgentContacts.Select(x => x.AgentUsername).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToListAsync(ct);
+
+        return agentsFromLogs.Union(agentsFromAllocations)
+            .OrderBy(x => x)
+            .ToList();
+    }
+
+    [Authorize]
     [GraphQLName("getCrmContactFleetDetails")]
     [UseFiltering]
     [UseSorting]
@@ -189,6 +213,18 @@ public class Query
             q = q.Where(x => !x.IsCompleted);
         }
         return q;
+    }
+
+    [Authorize]
+    [GraphQLName("getAllCrmCallReminders")]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 1000)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmCallReminder> GetAllCrmCallReminders(
+        [Service] CrmDbContext db)
+    {
+        return db.CrmCallReminders;
     }
 
     [Authorize]
@@ -1220,6 +1256,22 @@ public class Query
         var scope = dataService.ForNavLive();
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return scope.Query<Dataverse.NavLive.Employee>().AsQueryable(scope);
+    }
+
+    /// <summary>Paged D_C Header (Posted) table from NAV for E-Way Bill generation.</summary>
+    [Authorize]
+    [GraphQLName("getPostedDcHeaders")]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 2000)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<DCHeaderPosted> GetPostedDcHeaders(
+        [Service] IDataverseDataService dataService,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return scope.Query<DCHeaderPosted>().AsQueryable(scope);
     }
 
     /// <summary>Fetch reports by category for permission mapping.</summary>

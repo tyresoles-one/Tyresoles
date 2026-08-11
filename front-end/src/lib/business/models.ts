@@ -56,3 +56,27 @@ export type OrderLine = {
 export type OrderLineDispatch = Record<string, unknown>;
 export type OrderHeader = Record<string, unknown>;
 export type ShipmentInfo = Record<string, unknown>;
+
+export type InvoiceMapper = {
+	oldCompany?: string;
+	invoiceNo?: string;
+};
+
+export type InvLineMapper = {
+	invNo?: string;
+	oldCompany?: string;
+	lineNo?: number;
+	tyre?: string;
+	serialNo?: string;
+	date?: string;
+	make?: string;
+};
+
+export type EntityMapper = {
+	type?: string;
+	oldCode?: string;
+	oldCompany?: string;
+	oldRespCenter?: string;
+	newCode?: string;
+	name?: string;
+};

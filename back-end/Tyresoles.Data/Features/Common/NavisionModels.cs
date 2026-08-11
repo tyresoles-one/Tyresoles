@@ -3,6 +3,43 @@ using System.Text.Json;
 namespace Tyresoles.Data.Features.Common
 {
 
+public class InvoiceMapper
+{
+    public string OldCompany { get; set; } = string.Empty;
+    public string InvoiceNo { get; set; } = string.Empty;
+    public override string ToString() => JsonSerializer.Serialize(this);
+}
+
+public class InvLineMapper
+{
+    public string InvNo { get; set; } = string.Empty;
+    public string OldCompany { get; set; } = string.Empty;
+    public int LineNo { get; set; }
+    public string Tyre { get; set; } = string.Empty;
+    public string SerialNo { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public string Make { get; set; } = string.Empty;
+    public override string ToString() => JsonSerializer.Serialize(this);
+}
+
+public class EntityMapper
+{
+    public string Type { get; set; } = string.Empty;
+    public string OldCode { get; set; } = string.Empty;
+    public string OldCompany { get; set; } = string.Empty;
+    public string OldRespCenter { get; set; } = string.Empty;
+    public string NewCode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public bool IsValid() =>
+        !string.IsNullOrWhiteSpace(Type) &&
+        !string.IsNullOrWhiteSpace(OldCode) &&
+        !string.IsNullOrWhiteSpace(NewCode) &&
+        !string.IsNullOrWhiteSpace(Name) &&
+        !string.IsNullOrWhiteSpace(OldCompany) &&
+        !string.IsNullOrWhiteSpace(OldRespCenter);
+    public override string ToString() => JsonSerializer.Serialize(this);
+}
+
 public class GSTApiLog
 {
     public string DocumentType { get; set; } = string.Empty;
@@ -105,6 +142,7 @@ public class ClaimRequest
     public string InspReport { get; set; } = string.Empty;
     public bool OwnerRisk { get; set; }
     public string OldCompany { get; set; } = string.Empty;
+    public string OldRespCenter { get; set; } = string.Empty;
     public override string ToString() => JsonSerializer.Serialize(this);
 }
 

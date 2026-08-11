@@ -39,6 +39,7 @@ using Tyresoles.Web.Features.VpnInstaller;
 using Tyresoles.Web.Features.Downloads;
 using Tyresoles.Web.Features.DriveSync;
 using Tyresoles.Web.Features.WindowsServices;
+using Tyresoles.Data.Features.Merger;
 using StackExchange.Redis;
 using Microsoft.Data.SqlClient;
 
@@ -117,6 +118,7 @@ builder.Services.AddScoped<IPayrollReportService, PayrollReportService>();
 builder.Services.AddScoped<Tyresoles.Data.Features.Payroll.IPayrollService, Tyresoles.Data.Features.Payroll.PayrollService>();
 builder.Services.AddScoped<IProductionReportService, ProductionReportService>();
 builder.Services.AddScoped<IProductionService, ProductionService>();
+builder.Services.AddScoped<IMergerService, MergerService>();
 builder.Services.AddScoped<Tyresoles.Data.Features.Accounts.Reports.IAccountsReportService, Tyresoles.Data.Features.Accounts.Reports.AccountsReportService>();
 builder.Services.AddScoped<ISalesDashboardService, SalesDashboardService>();
 builder.Services.AddScoped<ScopedQueryCache>();

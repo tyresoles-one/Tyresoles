@@ -39,6 +39,8 @@
 		'bar-chart-3': 'chart-column',
 		'bar-chart-4': 'chart-column',
 		'check-circle-2': 'circle-check',
+		'check-circle': 'circle-check',
+		'x-circle': 'circle-x',
 		'check-square': 'square-check'
 	};
 

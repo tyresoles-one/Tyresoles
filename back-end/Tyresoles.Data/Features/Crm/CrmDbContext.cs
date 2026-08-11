@@ -149,6 +149,10 @@ public class CrmDbContext : DbContext
             e.Property(x => x.Notes).HasColumnType("nvarchar(max)");
             e.Property(x => x.CreatedBy).HasColumnType("nvarchar(128)").IsRequired();
             e.Property(x => x.CallDate).HasConversion(utcConverter);
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CrmCallReminder>(e =>
@@ -159,6 +163,10 @@ public class CrmDbContext : DbContext
             e.Property(x => x.CreatedBy).HasColumnType("nvarchar(128)").IsRequired();
             e.Property(x => x.ReminderDate).HasConversion(utcConverter);
             e.Property(x => x.CreatedAt).HasConversion(utcConverter);
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CrmAgentContact>(e =>

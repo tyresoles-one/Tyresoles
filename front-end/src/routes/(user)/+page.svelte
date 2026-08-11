@@ -18,6 +18,7 @@
     EcomileProcMgmtDashboard,
     ClaimsDashboard,
     ProcurementDashboard,
+    OutstandDashboard,
   } from "$lib/components/venUI/dashboards";
   import DashboardSwitcher from "$lib/components/DashboardSwitcher.svelte";
   import type { DashboardSwitcherOption } from "$lib/components/DashboardSwitcher.svelte";
@@ -32,7 +33,7 @@
 
   const userType = $derived($authStore.user?.userType?.toUpperCase());
 
-  type DashboardMode = "role" | "classic" | "claim" | "procurement";
+  type DashboardMode = "role" | "classic" | "claim" | "procurement" | "outstand";
   const modeStore = createPersistedStore<DashboardMode>(
     "dashboard-mode",
     "role",
@@ -44,6 +45,7 @@
     {no: 2, id: "classic", label: "Classic Sales", icon: "panels-left-bottom" },
     {no: 3, id: "claim", label: "Claims", icon: "file-box" },
     {no: 4, id: "procurement", label: "Procurement", icon: "box" },
+    {no: 5, id: "outstand", label: "Outstanding", icon: "wallet" },
   ];
 
   const allowedDashboards = $derived(
@@ -55,7 +57,7 @@
   const dashboardOptions = $derived(
     allowedDashboards.length > 0
       ? allDashboardOptions.filter(opt => allowedDashboards.includes(String(opt.no)))
-      : allDashboardOptions.filter(opt => opt.no === 1 || opt.no === 2) // Fallback: show 1 & 2 if no restrictions specified
+      : allDashboardOptions // Show all options when no explicit user restriction
   );
 
   $effect(() => {
@@ -163,6 +165,8 @@
         <ClaimsDashboard />
       {:else if mode === "procurement"}
         <ProcurementDashboard />
+      {:else if mode === "outstand"}
+        <OutstandDashboard />
       {/if}
     </div>
   {/key}

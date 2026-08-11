@@ -95,6 +95,9 @@ public sealed class DashboardController : ControllerBase
                 {
                     return BadRequest(new { error = ex.Message, code = "VALIDATION_ERROR" });
                 }
+            case "outstanding":
+                var outstandingRows = await _dashboardService.GetDashboardOutstandingAsync(scope, p, cancellationToken);
+                return Ok(outstandingRows);
             default:
                 return BadRequest(new { error = "Unknown dashboard type." });
         }

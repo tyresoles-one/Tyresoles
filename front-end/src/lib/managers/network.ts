@@ -91,6 +91,14 @@ export const endpoints = {
 	},
 	accounts: {
 		states: api("/api/accounts/states")
+	},
+	merger: {
+		oldCompanies: api("/api/merger/oldcompanies"),
+		oldRespCenters: api("/api/merger/oldrespcenters"),
+		getMapper: api("/api/merger/getmapper"),
+		prepareEntity: api("/api/merger/prepareentity"),
+		getOldInvLines: api("/api/merger/getoldinvlines"),
+		createClaimOnOldInv: api("/api/merger/createclaimonoldinv")
 	}
 };
 

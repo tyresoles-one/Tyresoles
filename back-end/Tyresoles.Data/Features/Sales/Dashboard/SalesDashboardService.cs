@@ -26,6 +26,7 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
         Task<DashboardData> GetDashboardCollectionAsync(ITenantScope scope, SalesReportParams p, CancellationToken cancellationToken = default);
         Task<List<MonthlySalesRow>> GetSalesChartDataAsync(ITenantScope scope, SalesReportParams p, CancellationToken cancellationToken = default);
         Task<DashboardSummary> GetDashboardSummaryAsync(ITenantScope scope, SalesReportParams p, CancellationToken cancellationToken = default);
+        Task<List<SalesDashboardService.OutstandingDashboardRow>> GetDashboardOutstandingAsync(ITenantScope scope, SalesReportParams p, CancellationToken cancellationToken = default);
     }
 
     public class SalesDashboardService : ISalesDashboardService
@@ -1158,6 +1159,134 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
             public int Indoors { get; set; }
             public int Charges { get; set; }
             public int Other { get; set; }
+        }
+
+        public async Task<List<OutstandingDashboardRow>> GetDashboardOutstandingAsync(
+            ITenantScope scope,
+            SalesReportParams p,
+            CancellationToken cancellationToken = default)
+        {
+            DateTime asOfDt = DateTime.Today;
+            if (!string.IsNullOrWhiteSpace(p.To) && DateTime.TryParse(p.To, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtTo))
+            {
+                asOfDt = dtTo.Date;
+            }
+            else if (!string.IsNullOrWhiteSpace(p.From) && DateTime.TryParse(p.From, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtFrom))
+            {
+                asOfDt = dtFrom.Date;
+            }
+            else if (!string.IsNullOrWhiteSpace(p.WorkDate) && DateTime.TryParse(p.WorkDate, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtWork))
+            {
+                asOfDt = dtWork.Date;
+            }
+
+            string custT = T(scope, "Customer", isShared: false);
+            string dealerT = T(scope, "Salesperson_Purchaser", isShared: false);
+            string areaT = T(scope, "Area", isShared: false);
+            string teamT = T(scope, "Team Salesperson", isShared: false);
+            string detLedgerT = T(scope, "Detailed Cust_ Ledg_ Entry", isShared: false);
+
+            var param = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["asOfDt"] = asOfDt
+            };
+
+            var where = new List<string>
+            {
+                "DLE.[Entry Type] = 1",
+                "DLE.[Posting Date] <= @asOfDt"
+            };
+
+            if (p.RespCenters?.Count > 0)
+            {
+                param["respCenters"] = p.RespCenters;
+                where.Add("Cust.[Responsibility Center] IN @respCenters");
+            }
+
+            if (p.Dealers?.Count > 0)
+            {
+                param["dealers"] = p.Dealers;
+                where.Add("Cust.[Dealer Code] IN @dealers");
+            }
+
+            if (p.Regions?.Count > 0)
+            {
+                param["regions"] = p.Regions;
+                where.Add("Teams.[Code] IN @regions");
+            }
+
+            if (!string.IsNullOrEmpty(p.Search))
+            {
+                param["search"] = "%" + p.Search.Trim() + "%";
+                where.Add("(Cust.[Name] LIKE @search OR Cust.[No_] LIKE @search OR Dealer.[Dealership Name] LIKE @search OR Dealer.[Code] LIKE @search)");
+            }
+
+            string whereClause = " WHERE " + string.Join(" AND ", where);
+
+            string sql = $@"
+            SELECT 
+                RTRIM(Cust.[No_]) + '_' + ISNULL(RTRIM(Dealer.[Code]), 'DIRECT') AS Id,
+                ISNULL(NULLIF(RTRIM(Teams.[Name]), ''), ISNULL(NULLIF(RTRIM(Teams.[Code]), ''), 'Unassigned Region')) AS Region,
+                ISNULL(RTRIM(Dealer.[Code]), 'DIRECT') AS DealerCode,
+                ISNULL(NULLIF(RTRIM(Dealer.[Dealership Name]), ''), ISNULL(NULLIF(RTRIM(Dealer.[Name]), ''), 'Direct Sales')) AS DealerName,
+                RTRIM(Cust.[No_]) AS CustomerCode,
+                RTRIM(Cust.[Name]) AS CustomerName,
+                ISNULL(RTRIM(Cust.[Responsibility Center]), '') AS RespCenter,
+                CASE 
+                    WHEN Dealer.[Product] = 1 THEN 'Ecomile'
+                    WHEN Dealer.[Product] = 2 THEN 'Retread'
+                    WHEN Dealer.[Product] = 3 THEN 'Flap & Tube'
+                    ELSE ISNULL(CAST(Dealer.[Product] AS VARCHAR(50)), 'General Product')
+                END AS Product,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) BETWEEN 0 AND 30 THEN DLE.[Amount] ELSE 0 END) AS Bucket0_30,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) BETWEEN 31 AND 60 THEN DLE.[Amount] ELSE 0 END) AS Bucket31_60,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) BETWEEN 61 AND 90 THEN DLE.[Amount] ELSE 0 END) AS Bucket61_90,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) BETWEEN 91 AND 180 THEN DLE.[Amount] ELSE 0 END) AS Bucket91_180,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) BETWEEN 181 AND 365 THEN DLE.[Amount] ELSE 0 END) AS Bucket181_365,
+                SUM(CASE WHEN DATEDIFF(day, DLE.[Posting Date], @asOfDt) > 365 THEN DLE.[Amount] ELSE 0 END) AS BucketOver365,
+                SUM(DLE.[Amount]) AS TotalBalance,
+                COUNT(DLE.[Entry No_]) AS InvoicesCount
+            FROM {detLedgerT} DLE WITH (NOLOCK)
+            INNER JOIN {custT} Cust WITH (NOLOCK) ON Cust.[No_] = DLE.[Customer No_]
+            LEFT JOIN {dealerT} Dealer WITH (NOLOCK) ON Dealer.[Code] = Cust.[Dealer Code]
+            LEFT JOIN {areaT} Area WITH (NOLOCK) ON Area.[Code] = Cust.[Area Code]
+            LEFT JOIN {teamT} Teams WITH (NOLOCK) ON Teams.[Team Code] = Area.[Team] AND Teams.[Type] = 6
+            {whereClause}
+            GROUP BY 
+                ISNULL(NULLIF(RTRIM(Teams.[Name]), ''), ISNULL(NULLIF(RTRIM(Teams.[Code]), ''), 'Unassigned Region')),
+                Dealer.[Code],
+                Dealer.[Dealership Name],
+                Dealer.[Name],
+                Cust.[No_],
+                Cust.[Name],
+                Cust.[Responsibility Center],
+                Dealer.[Product]
+            HAVING SUM(DLE.[Amount]) <> 0
+            ORDER BY TotalBalance DESC
+            ";
+
+            var rows = await scope.RawQueryToArrayAsync<OutstandingDashboardRow>(sql, param, cancellationToken);
+            return rows.ToList();
+        }
+
+        public class OutstandingDashboardRow
+        {
+            public string Id { get; set; } = string.Empty;
+            public string Region { get; set; } = string.Empty;
+            public string DealerCode { get; set; } = string.Empty;
+            public string DealerName { get; set; } = string.Empty;
+            public string CustomerCode { get; set; } = string.Empty;
+            public string CustomerName { get; set; } = string.Empty;
+            public string RespCenter { get; set; } = string.Empty;
+            public string Product { get; set; } = string.Empty;
+            public decimal Bucket0_30 { get; set; }
+            public decimal Bucket31_60 { get; set; }
+            public decimal Bucket61_90 { get; set; }
+            public decimal Bucket91_180 { get; set; }
+            public decimal Bucket181_365 { get; set; }
+            public decimal BucketOver365 { get; set; }
+            public decimal TotalBalance { get; set; }
+            public int InvoicesCount { get; set; }
         }
     }
 }
