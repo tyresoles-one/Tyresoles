@@ -948,7 +948,7 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
             string valueSelect = itemParam.SaleType == SaleType.ExchangeTyre ? "ROUND(SUM(Ledger.[Quantity]), 0)" : "ROUND(-SUM(Ledger.[Quantity]), 0)";
 
             if (itemParam.ItemCategories?.Count > 0) { param["itemCats"] = itemParam.ItemCategories; where.Add("Ledger.[Item Category Code] IN @itemCats"); }
-            if (!string.IsNullOrEmpty(itemParam.ProductGroup)) { param["prodGroup"] = itemParam.ProductGroup; where.Add("Ledger.[Product Group Code] = @prodGroup"); }
+            if (itemParam.ProductGroup?.Count > 0) { param["prodGroup"] = itemParam.ProductGroup; where.Add("Ledger.[Product Group Code] IN @prodGroup"); }
             if (itemParam.Items?.Count > 0) { param["items"] = itemParam.Items; where.Add("Ledger.[Item No_] IN @items"); }
 
             int[] locTypes = itemParam.SaleType switch { SaleType.Retread => new[] { 0, 1, 3, 4 }, SaleType.Ecomile => new[] { 0, 1, 3, 4 }, SaleType.IcTyre => new[] { 0, 1, 3, 4 }, SaleType.ExchangeTyre => new[] { 6 }, SaleType.Scrap => new[] { 4, 6 }, SaleType.IcEcoflex => new[] { 0 }, SaleType.Ecoflex => new[] { 0 }, SaleType.FlapTube => new[] { 0 }, SaleType.TreadRubber => new[] { 0 }, _ => new int[] { } };
@@ -976,9 +976,15 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
                 where.Add($"Cust.[Gen_ Bus_ Posting Group] {cc} 'SALES'");
             }
 
-            string label = !string.IsNullOrEmpty(itemParam.Name) ? itemParam.Name : (!string.IsNullOrEmpty(itemParam.ProductGroup) ? itemParam.ProductGroup : "");
+            string label = !string.IsNullOrEmpty(itemParam.Name) ? itemParam.Name : (itemParam.ProductGroup?.Count > 0 ? string.Join(", ", itemParam.ProductGroup) : "");
             string joinClause = joinCustomer ? $"INNER JOIN {custT} Cust ON Cust.[No_] = Ledger.[Source No_]" : "";
             string sql = $@"SELECT {itemParam.Id} as No, '{label}' as Label, ISNULL({valueSelect},0) as Value, (SELECT TOP 1 UOM.[Description] FROM {itemT} Items WITH (NOLOCK) LEFT JOIN {uomT} UOM WITH (NOLOCK) ON UOM.[Code] = Items.[Sales Unit of Measure] WHERE Items.[No_] = MAX(Ledger.[Item No_])) as Unit FROM {ledgerT} Ledger WITH (NOLOCK) {joinClause} WHERE {string.Join(" AND ", where)}";
+
+            string rsp = string.Empty;
+            foreach (var r in p.RespCenters)
+                rsp += $"{r},";
+
+            System.Console.WriteLine(rsp);
 
             var result = await scope.RawQueryToArrayAsync<Item>(sql, param, cancellationToken);
             if (result.Length > 0) return result[0];
@@ -1054,17 +1060,21 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
                 var prod = products[i]; string alias = $"Ledger{i}";
                 int[] locTypes = prod.SaleType switch { SaleType.Retread => new[] { 0, 1, 3 }, SaleType.Ecomile => new[] { 0, 1, 3 }, SaleType.IcTyre => new[] { 0, 1, 3 }, SaleType.Scrap => new[] { 4 }, SaleType.IcEcoflex => new[] { 0 }, SaleType.Ecoflex => new[] { 0 }, SaleType.FlapTube => new[] { 0 }, SaleType.TreadRubber => new[] { 0 }, _ => new int[] { } };
                 string locWhere = locTypes.Length > 0 ? (param[$"locTypes{i}"] = locTypes) != null ? $"AND [Location Code] IN (SELECT [Code] FROM {locT} WITH (NOLOCK) WHERE [Responsibility Center] = @respCenter AND [Type] IN @locTypes{i})" : "" : $"AND [Location Code] IN (SELECT [Code] FROM {locT} WITH (NOLOCK) WHERE [Responsibility Center] = @respCenter)";
-                param[$"itemCats{i}"] = prod.ItemCategories; param[$"prodGroup{i}"] = prod.ProductGroup ?? "";
-                joinClause += $" LEFT JOIN (SELECT [Source No_] as CustomerNo, -SUM(Quantity) as Qty FROM {itemLedgerT} WITH (NOLOCK) WHERE [Entry Type] = 1 AND [Posting Date] BETWEEN @fromDt AND @toDt AND [Item Category Code] IN @itemCats{i} AND [Product Group Code] = @prodGroup{i} {locWhere} GROUP BY [Source No_]) {alias} ON {alias}.CustomerNo = Cust.[No_] ";
+                param[$"itemCats{i}"] = prod.ItemCategories; param[$"prodGroup{i}"] = prod.ProductGroup ?? new List<string>();
+                joinClause += $" LEFT JOIN (SELECT [Source No_] as CustomerNo, -SUM(Quantity) as Qty FROM {itemLedgerT} WITH (NOLOCK) WHERE [Entry Type] = 1 AND [Posting Date] BETWEEN @fromDt AND @toDt AND [Item Category Code] IN @itemCats{i} AND [Product Group Code] IN @prodGroup{i} {locWhere} GROUP BY [Source No_]) {alias} ON {alias}.CustomerNo = Cust.[No_] ";
+
+                string firstGroup = prod.ProductGroup?.FirstOrDefault() ?? "";
 
                 switch (prod.SaleType)
                 {
                     case SaleType.Retread: case SaleType.Ecomile:
-                        selectClause += prod.ProductGroup == "OTR 1" ? $", ISNULL({alias}.Qty,0) as O1" : $", ISNULL({alias}.Qty,0) as [{prod.ProductGroup?.Substring(0, 1)}]"; break;
+                        bool isOtr1 = prod.ProductGroup?.Contains("OTR 1") == true;
+                        string aliasLetter = firstGroup.Length > 0 ? firstGroup.Substring(0, 1) : "";
+                        selectClause += isOtr1 ? $", ISNULL({alias}.Qty,0) as O1" : $", ISNULL({alias}.Qty,0) as [{aliasLetter}]"; break;
                     case SaleType.FlapTube:
-                        selectClause += $", ISNULL({alias}.Qty,0) as {CultureInfo.InvariantCulture.TextInfo.ToTitleCase(prod.ProductGroup?.ToLowerInvariant() ?? "")}"; break;
+                        selectClause += $", ISNULL({alias}.Qty,0) as {CultureInfo.InvariantCulture.TextInfo.ToTitleCase(firstGroup.ToLowerInvariant())}"; break;
                     case SaleType.Ecoflex:
-                        switch (prod.ProductGroup?.Trim())
+                        switch (firstGroup.Trim())
                         {
                             case "TILES": selectClause += $", ISNULL({alias}.Qty,0) as Tile"; break;
                             case "PLAYSAFE": selectClause += $", ISNULL({alias}.Qty,0) as PlaySafe"; break;

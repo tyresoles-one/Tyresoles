@@ -40,6 +40,8 @@ using Tyresoles.Web.Features.Downloads;
 using Tyresoles.Web.Features.DriveSync;
 using Tyresoles.Web.Features.WindowsServices;
 using Tyresoles.Data.Features.Merger;
+using Tyresoles.Data.Features.Admin.EmailAccounts;
+using Tyresoles.Web.Features.EmailAccounts;
 using StackExchange.Redis;
 using Microsoft.Data.SqlClient;
 
@@ -201,6 +203,9 @@ builder.Services.AddScoped<IDriveSyncService, DriveSyncService>();
 builder.Services.Configure<WindowsServiceOptions>(builder.Configuration.GetSection(WindowsServiceOptions.SectionName));
 builder.Services.AddSingleton<IWindowsServiceManager, WindowsServiceManager>();
 
+builder.Services.Configure<RediffmailSettings>(builder.Configuration.GetSection(RediffmailSettings.SectionName));
+builder.Services.AddHttpClient<IRediffmailService, RediffmailService>();
+
 // JWT: expiry options for UserService (Data layer); token generation in Web.
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<JwtExpiryOptions>(sp =>
@@ -309,7 +314,9 @@ gqlExecutor
     .AddQueryType<Query>()
     .AddMutationType<Mutation>()
     .AddSubscriptionType<Tyresoles.Web.GraphQL.Subscription>()
-    .AddTypeExtension<VendorTypeExtension>();
+    .AddTypeExtension<VendorTypeExtension>()
+    .AddTypeExtension<EmailAccountQueryExtension>()
+    .AddTypeExtension<EmailAccountMutationExtension>();
 
 var app = builder.Build();
 

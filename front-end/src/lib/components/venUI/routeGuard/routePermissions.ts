@@ -17,6 +17,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   "/crm-calling-supervisor": "CRM Calling Supervisor",
   "/crm-call-logs": "CRM Call Logs",
   "/crm-masters": "CRM Masters",
+  "/email-accounts": "Email Account Management",
   // /assist, /notifications: not listed — any logged-in user may access (no menu permission required)
 };
 

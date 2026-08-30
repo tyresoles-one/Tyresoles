@@ -1,0 +1,1381 @@
+User management APIs
+Introduction
+Users can be added in the organization through an interface like active directory or created on each mailing platform separately through GUI. In both the methods, each mailing platform is unaware of any new user getting added on another platform. Thus administrator has to manually add the newly created user on second mailing platform as a contact without mailbox.
+To overcome such problems, Rediffmail Pro has extended the APIs for complete user management. Administrator can automate the entire user management process or integrate these APIs with active directory to manage users through script.
+User management APIs
+User management includes six tasks as mentioned below. Each task can be accomplished programmatically using an individual API.  Each API is a URL request using HTTP POST method. The attributes of a user such as first name, last name, etc., should be mentioned in the ‘Parameters’ and ‘headers’ sections while calling these APIs. The response of an API is in the standard XML  Or  JSON format. The details of each API are as below. Only the administrative accounts of a domain have a permission to call these APIs. In order to use these user management APIs,  authentication API for admin account authentication should be called and session ID obtained as a response should be mentioned in subsequent calls.
+•      Admin Authentication
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/LoginUser              
+Parameters:
+FormName=existing
+login=adminid@companydomain.com
+passwd=<urlencoded pwd>
+output=xml/json
+remember=1;
+Headers:
+User-Agent: <User agent>
+Json Response (success)
+{
+    "HEAD": {
+        "TITLE": "SUCCESS",
+        "META": {
+            "NAME": "generator",
+            "CONTENT": "libtemplate#pro_relogin_mobilemailclient.html"
+        }
+    },
+    "BODY": {
+        "Rmail": {
+            "Status": null,
+            "Msg": "SUCCESS",
+            "Rm": "22feb2f386dbd5e3f1202deed6e923f7==AM0EjMxETMzUTM",
+            "Rl": "adminid@companydomain.com",
+            "Rsc": "K1KAK2UPSlmQ7XSZGmKzg0mbVr1",
+            "Rt": "==AMwAjN3czN",
+            "Ruad": null,
+            "IDPT4": "685B246659A119233195FF03D574123B=59738Z4DDD6K4462DBZD2D0695AK65A32",
+            "typeofAccount": "1",
+            "TFA": null,
+            "Rlo": null
+        }
+    }
+}
+XML  Response (success)
+<HTML>
+<HEAD>
+<TITLE>SUCCESS</TITLE>
+<META NAME="generator" CONTENT="libtemplate#pro_relogin_mobilemailclient.html">
+</HEAD>
+<BODY>
+<Rmail>
+<Status>0</Status>
+<Msg>SUCCESS</Msg>
+<Rm>895f4727949e1877f93384d7b1ea6500==wN1EjM5ATO1MTM</Rm>
+<Rl> adminid@companydomain.com</Rl>
+<Rsc>K1KXKXBK0Kl0Ko7r9ML6s2B2eCU</Rsc>
+<Rt>==AMwAjN3czN</Rt>
+<Ruad></Ruad>
+<typeofAccount>1</typeofAccount>
+</Rmail>
+</BODY>
+</HTML>
+ 
+JSon Response (Failure)
+{
+    "HEAD": {
+        "TITLE": "SESSION:FAILURE",
+        "META": {
+            "NAME": "generator",
+            "CONTENT": "libtemplate#pro_relogin_mobilemailclient.html"
+        }
+    },
+    "BODY": {
+        "Rmail": {
+            "Status": "-1",
+            "Msg": "ERROR",
+            "Rm": null,
+            "Rl": null,
+            "Rsc": null,
+            "Rt": null,
+            "Ruad": null,
+            "IDPT4": null,
+            "typeofAccount": "1",
+            "TFA": null,
+            "Rlo": null
+        }
+    }
+}
+XML Response (failure)
+<HTML>
+    <HEAD>
+        <TITLE>SESSION:FAILURE</TITLE>
+        <META NAME="generator" CONTENT="libtemplate#pro_relogin_mobilemailclient.html"/>
+    </HEAD>
+    <BODY>
+        <Rmail>
+            <Status>-1</Status>
+            <Msg>ERROR</Msg>
+            <Rm></Rm>
+            <Rl></Rl>
+            <Rsc></Rsc>
+            <Rt></Rt>
+            <Ruad></Ruad>
+            <IDPT4></IDPT4>
+            <typeofAccount>1</typeofAccount>
+            <TFA></TFA>
+            <Rlo></Rlo>
+        </Rmail>
+    </BODY>
+</HTML>
+•      User creation
+This method is used to create a new user on Rediffmail Platform. There are multiple fields which administrator can specify while creating a user. First name, last name, mailbox size, email ID, mobile and alternate email address are the mandatory field. The newly created user automatically gets added to the global address book of the domain.
+API will generate a failure response if a user already exists by same email address or if there are not enough unassigned accounts of mailbox size mentioned.
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/AddUser
+Parameters:
+domain_name=<companydomain.com>
+fname=<first_name>
+sname=<last_name>
+nickname=<nick_name>
+code=<employee_code>
+userid=<new_email_id_without_domain>
+passwd=<login password>
+pwd_change_at_firstlogin=<Prompt the user to change his password on his 1st login attempt : Possible values are Y OR N >
+mobile=<10_digit_mobile_no>
+userSpace=<new_account_space_license_in_mb. Ex. 500, 1024, 2048, etc.>
+month=<birth_month>
+day=<birth_date>
+year=<birth_year>
+branch=<branch>
+city=<city>
+altemail=<alternate_email_id>
+status=A
+segment=1
+designation=<designation>
+department=<department>
+org_name=<company_name>
+url=<company_url>
+role=<user_role>
+note=<notes>
+timezone=Asia/Kolkata
+address=<address>
+state=<state>
+zip=<6_digit_zip_code>
+country_code=91
+ph_work=<work_phone_number>
+ph_home=<home_phone_number>
+fax=<fax_number>
+mailingListId[]=<mailing_list1@mydomain.com>
+mailingListId[]=<mailing_list2@mydomain.com>
+mailingListId[]=<mailing_list3@mydomain.com>
+add_user.x=32
+add_user.y=11
+controller_action=addUser
+userdomainname=<companydomain.com>
+login=<complete_admin_email_address>
+output=xml/json
+               session_id=<Rsc_value>                #obtained as a response to admin authentication API call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+Json Response (success)
+{
+    "Action": "Add User",
+    "Status": "Success",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KYKM9efc2ec2tBe8nYVtXkuAU",
+    "Contact": {
+        "Nickname": "nick_name",
+        "Email": "new_email_id@companydomain.com",
+        "FirstName": "first_name",
+        "LastName": "last_name"
+    }
+}
+XML Response (success)
+<?xml version='1.0' ?>
+<Rmail>
+    <Action>Add User</Action>
+    <Status>Success</Status>
+    <Login> <![CDATA[admin_email_id]]></Login>
+    <Sessionid><![CDATA[K1KYKM9efc2ec2tBe8nYVtXkuAU]]></Sessionid>
+    <Contact>
+        <Nickname><![CDATA[nickname]></Nickname>
+        <Email><![CDATA[new_email_id@companydomain.com]]></Email>
+        <FirstName><![CDATA[first_name]]></FirstName>
+        <LastName><![CDATA[last_name]]></LastName>
+    </Contact>
+</Rmail>
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "1Allocated Mailbox Space is not available.",
+    "Message": "1Allocated Mailbox Space is not available.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KYKM9efc2ec2tBe8nYVtXkuAU"
+}
+XML Response (failure)
+<?xml version="1.0" encoding="UTF-8"?>
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR>
+        <![CDATA[1Allocated Mailbox Space is not available.]]>
+    </ERROR>
+    <Message>
+        <![CDATA[1Allocated Mailbox Space is not available.]]>
+    </Message>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KYKM9efc2ec2tBe8nYVtXkuAU]]>
+    </Sessionid>
+</Rmail>
+•      User modification
+This method is used to edit or modify the attributes of already existing user. Call this API to update the designation, address, phone number, etc. of a user. Please note that the email address of a user cannot be modified.
+Request
+ 
+Method:
+POST
+URL:
+                https://api.rediffmailpro.com/eproadminapi/UpdateUser
+Parameters:
+controller_action=confirm
+login=<admin_email_address_with_domain>
+userid=<email_id_without_domain_to_edit>
+fname=<first_name>
+sname=<last_name>
+code=<employee_code>
+branch=<branch>
+mobile=<10_digit_mobile_no>
+city=<city>
+status=A
+designation=<designation>
+department=<department>
+nickname=<nick_name>
+month=<birth_month>
+day=<birth_date>
+year=<birth_year>
+altemail=<alternate_email_id>
+role=<user_role>
+org_name=<company_name>
+url=<web_url>
+note=<notes>
+timezone=Asia/Kolkata
+address=<address>
+state=<state>
+zip=<6_digit_zip_code>
+ph_work=<work_phone_number>
+ph_home=<home_phone_number>
+country_code=91
+fax=<fax_number>
+mailingListId[]=<mailing_list1@mydomain.com>
+mailingListId[]=<mailing_list2@mydomain.com>
+mailingListId[]=<mailing_list3@mydomain.com>
+output=xml/json
+session_id==<Rsc_value>              #obtained as a response to authentication API call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+Json Response (success)
+{
+    "Action": "Edit User",
+    "Status": "Success",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KYKM9efc2ec2tBe8nYVtXkuAU",
+    "Contact": {
+        "Nickname": "nick_name",
+        "Email": "user_email_id",
+        "FirstName": "first_name",
+        "LastName": "last_name"
+    }
+}
+XML Response (success)
+<?xml version='1.0' ?>
+<Rmail>
+    <Action>Edit User</Action>
+    <Status>Success</Status>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KYKM9efc2ec2tBe8nYVtXkuAU]]>
+    </Sessionid>
+    <Contact>
+        <Nickname>
+            <![CDATA[nick_name]]>
+        </Nickname>
+        <Email>
+            <![CDATA[user_email_id]]>
+        </Email>
+        <FirstName>
+            <![CDATA[first_name]]>
+        </FirstName>
+        <LastName>
+            <![CDATA[last_name]]>
+        </LastName>
+    </Contact>
+</Rmail>
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "Entered Id is not a POP Id.",
+    "Message": "Entered Id is not a POP Id.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KYKM9efc2ec2tBe8nYVtXkuAU"
+}
+XML Response (failure)
+<?xml version="1.0" encoding="UTF-8"?>
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR>
+        <![CDATA[Entered Id is not a POP Id.]]>
+    </ERROR>
+    <Message>
+        <![CDATA[Entered Id is not a POP Id.]]>
+    </Message>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KYKM9efc2ec2tBe8nYVtXkuAU]]>
+    </Sessionid>
+</Rmail>
+•      User deletion
+When employee leaves organization, this API can be used to delete the employee email ID from the Rediffmail Pro platform. Please note once the user account is deleted, the data associated with the account also gets deleted permanently.
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/DeleteUser
+Parameters:
+del_user=<email_id_to_delete_with_domain>
+controller_action=Delete
+login==<admin_email_address_with_domain>
+output=xml/json
+session_id==<Rsc_value>              #obtained as a response to admin authentication API call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+JSON Response (success)
+{
+    "Action": "Delete User",
+    "Status": "Success",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V",
+    "Contact": {
+        "Nickname": "nick_name",
+        "Email": "user_email_id",
+        "FirstName": "first_name",
+        "LastName": "last_name"
+    }
+}
+XML Response (success)
+<?xml version='1.0' ?>
+<Rmail>
+<Action>Delete User</Action>
+<Status>Success</Status>
+<Login><![CDATA[admin_email_id]]></Login>
+<Sessionid><![CDATA[K1KLKUJXG6MzJ5n4sBzzdY6foYV n]]></Sessionid>
+<Contact>
+<Nickname><![CDATA[nick_name]]></Nickname>
+<Email><![CDATA[user_email_id]]></Email>
+<FirstName><![CDATA[first_name]]></FirstName>
+<LastName><![CDATA[last_name]]></LastName>
+</Contact>
+</Rmail>
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "Entered Id is not an existing POP Id.",
+    "Message": "Entered Id is not an existing POP Id.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V"
+}
+XML Response (failure)
+<?xml version="1.0" encoding="UTF-8"?>
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR>
+        <![CDATA[Entered Id is not an existing POP Id.]]>
+    </ERROR>
+    <Message>
+        <![CDATA[Entered Id is not an existing POP Id.]]>
+    </Message>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]>
+    </Sessionid>
+</Rmail>
+ 
+•      Password management
+This method modifies the password of a user. This method is especially helpful to make sure that all users follow the corporate password policy guidelines and have same password across all the applications they use.
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/ChangePassword
+Parameters:
+userid=<email_id_to_change_without_domain>
+login==<admin_email_address_with_domain>
+passwd=<new_password>
+controller_action=changePassword
+output=xml/json
+session_id==<Rsc_value>              #obtained as a response to admin authentication API call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+Json Response (success)
+{
+    "Action": "Change Password",
+    "Status": "Success",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V",
+    "Contact": {
+        "Nickname":"nick_name",
+        "Email": "user_email_id",
+        "FirstName": "fisrt_name",
+        "LastName": "last_name"
+    }
+}
+ 
+XML Response (success)
+<?xml version='1.0' ?>
+<Rmail>
+    <Action>Change Password</Action>
+    <Status>Success</Status>
+    <Login>
+        <![CDATA[admin_user_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]>
+    </Sessionid>
+    <Contact>
+        <Nickname>
+            <![CDATA[nick_name]]>
+        </Nickname>
+        <Email>
+            <![CDATA[user_email_id]]>
+        </Email>
+        <FirstName>
+            <![CDATA[first_name]]>
+        </FirstName>
+        <LastName>
+            <![CDATA[last_name]]>
+        </LastName>
+    </Contact>
+</Rmail>
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "There is no such user.",
+    "Message": "There is no such user.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V"
+}
+XML Response (failure)
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR><![CDATA[There is no such user.]]> </ERROR>
+    <Message><![CDATA[There is no such user.]]> </Message>
+    <Login><![CDATA[admin_email_id]]></Login>
+    <Sessionid><![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]> </Sessionid>
+</Rmail>
+•      Adding a contact in global address book
+This method adds a contact in a global address book maintained on a Rediffmail platform for the domain. The contact can have various fields specified in the vcf format. This method is especially useful in hybrid environment where users created on Exchange or lotus notes. Such users can be added to global address book on Rediffmail platform using this API.
+ 
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/AddGlobalAddressContact
+Parameters:
+fname=<first_name>
+sname=<last_name>
+nickname=<nick_name>
+emailid=<email_id_with_domain>
+month=<birth_month>
+day=<birth_date>
+year=<birth_year>
+designation=<designation>
+department=<department>
+role=<user_role>
+mobile=<10_digit_mobile_number>
+ph_work=<work_phone_number>
+ph_home=<home_phone_number>
+fax=<fax_number>
+address=<address>
+city=<city>
+state=<state>
+zip=<6_digit_zip_code>
+country_code=91
+org_name=<company_name>
+url=<web_url>
+note=<notes>
+timezone=Asia/Kolkata
+addEmail=Add Email
+domain=<companydomain>
+controller_action=
+login=<admin_email_address_with_domain>
+output=xml/json
+session_id=<Rsc_value>                #obtained as a response to admin authentication API call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+Json Response (success)
+{
+    "Action": "Add Global Address User",
+    "Status": "Success",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V",
+    "Contact": {
+        "Nickname": "nick_name",
+        "Email": "new_user_email_id",
+        "FirstName": "fisrt_name",
+        "LastName": "last_name"
+    }
+}
+XML  Response (success)
+<Rmail>
+    <Action>Add Global Address User</Action>
+    <Status>Success</Status>
+    <Login><![CDATA[admin_email_id]]></Login>
+    <Sessionid><![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]></Sessionid>
+    <Contact>
+               <Nickname><![CDATA[nick_name]]></Nickname>
+             <Email><![CDATA[new_email_id]]> </Email>
+              <FirstName><![CDATA[first_name]]></FirstName>
+              <LastName><![CDATA[last_name]]></LastName>
+    </Contact>
+</Rmail>
+JSON Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "Email Id already exists.",
+    "Message": "Email Id already exists.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V"
+}
+XML Response (failure)
+<?xml version="1.0" encoding="UTF-8"?>
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR>
+        <![CDATA[Email Id already exists.]]>
+    </ERROR>
+    <Message>
+        <![CDATA[Email Id already exists.]]>
+    </Message>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]>
+    </Sessionid>
+</Rmail>
+ 
+•      Retrieving contacts from global address book
+This method useful to get the list of all the users in global address book maintained on Rediffmail platform.
+Request
+ 
+Method:
+POST
+URL:  
+               https://api.rediffmailpro.com/eproadminapi/GetGlobalAddressContact
+Parameters:
+controller=showaddrbook
+output=xml/json
+controller_action=getglbaddrbk
+all=1
+sortfield=0
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>;accounttype=0(if typeofAccount_value=0)else77;Rt=<rt_value>
+JSON Response (success)
+{
+    "Action": "Get Global Addressbook",
+    "Status": "Success",
+    "Login": "admin@eprotesting.com",
+    "Sessionid": "K1KOKqrG0xoY7ShIoXjjlFtSxTU",
+    "Lst": "1531219905",
+    "Contact":
+    [         
+               {
+            "Nickname": "nick_name",
+            "Email": "user_email_id",
+            "FirstName": "first_name",
+            "LastName": "last_name",
+            "Department": null,
+            "Designation": null,
+            "Role": null,
+            "Mobile": null,
+            "Url": null,
+            "Dob": null,
+            "WorkPhone": null,
+            "HomePhone": null,
+            "Fax": null,
+            "Photo": null,
+            "Agent": null,
+            "OrganizationName": null,
+            "Note": null,
+            "Categories": null,
+            "Address": null,
+            "City": null,
+            "State": null,
+            "Zip": null,
+            "Countrycode": null,
+            "HybridSetupUser": null
+        },
+        {
+            "Nickname": "nick_name",
+            "Email": "user_email_id",
+            "FirstName": "first_name",
+            "LastName": "last_name",
+            "Department": null,
+            "Designation": null,
+            "Role": null,
+            "Mobile": null,
+            "Url": null,
+            "Dob": null,
+            "WorkPhone": null,
+            "HomePhone": null,
+            "Fax": null,
+            "Photo": null,
+            "Agent": null,
+            "OrganizationName": null,
+            "Note": null,
+            "Categories": null,
+            "Address": null,
+            "City": null,
+            "State": null,
+            "Zip": null,
+            "Countrycode": null,
+            "HybridSetupUser": null
+        }
+    ]
+}
+XML Response (success)
+<Rmail>
+    <Action>Get Global Addressbook</Action>
+    <Status>Success</Status>
+    <Login><![CDATA[admin_email_id]]></Login>
+    <Sessionid><![CDATA[K1KOKqrG0xoY7ShIoXjjlFtSxTU]]></Sessionid>
+    <Lst><![CDATA[1531220079]]></Lst>
+    <Contact>
+<Nickname><![CDATA[nick_name]]></Nickname>
+<Email><![CDATA[user_email_id]]></Email>
+<FirstName><![CDATA[first_name]]></FirstName>
+<LastName><![CDATA[last_name]]></LastName>
+<Department><![CDATA[ ]]></Department>
+<Designation> <![CDATA[ ]]></Designation>
+<Role><![CDATA[]]></Role>
+<Mobile><![CDATA[]]></Mobile>
+<Url><![CDATA[]]></Url>
+<Dob><![CDATA[]]></Dob>
+<Designation><![CDATA[ ]]></Designation>
+<WorkPhone><![CDATA[]]></WorkPhone>
+<HomePhone><![CDATA[]]></HomePhone>
+<Fax><![CDATA[]]></Fax>
+<Photo><![CDATA[]]></Photo>
+<Agent><![CDATA[]]></Agent>
+<OrganizationName><![CDATA[]]></OrganizationName>
+<Note><![CDATA[]]></Note>
+<Categories><![CDATA[]]></Categories>
+<Address><![CDATA[]]></Address>
+<City><![CDATA[]]></City>
+<State><![CDATA[]]></State>
+<Zip><![CDATA[]]></Zip>
+<Countrycode><![CDATA[]]></Countrycode>
+<HybridSetupUser><![CDATA[0]]></HybridSetupUser>      
+    </Contact>
+    <Contact>
+<Nickname><![CDATA[nick_name]]></Nickname>
+<Email><![CDATA[user_email_id]]></Email>
+<FirstName><![CDATA[first_name]]></FirstName>
+<LastName><![CDATA[last_name]]></LastName>
+<Department><![CDATA[department_name]]></Department>
+<Designation><![CDATA[designation]]></Designation>
+<Role><![CDATA[]]></Role>
+<Mobile><![CDATA[]]></Mobile>
+<Url><![CDATA[]]></Url>
+<Dob><![CDATA[]]></Dob>
+<Designation><![CDATA[designation]]></Designation>
+<WorkPhone><![CDATA[]]></WorkPhone>
+<HomePhone><![CDATA[]]></HomePhone>
+<Fax><![CDATA[]]></Fax>
+<Photo><![CDATA[]]></Photo>
+<Agent><![CDATA[]]></Agent>
+<OrganizationName><![CDATA[]]></OrganizationName>
+<Note><![CDATA[]]></Note>
+<Categories><![CDATA[]]></Categories>
+<Address><![CDATA[]]></Address>
+<City><![CDATA[]]></City>
+<State><![CDATA[]]></State>
+<Zip><![CDATA[]]></Zip>
+<Countrycode><![CDATA[]]></Countrycode>
+<HybridSetupUser><![CDATA[0]]></HybridSetupUser>
+    </Contact>
+<Rmail>
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "Message": "Your session is invalid.Please login again.",
+    "Login": "admin_email_id",
+    "Sessionid": "K1KNKPkV2YdSUCpITYUjEXSMc5V"
+}
+XML Response (failure)
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <Message>Your session is invalid.Please login again.</Message>
+    <Login>
+        <![CDATA[admin_email_id]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KNKPkV2YdSUCpITYUjEXSMc5V]]>
+    </Sessionid>
+</Rmail>
+User Activiation and Deactivation  :
+                    This method used to activate and deactivate single or multiple users.
+Request
+ 
+Method:
+POST
+URL: 
+               https://api.rediffmailpro.com/eproadminapi/UpdateUserStatus
+Parameters:
+controller=possible values  [Active/Inactive/Deactive]
+output=xml/json
+login=<admin_email_address_with_domain>
+userids[]=<email_id_to_activate_without_domain>
+userids[]=<email_id_to_activate_withput_domain>
+userids[]=<email_id_to_activate_without_domain>
+employee_codes[]=<employee_codes_to_activate_user>
+employee_codes[]=<employee_codes_to_activate_user>
+userdomainname=<companydomain.com>
+session_id==<Rsc_value>              #obtained as a response to admin authentication API
+call
+ 
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>; Rt=<rt_value>                                                                              #obtained as a response to admin authentication API call
+JSON Response for single user (success)
+{
+    "Action": "Activated",
+    "Status": "Success",
+    "Message": "User Activated successfully",
+    "Error": null,
+    "UserDetails": {
+        "User": {
+            "Userid": "email_id_to_activate_without_domain",
+            "UserStatus": "Success",
+            "Message": "User updated successfully"
+        }
+    }
+}
+JSON Response for multiple user (success)
+{
+    "Action": "Activated",
+    "Status": "Success",
+    "Message": "User Activated successfully",
+    "Error": null,
+    "UserDetails": {
+        "User": [
+            {
+                "Userid": "email_id_to_activate_without_domain",
+                "UserStatus": "Success",
+                "Message": "User updated successfully"
+            },
+            {
+                "Userid": "email_id_to_activate_without_domain",
+                "UserStatus": "Success",
+                "Message": "User updated successfully"
+            }
+        ]
+    }
+}
+XML Response for single User (success)
+<?xml version="1.0"?>
+<Rmail>
+    <Action>
+        <![CDATA[Deactivated]]>
+    </Action>
+    <Status>
+        <![CDATA[Success]]>
+    </Status>
+    <Message>
+        <![CDATA[User Deactivated successfully]]>
+    </Message>
+    <Error>
+        <![CDATA[]]>
+    </Error>
+    <UserDetails>
+        <User>
+            <Userid>
+                <![CDATA[email_id_to_deactivate_without_domain]]>
+            </Userid>
+            <UserStatus>
+                <![CDATA[Success]]>
+            </UserStatus>
+            <Message>
+                <![CDATA[User updated successfully]]>
+            </Message>
+        </User>
+    </UserDetails>
+</Rmail>
+XML Response for Multiple User (success)
+<?xml version="1.0"?>
+<Rmail>
+    <Action>
+        <![CDATA[Deactivated]]>
+    </Action>
+    <Status>
+        <![CDATA[Success]]>
+    </Status>
+    <Message>
+        <![CDATA[User Deactivated successfully]]>
+    </Message>
+    <Error>
+        <![CDATA[]]>
+    </Error>
+    <UserDetails>
+        <User>
+            <Userid>
+                <![CDATA[email_id_to_deactivate_without_domain]]>
+            </Userid>
+            <UserStatus>
+                <![CDATA[Success]]>
+            </UserStatus>
+            <Message>
+                <![CDATA[User updated successfully]]>
+            </Message>
+        </User>
+        <User>
+            <Userid>
+                <![CDATA[email_id_to_deactivate_without_domain]]>
+            </Userid>
+            <UserStatus>
+                <![CDATA[Success]]>
+            </UserStatus>
+            <Message>
+                <![CDATA[User updated successfully]]>
+            </Message>
+        </User>
+    </UserDetails>
+</Rmail>
+ 
+Json Response (failure)
+{
+    "Action": "Display Error",
+    "Status": "Failure",
+    "ERROR": "Mandatory parameter userids missing.",
+    "Message": "Mandatory parameter userids missing.",
+    "Login": "email_id_to_activate_with_domain",
+    "Sessionid": "K1KVKhNLKMyU4AtlAOlcfVa54aU"
+}
+XML Response (failure)
+<?xml version="1.0" encoding="UTF-8"?>
+<Rmail>
+    <Action>Display Error</Action>
+    <Status>Failure</Status>
+    <ERROR>
+        <![CDATA[Mandatory parameter userids missing.]]>
+    </ERROR>
+    <Message>
+        <![CDATA[Mandatory parameter userids missing.]]>
+    </Message>
+    <Login>
+        <![CDATA[email_id_to_activate_with_domain]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KVKhNLKMyU4AtlAOlcfVa54aU]]>
+    </Sessionid>
+</Rmail>
+ 
+•      Retrieving User Details
+This method useful to get the user details of registered  user on rediffmail.
+Request
+ 
+Method:
+POST
+URL:  
+               https://api.rediffmailpro.com/eproadminapi/GetUserDetails
+Parameters:
+controller=edit
+login=<admin_email_address_with_domain>
+userid=<email_id_to_getuserdetails_without_domain>
+employee_code=<fetch_user_details_by_employee_code>
+userdomainname=<companydomain.com>
+session_id==<Rsc_value>              #obtained as a response to admin authentication API
+output=xml/json
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>;accounttype=0(if typeofAccount_value=0)else77;Rt=<rt_value>
+Json Response (success)
+{
+    "Action": "Edit User",
+    "Login": "admin_email_address_with_domain",
+    "Sessionid": "K1KUKumrPsvoOGDUHh2nVzB69VU",
+    "Status": "Success",
+    "Contact": {
+        "Email": "user_email_address_with_domain",
+        "fname": "user_firstname",
+        "sname": "user_surname",
+        "nickname": "user_nickname",
+        "code": "user_employeecode",
+        "day": "day_of_dob",
+        "month": "month_of_dob",
+      "year": "year_of_dob",
+        "branch": "branch_name",
+        "mobile": "mobile_number",
+        "city": "city_name",
+        "altemail": "alternate_email",
+        "status": "user_status",
+        "designation": "designation",
+        "department": "department_name",
+        "role": "role",
+        "org_name": "organisation name",
+        "url": "company_url",
+        "note": "note",
+        "timezone": "Asia/Kolkata",
+        "address": "address",
+        "state": "state",
+        "zip": "zipcode",
+        "country_code": "91",
+        "ph_work": "phone_number_of_office",
+        "ph_home": "phone_number_of_home",
+        "fax": "fax_number"
+    },
+    "mailingListId": "small3@eprotesting.com,testuserpull@eprotesting.com"
+}
+Json Response (failure)
+{
+    "Action": "Edit User",
+    "Login": "admin_email_address_with_domain",
+    "Sessionid": "K1KUKumrPsvoOGDUHh2nVzB69VU",
+    "Status": "Failure",
+    "ERROR": "User is not present"
+}
+XML  Response (success)
+<?xml version='1.0' ?>
+<Rmail>
+    <Action>Edit User</Action>
+    <Login>
+        <![CDATA[admin_email_address_with_domain]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[session_id_value]]>
+    </Sessionid>
+    <Status>Success</Status>
+    <Contact>
+        <Email>
+            <![CDATA[userid_email_address_with_domain]]>
+        </Email>
+        <fname>
+            <![CDATA[user_firstname]]>
+        </fname>
+        <sname>
+            <![CDATA[user_surname]]>
+        </sname>
+        <nickname>
+            <![CDATA[user_nickname]]>
+        </nickname>
+        <code>
+            <![CDATA[user_employeecode]]>
+        </code>
+        <day>
+            <![CDATA[date_of_dob]]>
+        </day>
+        <month>
+            <![CDATA[month_of_dob]]>
+        </month>
+        <year>
+            <![CDATA[year_of_dob]]>
+        </year>
+        <branch>
+            <![CDATA[branch_name]]>
+        </branch>
+        <mobile>
+            <![CDATA[mobile_number]]>
+        </mobile>
+        <city>
+            <![CDATA[city_name]]>
+        </city>
+        <altemail>
+            <![CDATA[alternate_email]]>
+        </altemail>
+        <status>
+            <![CDATA[user_status]]>
+        </status>
+        <designation>
+            <![CDATA[designation]]>
+        </designation>
+        <department>
+            <![CDATA[department_name]]>
+        </department>
+        <role>
+            <![CDATA[role]]>
+        </role>
+        <org_name>
+            <![CDATA[organisation_name]]>
+        </org_name>
+        <url>
+            <![CDATA[company_url]]>
+        </url>
+        <note>
+            <![CDATA[note]]>
+        </note>
+        <timezone>
+            <![CDATA[Asia/Kolkata]]>
+        </timezone>
+        <address>
+            <![CDATA[address]]>
+        </address>
+        <state>
+            <![CDATA[state]]>
+        </state>
+        <zip>
+            <![CDATA[zipcode]]>
+        </zip>
+        <country_code>
+            <![CDATA[91]]>
+        </country_code>
+        <ph_work>
+            <![CDATA[phone_number_of_office]]>
+        </ph_work>
+        <ph_home>
+            <![CDATA[phone_number_of home]]>
+        </ph_home>
+        <fax>
+            <![CDATA[fax_number]]>
+        </fax>
+    </Contact>
+    <mailingListId>
+        <![CDATA[small3@eprotesting.com,testuserpull@eprotesting.com]]>
+    </mailingListId>
+</Rmail>
+XML  Response (failure)
+<?xml version='1.0' ?>
+<Rmail>
+    <Action>Edit User</Action>
+    <Login>
+        <![CDATA[admin_email_address_with_domain]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KUKumrPsvoOGDUHh2nVzB69VU]]>
+    </Sessionid>
+    <Status>Failure</Status>
+    <ERROR>User is not present</ERROR>
+</Rmail>
+ 
+•      Retrieving User Details using Employee Code
+This method useful to get the user details of registered  user on rediffmail.
+Request
+ 
+Method:
+POST
+URL:  
+               https://api.rediffmailpro.com/eproadminapi/GetUserDetails
+Parameters:
+controller=edit
+login=<admin_email_address_with_domain>
+employee_code=<employee_code_of_the_user>
+userdomainname=<companydomain.com>
+session_id==<Rsc_value>              #obtained as a response to admin authentication API
+output=xml/json
+Headers:
+Cookie: Rm=<rm_value>; Rsc=<rsc_value>; Rl=<rl_value>;accounttype=0(if typeofAccount_value=0)else77;Rt=<rt_value>
+Json Response (success)
+{
+               "Action": "Edit User",
+               "Login": "admin_email_address_with_domain ",
+               "Sessionid": "K1KHKihRcUNY12WPvoUt1V4wWNU",
+               "Status": "Success",
+               "UserDetails": {
+                              "User": [{
+                                                            "Contact": {
+                                                                           "Email": "user_email_id_with_domain",
+                                                                           "fname": "user_firstname",
+                                                                           "sname": "user_lastname",
+                                                                           "nickname": "user_nickname",
+                                                                           "code": "user_employee_code",
+                                                                           "day": "day_of_dob",
+                                                                           "month": "month_of_dob",
+                                                                           "year": "year_of_dob",
+                                                                           "branch": "branchname_ot _the_user",
+                                                                           "mobile": "user_mobile_number",
+                                                                           "city": "user_city",
+                                                                           "altemail": "alternate_email_id",
+                                                                           "status": "status_of_the_user",
+                                                                           "designation": "user_designation",
+                                                                           "department": "user_department",
+                                                                           "role": "role",
+                                                                           "org_name": "organisation_name",
+                                                                           "url": "website_url_of the_organisation",
+                                                                           "note": "note",
+                                                                           "timezone": "timezone",
+                                                                           "address": "address",
+                                                                           "state": "state",
+                                                                           "zip": "zipcode",
+                                                                           "country_code": "country_code",
+                                                                           "ph_work": "phone_no_of_office",
+                                                                           "ph_home": "phone_no_of_home",
+                                                                           "fax": "fax_no"
+                                                            }
+                                             },
+                                             {
+                                                            "Contact": {
+                                                                           "Email": "user_email_id_with_domain",
+                                                                           "fname": "user_firstname",
+                                                                           "sname": "user_lastname",
+                                                                           "nickname": "user_nickname",
+                                                                           "code": "user_employee_code",
+                                                                           "day": "day_of_dob",
+                                                                           "month": "month_of_dob",
+                                                                           "year": "year_of_dob",
+                                                                           "branch": "branchname_ot _the_user",
+                                                                           "mobile": "user_mobile_number",
+                                                                           "city": "user_city",
+                                                                           "altemail": "alternate_email_id",
+                                                                           "status": "status_of_the_user",
+                                                                           "designation": "user_designation",
+                                                                           "department": "user_department",
+                                                                           "role": "role",
+                                                                           "org_name": "organisation_name",
+                                                                           "url": "website_url_of the_organisation",
+                                                                           "note": "note",
+                                                                           "timezone": "timezone",
+                                                                           "address": "address",
+                                                                           "state": "state",
+                                                                           "zip": "zipcode",
+                                                                           "country_code": "country_code",
+                                                                           "ph_work": "phone_no_of_office",
+                                                                           "ph_home": "phone_no_of_home",
+                                                                           "fax": "fax_no"
+                                                            }
+                                             }
+                              ]
+               }
+}
+Json Response (failure)
+{
+    "Action": "Edit User",
+    "Login": " admin_email_address_with_domain ",
+    "Sessionid": "K1KHKihRcUNY12WPvoUt1V4wWNU",
+    "Status": "Failure",
+    "ERROR": "User is not present"
+}
+ 
+XML  Response (success)
+<?xml version="1.0"?>
+<Rmail>
+    <Action>Edit User</Action>
+    <Login>
+        <![CDATA[admin_email_address_with_domain]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KHKihRcUNY12WPvoUt1V4wWNU]]>
+    </Sessionid>
+    <Status>Success</Status>
+    <UserDetails>
+        <User>
+            <Contact>
+                <Email>
+                    <![CDATA[user_email_address_with_domain]]>
+                </Email>
+                <fname>
+                    <![CDATA[user_firstname]]>
+                </fname>
+                <sname>
+                    <![CDATA[user_lastname]]>
+                </sname>
+                <nickname>
+                    <![CDATA[user_nickname]]>
+                </nickname>
+                <code>
+                    <![CDATA[user_employee_code]]>
+                </code>
+                <day>
+                    <![CDATA[day_of_dob]]>
+                </day>
+                <month>
+                    <![CDATA[mionth_of_dob]]>
+                </month>
+                <year>
+                    <![CDATA[year_of_dob]]>
+                </year>
+                <branch>
+                    <![CDATA[technology1]]>
+                </branch>
+                <mobile>
+                    <![CDATA[user_mobile_no]]>
+                </mobile>
+                <city>
+                    <![CDATA[user_city]]>
+                </city>
+                <altemail>
+                    <![CDATA[alternate_email_id]]>
+                </altemail>
+                <status>
+                    <![CDATA[status_of_the_user]]>
+                </status>
+                <designation>
+                    <![CDATA[user_designation]]>
+                </designation>
+                <department>
+                    <![CDATA[department]]>
+                </department>
+                <role>
+                    <![CDATA[role]]>
+                </role>
+                <org_name>
+                    <![CDATA[organization_name]]>
+                </org_name>
+                <url>
+                    <![CDATA[website_url]]>
+                </url>
+                <note>
+                    <![CDATA[note]]>
+                </note>
+                <timezone>
+                    <![CDATA[timezone]]>
+                </timezone>
+                <address>
+                    <![CDATA[address]]>
+                </address>
+                <state>
+                    <![CDATA[state]]>
+                </state>
+                <zip>
+                    <![CDATA[zipcode]]>
+                </zip>
+                <country_code>
+                    <![CDATA[country_code]]>
+                </country_code>
+                <ph_work>
+                    <![CDATA[phone_no_of_office]]>
+                </ph_work>
+                <ph_home>
+                    <![CDATA[phone_no_of_home]]>
+                </ph_home>
+                <fax>
+                    <![CDATA[fax_number]]>
+                </fax>
+            </Contact>
+        </User>
+               <User>
+            <Contact>
+                <Email>
+                    <![CDATA[user_email_address_with_domain]]>
+                </Email>
+                <fname>
+                    <![CDATA[user_firstname]]>
+                </fname>
+                <sname>
+                    <![CDATA[user_lastname]]>
+                </sname>
+                <nickname>
+                    <![CDATA[user_nickname]]>
+                </nickname>
+                <code>
+                    <![CDATA[user_employee_code]]>
+                </code>
+                <day>
+                    <![CDATA[day_of_dob]]>
+                </day>
+                <month>
+                    <![CDATA[mionth_of_dob]]>
+                </month>
+                <year>
+                    <![CDATA[year_of_dob]]>
+                </year>
+                <branch>
+                    <![CDATA[technology1]]>
+                </branch>
+                <mobile>
+                    <![CDATA[user_mobile_no]]>
+                </mobile>
+                <city>
+                    <![CDATA[user_city]]>
+                </city>
+                <altemail>
+                    <![CDATA[alternate_email_id]]>
+                </altemail>
+                <status>
+                    <![CDATA[status_of_the_user]]>
+                </status>
+                <designation>
+                    <![CDATA[user_designation]]>
+                </designation>
+                <department>
+                    <![CDATA[department]]>
+                </department>
+                <role>
+                    <![CDATA[role]]>
+                </role>
+                <org_name>
+                    <![CDATA[organization_name]]>
+                </org_name>
+                <url>
+                    <![CDATA[website_url]]>
+                </url>
+                <note>
+                    <![CDATA[note]]>
+                </note>
+                <timezone>
+                    <![CDATA[timezone]]>
+                </timezone>
+                <address>
+                    <![CDATA[address]]>
+                </address>
+                <state>
+                    <![CDATA[state]]>
+                </state>
+                <zip>
+                    <![CDATA[zipcode]]>
+                </zip>
+                <country_code>
+                    <![CDATA[country_code]]>
+                </country_code>
+                <ph_work>
+                    <![CDATA[phone_no_of_office]]>
+                </ph_work>
+                <ph_home>
+                    <![CDATA[phone_no_of_home]]>
+                </ph_home>
+                <fax>
+                    <![CDATA[fax_number]]>
+                </fax>
+            </Contact>
+        </User>
+    </UserDetails>
+</Rmail>
+ 
+XML  Response (failure)
+<?xml version="1.0"?>
+<Rmail>
+    <Action>Edit User</Action>
+    <Login>
+        <![CDATA[admin_email_address_with_domain]]>
+    </Login>
+    <Sessionid>
+        <![CDATA[K1KHKihRcUNY12WPvoUt1V4wWNU]]>
+    </Sessionid>
+    <Status>Failure</Status>
+    <ERROR>User is not present</ERROR>
+</Rmail>
+ 
+New user creation
+As stated earlier, new user is either created using a common interface like active directory or through GUIs provided by Rediffmail Pro and Microsoft exchange or Lotus notes, etc. When a user is created on Exchange or Notes, it should get automatically added into global address book maintained on Rediff platform as a contact and vice versa.
+•       Use case 1: User added on Exchange/Office365 using AD
+In this use case, a new user is desired to have her mailbox on exchange/office 365 platform. Administrator adds a new user to active directory and indicates that it is a exchange/O365 user. Active directory integration with exchange/O365 ensures that the user is automatically created on exchange/O365 platform and it also gets added to the global address book maintained on exchange/O365 platform.
+ 
+However, this user still needs to be added to global address book on Rediff platform. Administrator should use ‘Create creation’ API to add user to Rediff’s global address book.
+ 
+ 
+•        Use case 2: User added on Rediff platform through AD
+In this use case, new user in the organization is desired to have a mailbox on the Rediffmail enterprise platform.
+ 
+ 
+While adding a new user in the organization to active directory using a power shell script, call ‘User creation’ API in the same script and user will get created on the Rediffmail Pro platform. Now to add same user to global address book maintained at exchange server, create a new user in exchange server as ‘Users with external email addresses’ or ‘contacts with external email addresses’ based on requirement. This makes sure that the information of the new user added on the Rediffmail Pro platform is available to the entire users on exchange server.

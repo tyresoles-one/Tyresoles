@@ -21,7 +21,7 @@ public class ItemCategoryProductGroup
     public SaleType SaleType { get; set; }
     public string? Product { get; set; }
     public System.Collections.Generic.List<string>? ItemCategories { get; set; }
-    public string? ProductGroup { get; set; }
+    public System.Collections.Generic.List<string>? ProductGroup { get; set; }
     public System.Collections.Generic.List<string>? Items { get; set; }
     public string? Name { get; set; }
     public double Unit { get; set; }

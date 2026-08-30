@@ -71,6 +71,11 @@ public sealed class SalesService : ISalesService
         var navDealer = MapSaveInputToNavCreateDealer(input, customerNo);
         await _connector.CreateDealerAsync(navDealer).ConfigureAwait(false);
 
+        var existingDealer = await scope.Query<SalespersonPurchaser>()
+            .Where(s => s.Code == code)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
         // Direct SQL update for full field set (SOAP CreateDealer does not include Mobile, Status, etc.).
         var dealer = new SalespersonPurchaser
         {
@@ -94,7 +99,14 @@ public sealed class SalesService : ISalesService
             BankName = input.BankName ?? "",
             BankACNo = input.BankACNo ?? "",
             BankBranch = input.BankBranch ?? "",
-            BankIFSC = input.BankIFSC ?? ""
+            BankIFSC = input.BankIFSC ?? "",
+            ResponsibilityCenter = existingDealer?.ResponsibilityCenter ?? "",
+            Group = existingDealer?.Group ?? "",
+            Depot = existingDealer?.Depot ?? "",
+            PrimaryCustomerNo = existingDealer?.PrimaryCustomerNo ?? "",
+            BasePriceMaster = existingDealer?.BasePriceMaster ?? "",
+            GlobalDimension1Code = existingDealer?.GlobalDimension1Code ?? "",
+            GlobalDimension2Code = existingDealer?.GlobalDimension2Code ?? ""
         };
 
         await scope.UpdateAsync(dealer, ct).ConfigureAwait(false);

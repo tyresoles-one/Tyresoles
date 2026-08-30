@@ -48,9 +48,12 @@
                     </button>
 
                     <div class="grid grid-cols-2 gap-3">
-                        <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all group opacity-60 hover:opacity-100">
-                             <Icon name="user-cog" class="size-5 mb-2 text-muted-foreground group-hover:text-primary" />
-                             <span class="text-[11px] font-bold">Manage Users</span>
+                        <button 
+                            onclick={() => goto('/email-accounts')}
+                            class="flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all group active:scale-95"
+                        >
+                             <Icon name="mail" class="size-5 mb-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                             <span class="text-[11px] font-bold group-hover:text-primary transition-colors">Email Accounts</span>
                         </button>
                         <button 
                             onclick={() => goto('/vendors')}

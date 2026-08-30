@@ -2756,7 +2756,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",                
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "GIANT",
+            ProductGroup = new List<string> { "GIANT" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2765,7 +2765,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",                
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "RADIAL G",
+            ProductGroup = new List<string> { "RADIAL G" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2774,7 +2774,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",                
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "LCV",
+            ProductGroup = new List<string> { "LCV" },
             Unit = 0.5
         });
         products.Add(new ItemCategoryProductGroup
@@ -2783,7 +2783,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",                
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "PASS",
+            ProductGroup = new List<string> { "PASS" },
             Unit = 0.33
         });
         products.Add(new ItemCategoryProductGroup
@@ -2792,7 +2792,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",                
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "TRACTOR",
+            ProductGroup = new List<string> { "TRACTOR" },
             Unit = 2
         });
         products.Add(new ItemCategoryProductGroup
@@ -2801,7 +2801,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "OTR",
+            ProductGroup = new List<string> { "OTR" },
             Unit = 7.00
         });
         products.Add(new ItemCategoryProductGroup
@@ -2810,7 +2810,7 @@ LEFT JOIN (
             SaleType = SaleType.Retread,
             Product = "Retread Tyre",
             ItemCategories = new List<string> { "RETD" },
-            ProductGroup = "OTR 1",
+            ProductGroup = new List<string> { "OTR 1" },
             Unit = 3.00
         });
         #endregion Retread
@@ -2821,7 +2821,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "GIANT",
+            ProductGroup = new List<string> { "GIANT" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2830,7 +2830,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "RADIAL G",
+            ProductGroup = new List<string> { "RADIAL G" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2839,7 +2839,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "LCV",
+            ProductGroup = new List<string> { "LCV" },
             Unit = 0.5
         });
         products.Add(new ItemCategoryProductGroup
@@ -2848,7 +2848,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "PASS",
+            ProductGroup = new List<string> { "PASS" },
             Unit = 0.33
         });
         products.Add(new ItemCategoryProductGroup
@@ -2857,7 +2857,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "TRACTOR",
+            ProductGroup = new List<string> { "TRACTOR" },
             Unit = 2
         });
         products.Add(new ItemCategoryProductGroup
@@ -2866,7 +2866,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "OTR",
+            ProductGroup = new List<string> { "OTR" },
             Unit = 7.00
         });
         products.Add(new ItemCategoryProductGroup
@@ -2875,7 +2875,7 @@ LEFT JOIN (
             SaleType = SaleType.Ecomile,
             Product = "Ecomile Tyre",
             ItemCategories = new List<string> { "ECOMILE" },
-            ProductGroup = "OTR 1",
+            ProductGroup = new List<string> { "OTR 1" },
             Unit = 3.00
         });
         #endregion Ecomile
@@ -2894,7 +2894,7 @@ LEFT JOIN (
             Id = 1,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "GIANT",
+            ProductGroup = new List<string> { "GIANT" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2902,7 +2902,7 @@ LEFT JOIN (
             Id = 2,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "RADIAL G",
+            ProductGroup = new List<string> { "RADIAL G" },
             Unit = 1
         });
         products.Add(new ItemCategoryProductGroup
@@ -2910,7 +2910,7 @@ LEFT JOIN (
             Id = 3,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "LCV",
+            ProductGroup = new List<string> { "LCV" },
             Unit = 0.5
         });
         products.Add(new ItemCategoryProductGroup
@@ -2918,7 +2918,7 @@ LEFT JOIN (
             Id = 4,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "PASS",
+            ProductGroup = new List<string> { "PASS" },
             Unit = 0.33
         });
         products.Add(new ItemCategoryProductGroup
@@ -2926,7 +2926,7 @@ LEFT JOIN (
             Id = 5,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "TRACTOR",
+            ProductGroup = new List<string> { "TRACTOR" },
             Unit = 2
         });
         products.Add(new ItemCategoryProductGroup
@@ -2934,7 +2934,7 @@ LEFT JOIN (
             Id = 6,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "OTR",
+            ProductGroup = new List<string> { "OTR" },
             Unit = 7.00
         });
         products.Add(new ItemCategoryProductGroup
@@ -2942,7 +2942,7 @@ LEFT JOIN (
             Id = 7,
             SaleType = SaleType.IcTyre,                
             ItemCategories = new List<string> { "ECOMILE", "RETD", "CASING" },
-            ProductGroup = "OTR 1",
+            ProductGroup = new List<string> { "OTR 1" },
             Unit = 3.00
         });
         #endregion Intercompany Retd
@@ -2952,14 +2952,14 @@ LEFT JOIN (
             Id = 1,
             SaleType = SaleType.Scrap,
             ItemCategories = new List<string> { "SCRAP" },
-            ProductGroup = "RUBDUST",
+            ProductGroup = new List<string> { "RUBDUST" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 2,
             SaleType = SaleType.Scrap,
             ItemCategories = new List<string> { "SCRAP" },
-            ProductGroup = "RUB SCRAP",
+            ProductGroup = new List<string> { "RUB SCRAP" },
             Items = new List<string> { "RUB SCRP RDL" },
             Name="RUB RDL"
         });
@@ -2968,7 +2968,7 @@ LEFT JOIN (
             Id = 3,
             SaleType = SaleType.Scrap,
             ItemCategories = new List<string> { "SCRAP" },
-            ProductGroup = "RUB SCRAP",
+            ProductGroup = new List<string> { "RUB SCRAP" },
             Items = new List<string> { "RUB SCRP NYL" },
             Name = "RUB NYL"
         });
@@ -2977,7 +2977,7 @@ LEFT JOIN (
             Id = 4,
             SaleType = SaleType.Scrap,
             ItemCategories = new List<string> { "SCRAP" },
-            ProductGroup = "RUB SCRAP",
+            ProductGroup = new List<string> { "RUB SCRAP" },
             Items = new List<string> { "RUB SCRP BEED" },
             Name = "RUB BEED"
         });
@@ -2989,49 +2989,66 @@ LEFT JOIN (
             Id = 1,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TILES",
+            ProductGroup = new List<string> { "TILES" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 2,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "PLAYSAFE",
+            ProductGroup = new List<string> { "PLAYSAFE" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 3,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "RUNTRACK",
+            ProductGroup = new List<string> { "RUNTRACK", "RUNATHON" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 4,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "OUTDOORS",
+            ProductGroup =  new List<string> { "OUTDOORS" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 5,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "INDOORSP",
+            ProductGroup = new List<string> { "INDOORSP" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 6,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "CHARGE",
+            ProductGroup = new List<string> { "RUBBER ROL" },
+            Name = "RUBBER ROLL"
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 7,
             SaleType = SaleType.Ecoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "OTHERS",
+            ProductGroup = new List<string> { "TURF" },            
+        });
+        products.Add(new ItemCategoryProductGroup
+        {
+            Id = 8,
+            SaleType = SaleType.Ecoflex,
+            ItemCategories = new List<string> { "FIN-GOODS" },
+            ProductGroup = new List<string> { "CHARGE" },
+            Name = "LABOUR CHARGES"
+        });
+        products.Add(new ItemCategoryProductGroup
+        {
+            Id = 9,
+            SaleType = SaleType.Ecoflex,
+            ItemCategories = new List<string> { "FIN-GOODS" },
+            ProductGroup = new List<string> { "OTHERS" },
+            Name = "REWORK/OTHERS"
         });
         #endregion Ecoflex
         #region Intercompany Ecoflex
@@ -3040,21 +3057,21 @@ LEFT JOIN (
             Id = 1,
             SaleType = SaleType.IcEcoflex,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TILES",
+            ProductGroup = new List<string> { "TILES" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 2,
             SaleType = SaleType.IcEcoflex,
             ItemCategories = new List<string> { "RAW-MAT" },
-            ProductGroup = "EPDM",
+            ProductGroup = new List<string> { "EPDM" },
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 3,
             SaleType = SaleType.IcEcoflex,
             ItemCategories = new List<string> { "RAW-MAT" },
-            ProductGroup = "BINDER",
+            ProductGroup = new List<string> { "BINDER" },
         });
         #endregion Intercompany Ecoflex
         #region Trading
@@ -3062,14 +3079,14 @@ LEFT JOIN (
         {
             Id = 1,
             ItemCategories = new List<string> { "TRADE" },
-            ProductGroup = "TUBE",
+            ProductGroup = new List<string> { "TUBE" },
             SaleType = SaleType.FlapTube,
         });
         products.Add(new ItemCategoryProductGroup
         {
             Id = 2,
             ItemCategories = new List<string> { "TRADE" },
-            ProductGroup = "FLAP",
+            ProductGroup = new List<string> { "FLAP" },
             SaleType = SaleType.FlapTube,
         });
         #endregion Trading
@@ -3079,7 +3096,7 @@ LEFT JOIN (
             Id = 1,
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TRADE-RUBB",
+            ProductGroup = new List<string> { "TRADE-RUBB" },
             Items = new List<string> { "RUBBER-PCP", "RUBBER-RADIAL-PRM" },
             Name = "Rubber PCP"
         });
@@ -3088,7 +3105,7 @@ LEFT JOIN (
             Id = 2,
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TRADE-RUBB",
+            ProductGroup = new List<string> { "TRADE-RUBB" },
             Items = new List<string> { "RUBBER-HOT", "RUBBER-RADIAL" },
             Name = "Rubber HOT"
         });
@@ -3097,7 +3114,7 @@ LEFT JOIN (
             Id = 3,
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TRADE-RUBB",
+            ProductGroup = new List<string> { "TRADE-RUBB" },
             Items = new List<string> { "RUBBER-PORT" },
             Name = "Rubber OTR"
         });
@@ -3106,7 +3123,7 @@ LEFT JOIN (
             Id = 4,
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TRADE-RUBB",
+            ProductGroup = new List<string> { "TRADE-RUBB" },
             Items = new List<string> { "RUBBER-PATTI" },
             Name = "Rubber Patti"
         });
@@ -3115,7 +3132,7 @@ LEFT JOIN (
             Id = 4,
             SaleType = SaleType.TreadRubber,
             ItemCategories = new List<string> { "FIN-GOODS" },
-            ProductGroup = "TRADE-RUBB",
+            ProductGroup = new List<string> { "TRADE-RUBB" },
             Items = new List<string> { "RUBBER-BGUM" },
             Name = "Bonding Gum"
         });

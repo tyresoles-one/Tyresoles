@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -65,24 +66,30 @@
 
 	$effect(() => {
 		if (open) {
-			// Reset selections when opened
-			coolDownDays = null;
-			if (isSingleLocation) {
-				dialogFormValues.respCenter = userLocations[0].code || '';
-			} else {
-				dialogFormValues.respCenter = '';
-			}
-			dialogFormValues.areas = '';
-			
-			selectedProducts = [];
-			selectedStates = [];
-			selectedCities = [];
-			selectedTags = [];
-			selectedTypes = [];
-			selectedCategories = [];
+			untrack(() => {
+				coolDownDays = null;
+				if (isSingleLocation) {
+					dialogFormValues.respCenter = userLocations[0]?.code || '';
+				} else {
+					dialogFormValues.respCenter = '';
+				}
+				dialogFormValues.areas = '';
+				
+				selectedProducts = [];
+				selectedStates = [];
+				selectedCities = [];
+				selectedTags = [];
+				selectedTypes = [];
+				selectedCategories = [];
+			});
+		}
+	});
 
-			fetchProducts(dialogFormValues.respCenter);
-			fetchLookups(dialogFormValues.respCenter);
+	$effect(() => {
+		if (open) {
+			const rc = dialogFormValues.respCenter;
+			fetchProducts(rc);
+			fetchLookups(rc);
 		}
 	});
 
