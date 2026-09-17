@@ -69,9 +69,9 @@ export interface TreeNode {
 
 export interface FetchOutstandingParams {
   asOfDate?: string;
-  region?: string;
+  regions?: string[];
   product?: string;
   respCenters?: string[];
-  agingFilter?: AgingFilterOption;
+  agingFilters?: AgingFilterOption[];
   search?: string;
 }

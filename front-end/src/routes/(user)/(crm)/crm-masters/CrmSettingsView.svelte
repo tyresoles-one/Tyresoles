@@ -47,7 +47,9 @@
 
 	onMount(async () => {
 		try {
-			const res = await graphqlQuery(GetCrmSettingDocument, { variables: { key: SETTING_KEY } });
+			const res = await graphqlQuery<{ getCrmSetting: { key: string; value: string } | null }>(GetCrmSettingDocument, {
+				variables: { key: SETTING_KEY }
+			});
 			if (res.data?.getCrmSetting?.value) {
 				mappings = JSON.parse(res.data.getCrmSetting.value);
 			} else {

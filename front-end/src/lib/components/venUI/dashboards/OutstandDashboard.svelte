@@ -18,6 +18,7 @@
     endOfMonth,
   } from "@internationalized/date";
   import { fetchOutstandingData } from "./outstand-dashboard/api";
+  import { Select } from "$lib/components/venUI/select";
   import type {
     OutstandingRow,
     OutstandingInvoice,
@@ -36,11 +37,22 @@
   let rows = $state<OutstandingRow[]>([]);
   let expanded = $state<Record<string, boolean>>({});
   let groupingMode = $state<GroupingMode>("region-dealer-customer");
-  let agingFilter = $state<AgingFilterOption>("all");
-  let selectedRegion = $state<string>("ALL");
-  let selectedProduct = $state<string>("ALL");
-  let selectedRespCenter = $state<string>("ALL");
+  let selectedRegions = $state<string[]>([]);
+  let selectedProducts = $state<string[]>([]);
+  let selectedRespCenters = $state<string[]>([]);
+  let selectedAgingFilters = $state<string[]>([]);
   let searchQuery = $state<string>("");
+
+  const agingOptions = [
+    { value: "below30", label: "Below 30 Days (Current)" },
+    { value: "below60", label: "Below 60 Days" },
+    { value: "below90", label: "Below 90 Days" },
+    { value: "above30", label: "Above 30 Days Overdue" },
+    { value: "above60", label: "Above 60 Days Overdue" },
+    { value: "above90", label: "Above 90 Days Overdue" },
+    { value: "above180", label: "Above 180 Days Overdue" },
+    { value: "above365", label: "Above 365 Days (Critical)" },
+  ];
 
   // Modal / Detail state
   let detailOpen = $state(false);
@@ -108,14 +120,20 @@
     return Array.from(set).sort();
   });
 
+  const EXCLUDED_RESP_CENTERS = new Set(["GOA", "HO", "MUM", "PUN"]);
+
   const availableRespCenters = $derived.by(() => {
     const set = new Set<string>();
     const locs = $authStore.locations ?? [];
     for (const l of locs) {
-      if (l.code) set.add(l.code);
+      if (l.code && !EXCLUDED_RESP_CENTERS.has(l.code.trim().toUpperCase())) {
+        set.add(l.code);
+      }
     }
     for (const r of rows) {
-      if (r.respCenter) set.add(r.respCenter);
+      if (r.respCenter && !EXCLUDED_RESP_CENTERS.has(r.respCenter.trim().toUpperCase())) {
+        set.add(r.respCenter);
+      }
     }
     return Array.from(set).sort();
   });
@@ -124,16 +142,19 @@
   const filteredRows = $derived.by(() => {
     let list = rows;
 
-    if (selectedRegion !== "ALL") {
-      list = list.filter((r) => r.region.toLowerCase() === selectedRegion.toLowerCase());
+    if (selectedRegions.length > 0) {
+      const set = new Set(selectedRegions.map((s) => s.toLowerCase()));
+      list = list.filter((r) => r.region && set.has(r.region.toLowerCase()));
     }
 
-    if (selectedProduct !== "ALL") {
-      list = list.filter((r) => r.product.toLowerCase().includes(selectedProduct.toLowerCase()));
+    if (selectedProducts.length > 0) {
+      const set = new Set(selectedProducts.map((s) => s.toLowerCase()));
+      list = list.filter((r) => r.product && set.has(r.product.toLowerCase()));
     }
 
-    if (selectedRespCenter !== "ALL") {
-      list = list.filter((r) => r.respCenter?.toLowerCase() === selectedRespCenter.toLowerCase());
+    if (selectedRespCenters.length > 0) {
+      const set = new Set(selectedRespCenters.map((s) => s.toLowerCase()));
+      list = list.filter((r) => r.respCenter && set.has(r.respCenter.toLowerCase()));
     }
 
     if (searchQuery.trim()) {
@@ -148,18 +169,20 @@
       );
     }
 
-    if (agingFilter === "all") return list;
+    if (selectedAgingFilters.length === 0) return list;
 
     return list.filter((r) => {
-      if (agingFilter === "below30") return r.bucket0_30 > 0;
-      if (agingFilter === "below60") return r.bucket0_30 + r.bucket31_60 > 0;
-      if (agingFilter === "below90") return r.bucket0_30 + r.bucket31_60 + r.bucket61_90 > 0;
-      if (agingFilter === "above30") return r.totalBalance - r.bucket0_30 > 0;
-      if (agingFilter === "above60") return r.totalBalance - (r.bucket0_30 + r.bucket31_60) > 0;
-      if (agingFilter === "above90") return r.bucket91_180 + r.bucket181_365 + r.bucketOver365 > 0;
-      if (agingFilter === "above180") return r.bucket181_365 + r.bucketOver365 > 0;
-      if (agingFilter === "above365") return r.bucketOver365 > 0;
-      return true;
+      return selectedAgingFilters.some((f) => {
+        if (f === "below30") return r.bucket0_30 > 0;
+        if (f === "below60") return r.bucket0_30 + r.bucket31_60 > 0;
+        if (f === "below90") return r.bucket0_30 + r.bucket31_60 + r.bucket61_90 > 0;
+        if (f === "above30") return r.totalBalance - r.bucket0_30 > 0;
+        if (f === "above60") return r.totalBalance - (r.bucket0_30 + r.bucket31_60) > 0;
+        if (f === "above90") return r.bucket91_180 + r.bucket181_365 + r.bucketOver365 > 0;
+        if (f === "above180") return r.bucket181_365 + r.bucketOver365 > 0;
+        if (f === "above365") return r.bucketOver365 > 0;
+        return true;
+      });
     });
   });
 
@@ -426,16 +449,37 @@
 
   function toIso(date: unknown): string {
     if (!date) return "";
-    if (typeof date === "string") return new Date(date).toISOString();
-    if (
-      date &&
-      typeof date === "object" &&
-      "toDate" in date &&
-      typeof (date as { toDate: unknown }).toDate === "function"
-    ) {
-      return (date as { toDate: (tz: unknown) => Date }).toDate(
-        getLocalTimeZone()
-      ).toISOString();
+    if (typeof date === "string") {
+      if (/^\d{4}-\d{2}-\d{2}/.test(date)) {
+        return date.substring(0, 10);
+      }
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+      return date;
+    }
+    if (date && typeof date === "object") {
+      if ("year" in date && "month" in date && "day" in date) {
+        const y = String((date as { year: number }).year);
+        const m = String((date as { month: number }).month).padStart(2, "0");
+        const d = String((date as { day: number }).day).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+      if ("toDate" in date && typeof (date as { toDate: unknown }).toDate === "function") {
+        try {
+          const d = (date as { toDate: (tz: unknown) => Date }).toDate(getLocalTimeZone());
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        } catch {
+          // ignore
+        }
+      }
     }
     return "";
   }
@@ -455,10 +499,8 @@
     const res = await fetchOutstandingData(
       {
         asOfDate,
-        region: selectedRegion,
-        product: selectedProduct,
-        respCenters: selectedRespCenter !== "ALL" ? [selectedRespCenter] : undefined,
-        agingFilter,
+        regions: selectedRegions.length > 0 ? selectedRegions : undefined,
+        respCenters: selectedRespCenters.length > 0 ? selectedRespCenters : undefined,
         search: searchQuery,
       },
       signal
@@ -689,64 +731,57 @@
       </div>
 
       <!-- Responsibility Center Filter -->
-      <div class="flex items-center gap-2 bg-background/50 border border-input rounded-xl px-3 h-9">
-        <Icon name="building" class="size-4 text-muted-foreground shrink-0" />
-        <select
-          bind:value={selectedRespCenter}
-          class="w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none cursor-pointer"
-        >
-          <option value="ALL">All Resp Centers</option>
-          {#each availableRespCenters as rc}
-            <option value={rc}>{rc}</option>
-          {/each}
-        </select>
+      <div class="w-full">
+        <Select
+          options={availableRespCenters}
+          bind:value={selectedRespCenters}
+          multiple={true}
+          clearable={true}
+          placeholder="All Resp Centers"
+          searchPlaceholder="Search Resp Centers..."
+          class="h-9 w-full rounded-xl border-input bg-background/50 text-xs sm:text-sm font-medium"
+        />
       </div>
 
       <!-- Region Filter -->
-      <div class="flex items-center gap-2 bg-background/50 border border-input rounded-xl px-3 h-9">
-        <Icon name="map-pin" class="size-4 text-muted-foreground shrink-0" />
-        <select
-          bind:value={selectedRegion}
-          class="w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none cursor-pointer"
-        >
-          <option value="ALL">All Regions</option>
-          {#each availableRegions as reg}
-            <option value={reg}>{reg} Region</option>
-          {/each}
-        </select>
+      <div class="w-full">
+        <Select
+          options={availableRegions}
+          bind:value={selectedRegions}
+          multiple={true}
+          clearable={true}
+          placeholder="All Regions"
+          searchPlaceholder="Search Regions..."
+          class="h-9 w-full rounded-xl border-input bg-background/50 text-xs sm:text-sm font-medium"
+        />
       </div>
 
       <!-- Product Filter -->
-      <div class="flex items-center gap-2 bg-background/50 border border-input rounded-xl px-3 h-9">
-        <Icon name="package" class="size-4 text-muted-foreground shrink-0" />
-        <select
-          bind:value={selectedProduct}
-          class="w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none cursor-pointer"
-        >
-          <option value="ALL">All Products</option>
-          {#each availableProducts as prod}
-            <option value={prod}>{prod}</option>
-          {/each}
-        </select>
+      <div class="w-full">
+        <Select
+          options={availableProducts}
+          bind:value={selectedProducts}
+          multiple={true}
+          clearable={true}
+          placeholder="All Products"
+          searchPlaceholder="Search Products..."
+          class="h-9 w-full rounded-xl border-input bg-background/50 text-xs sm:text-sm font-medium"
+        />
       </div>
 
       <!-- Aging Bucket Filter -->
-      <div class="flex items-center gap-2 bg-background/50 border border-input rounded-xl px-3 h-9">
-        <Icon name="clock" class="size-4 text-muted-foreground shrink-0" />
-        <select
-          bind:value={agingFilter}
-          class="w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none cursor-pointer text-primary"
-        >
-          <option value="all">All Aging Buckets</option>
-          <option value="below30">Below 30 Days (Current)</option>
-          <option value="below60">Below 60 Days</option>
-          <option value="below90">Below 90 Days</option>
-          <option value="above30">Above 30 Days Overdue</option>
-          <option value="above60">Above 60 Days Overdue</option>
-          <option value="above90">Above 90 Days Overdue</option>
-          <option value="above180">Above 180 Days Overdue</option>
-          <option value="above365">Above 365 Days (Critical)</option>
-        </select>
+      <div class="w-full">
+        <Select
+          options={agingOptions}
+          bind:value={selectedAgingFilters}
+          valueKey="value"
+          labelKey="label"
+          multiple={true}
+          clearable={true}
+          placeholder="All Aging Buckets"
+          searchPlaceholder="Search Aging Brackets..."
+          class="h-9 w-full rounded-xl border-input bg-background/50 text-xs sm:text-sm font-medium text-primary"
+        />
       </div>
     </div>
   </div>

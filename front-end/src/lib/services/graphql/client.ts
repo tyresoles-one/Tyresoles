@@ -231,15 +231,21 @@ async function attemptRefreshTokens(): Promise<boolean> {
 
 function isUnauthorizedError(error: unknown): boolean {
   if (!error) return false;
-  const str = String(error);
-  if (str.includes("401") || str.includes("UNAUTHENTICATED")) return true;
   if (typeof error === "object" && "response" in error) {
     const res = (error as any).response;
     if (res?.status === 401) return true;
     const errors = res?.errors || [];
-    return errors.some((e: any) => e.extensions?.code === "UNAUTHENTICATED" || e.message?.toLowerCase().includes("unauthenticated") || e.message?.toLowerCase().includes("unauthorized"));
+    if (errors.some((e: any) => 
+      e.extensions?.code === "UNAUTHENTICATED" || 
+      e.extensions?.code === "AUTH_NOT_AUTHENTICATED" ||
+      e.message?.toLowerCase().includes("unauthenticated") || 
+      e.message?.toLowerCase().includes("unauthorized")
+    )) {
+      return true;
+    }
   }
-  return false;
+  const message = (error as any)?.message || String(error);
+  return /\b401\b/.test(message) && (message.toLowerCase().includes("status") || message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("unauthenticated"));
 }
 
 export { clearUserSession };

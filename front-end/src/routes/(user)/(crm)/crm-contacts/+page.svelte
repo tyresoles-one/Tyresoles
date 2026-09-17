@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { buildQuery, buildMutation, graphqlQuery } from '$lib/services/graphql';
 	import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
@@ -9,12 +10,12 @@
 	import { toast } from '$lib/components/venUI/toast';
 	import { TableActions } from '$lib/components/venUI/tableActions';
 	import { DataGrid, type DataGridColumn, type FilterRule } from '$lib/components/venUI/datagrid';
-	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth';
 
 	type CrmContact = {
 		id: string;
 		contactType?: string | null;
+		contactCategory?: string | null;
 		fullName: string;
 		companyName?: string | null;
 		mobileNo?: string | null;
@@ -29,8 +30,16 @@
 		erpAreaCodes?: string | null;
 		products?: string | null;
 		tags?: string | null;
+		division?: string | null;
+		targetProduct?: string | null;
+		leadSourceType?: string | null;
+		leadSourceChannel?: string | null;
+		sourceUrl?: string | null;
+		qualityScore?: number | null;
 		isActive: boolean;
 		createdBy?: string | null;
+		prefLanguage?: string | null;
+		location?: string | null;
 	};
 
 	type CrmMasterItem = {
@@ -87,8 +96,16 @@
 					erpAreaCodes
 					products
 					tags
+					division
+					targetProduct
+					leadSourceType
+					leadSourceChannel
+					sourceUrl
+					qualityScore
 					isActive
 					createdBy
+					prefLanguage
+					location
 				}
 				totalCount
 			}
@@ -114,8 +131,16 @@
 				erpAreaCodes
 				products
 				tags
+				division
+				targetProduct
+				leadSourceType
+				leadSourceChannel
+				sourceUrl
+				qualityScore
 				isActive
 				createdBy
+				prefLanguage
+				location
 			}
 		}
 	` as unknown as TypedDocumentNode<SaveCrmContactResult, { input: any }>;
@@ -143,7 +168,10 @@
 					{ mobileNo: { contains: q } },
 					{ emailIds: { contains: q } },
 					{ city: { contains: q } },
-					{ tags: { contains: q } }
+					{ tags: { contains: q } },
+					{ leadSourceChannel: { contains: q } },
+					{ prefLanguage: { contains: q } },
+					{ location: { contains: q } }
 				]
 			});
 		}
@@ -162,7 +190,8 @@
 						operator = 'eq';
 					}
 				}
-				return { [r.columnId]: { [operator]: val } };
+				const colKey = r.columnId === 'LeadSourceChannel' ? 'leadSourceChannel' : r.columnId;
+				return { [colKey]: { [operator]: val } };
 			});
 			andConds.push(...filterConds);
 		}
@@ -265,14 +294,35 @@
 	const columns: DataGridColumn<CrmContact>[] = [
 		{ accessorKey: 'fullName', header: 'Full Name' },
 		{ accessorKey: 'companyName', header: 'Company' },
-		{ accessorKey: 'erpCustomerNos', header: 'ERP Customer No' },
-		{ accessorKey: 'contactType', header: 'Type' },
-		{ accessorKey: 'contactCategory', header: 'Category' },
+		{ accessorKey: 'division', header: 'Division' },
+		{ accessorKey: 'targetProduct', header: 'Target Product' },
+		{
+			accessorKey: 'leadSourceType',
+			header: 'Source',
+			cell: ({ row }) => {
+				const type = row.original.leadSourceType || 'Manual';
+				const channel = row.original.leadSourceChannel;
+				return channel ? `${type} (${channel})` : type;
+			}
+		},
+		{
+			accessorKey: 'leadSourceChannel',
+			header: 'Lead Source Channel',
+			cell: ({ getValue }) => getValue() || '—'
+		},
 		{ accessorKey: 'mobileNo', header: 'Mobile' },
-		{ accessorKey: 'emailIds', header: 'Email' },
+		{
+			accessorKey: 'prefLanguage',
+			header: 'Pref Language',
+			cell: ({ getValue }) => getValue() || '—'
+		},
 		{ accessorKey: 'city', header: 'City' },
 		{ accessorKey: 'state', header: 'State' },
-		{ accessorKey: 'products', header: 'Products' },
+		{
+			accessorKey: 'location',
+			header: 'Location',
+			cell: ({ getValue }) => getValue() || '—'
+		},
 		{ accessorKey: 'respCenter', header: 'Resp Center' },
 		{
 			accessorKey: 'isActive',
@@ -305,14 +355,25 @@
 		mobileCardFallback={true}
 	>
 		{#snippet actions()}
-			<Button
-				size="sm"
-				class="gap-2 shrink-0 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-sm rounded-xl px-4 py-2 transition-all"
-				onclick={openAddDialog}
-			>
-				<Icon name="plus" class="size-3.5" />
-				<span>Add Contact</span>
-			</Button>
+			<div class="flex items-center gap-2">
+				<a
+					href="/crm-masters?category=leads"
+					target="_blank"
+					class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-xs"
+					title="Manage Contact Types, Categories, and Sources in CRM Masters"
+				>
+					<Icon name="database" class="size-3.5 text-primary" />
+					<span>CRM Masters</span>
+				</a>
+				<Button
+					size="sm"
+					class="gap-2 shrink-0 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-sm rounded-xl px-4 py-2 transition-all"
+					onclick={openAddDialog}
+				>
+					<Icon name="plus" class="size-3.5" />
+					<span>Add Contact</span>
+				</Button>
+			</div>
 		{/snippet}
 	</DataGrid>
 </div>

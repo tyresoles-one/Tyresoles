@@ -13,6 +13,10 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 
+	import { DatePicker, DatePresets, type PresetEntry } from '$lib/components/venUI/date-picker';
+	import { Select } from '$lib/components/venUI/select';
+	import { today, getLocalTimeZone, CalendarDate } from '@internationalized/date';
+
 	import {
 		GetAllCrmCallLogsDocument,
 		GetCrmAgentContactsDocument,
@@ -20,6 +24,9 @@
 		GetCrmCallLogUsersDocument,
 		GetAllCrmCallRemindersDocument,
 		CompleteCrmReminderDocument,
+		GetMyDocumentsDocument,
+		UpdateCrmCallLogInvoicesDocument,
+		type DocumentDto,
 		type DetailedCallLog,
 		type CrmAgentContactInfo,
 		type CrmContactInfo,
@@ -28,12 +35,22 @@
 
 	// Filters State
 	let datePreset = $state<'today' | 'yesterday' | 'week' | 'month' | 'custom' | 'all'>('week');
-	let fromDate = $state<string>('');
-	let toDate = $state<string>('');
+	let dateRange = $state<{ start: any; end: any } | undefined>();
 	let selectedOutcome = $state<string>('ALL');
 	let textSearch = $state<string>('');
 	let remindersOnly = $state<boolean>(false);
 	let selectedAllocatedContact = $state<CrmAgentContactInfo | null>(null);
+
+	// Date Presets for venUI DatePicker
+	const nowCal = today(getLocalTimeZone());
+	const callLogPresets: PresetEntry[] = [
+		{ label: 'Today', value: { start: nowCal, end: nowCal } },
+		{ label: 'Yesterday', value: { start: nowCal.subtract({ days: 1 }), end: nowCal.subtract({ days: 1 }) } },
+		{ label: 'Last 7 Days', value: { start: nowCal.subtract({ days: 7 }), end: nowCal } },
+		{ label: 'Last 30 Days', value: { start: nowCal.subtract({ days: 30 }), end: nowCal } },
+		DatePresets.range.thisMonth(nowCal),
+		DatePresets.range.lastMonth(nowCal)
+	];
 
 	// User / Agent Multi-Select Filter State
 	let availableUsers = $state<string[]>([]);
@@ -80,34 +97,270 @@
 	let showReminderModal = $state<boolean>(false);
 	let isCompletingReminder = $state<boolean>(false);
 
+	// Sales Invoices (last 30 days & respCenter 'BEL')
+	let salesInvoices = $state<DocumentDto[]>([]);
+	let isLoadingInvoices = $state<boolean>(false);
+	let selectedInvoiceNos = $state<string[]>([]);
+	let initialLoadedInvoiceNos = $state<string[]>([]);
+	let isSavingInvoices = $state<boolean>(false);
+	let selectedInvoiceMap = $state<Map<string, string[]>>(new Map());
+
+	let hasInvoiceChanges = $derived.by(() => {
+		if (!selectedCallLog) return false;
+		if (selectedInvoiceNos.length !== initialLoadedInvoiceNos.length) return true;
+		const setA = new Set(selectedInvoiceNos);
+		return !initialLoadedInvoiceNos.every((no) => setA.has(no));
+	});
+
+	let selectedInvoices = $derived.by(() => {
+		const invoiceMap = new Map(salesInvoices.map((inv) => [inv.no, inv]));
+		return selectedInvoiceNos.map((no) => {
+			if (invoiceMap.has(no)) {
+				return invoiceMap.get(no)!;
+			}
+			return {
+				no,
+				date: '',
+				customerNo: '',
+				name: 'Linked Invoice',
+				amount: 0,
+				quantity: 0
+			} as DocumentDto;
+		});
+	});
+
+	let totalSelectedInvoicesAmount = $derived(
+		selectedInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+	);
+
+	let totalSelectedInvoicesTyres = $derived(
+		selectedInvoices.reduce((sum, inv) => sum + (inv.quantity || 0), 0)
+	);
+
+	const invoiceColumns = [
+		{ header: 'Invoice No', accessor: (row: DocumentDto) => row.no, class: 'font-mono font-bold min-w-[100px]' },
+		{ header: 'Customer', accessor: (row: DocumentDto) => row.name, class: 'min-w-[140px] truncate' },
+		{ header: 'Tyres', accessor: (row: DocumentDto) => (row.quantity ? `${row.quantity} tyres` : '0 tyres'), class: 'text-center font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400' },
+		{ header: 'Date', accessor: (row: DocumentDto) => formatInvoiceDate(row.date), class: 'text-right whitespace-nowrap' },
+		{ header: 'Amount', accessor: (row: DocumentDto) => formatCurrency(row.amount), class: 'text-right font-mono font-semibold whitespace-nowrap text-emerald-600 dark:text-emerald-400' }
+	];
+
+	function formatInvoiceDate(iso?: string) {
+		if (!iso) return '—';
+		try {
+			return new Date(iso).toLocaleDateString('en-IN', {
+				day: '2-digit',
+				month: 'short',
+				year: 'numeric'
+			});
+		} catch {
+			return iso;
+		}
+	}
+
+	function formatCurrency(n?: number) {
+		return new Intl.NumberFormat('en-IN', {
+			style: 'currency',
+			currency: 'INR',
+			maximumFractionDigits: 0
+		}).format(n || 0);
+	}
+
+	async function loadSalesInvoices() {
+		if (salesInvoices.length > 0 || isLoadingInvoices) return;
+		isLoadingInvoices = true;
+		try {
+			const now = new Date();
+			const thirtyDaysAgo = new Date();
+			thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+			thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+			const res = await graphqlQuery<{ getMyDocuments: DocumentDto[] }>(GetMyDocumentsDocument, {
+				variables: {
+					input: {
+						view: 'Invoice',
+						respCenters: ['BEL'],
+						from: thirtyDaysAgo.toISOString(),
+						to: now.toISOString(),
+						take: 500
+					}
+				}
+			});
+			if (res.success && res.data?.getMyDocuments) {
+				salesInvoices = res.data.getMyDocuments;
+			}
+		} catch (e) {
+			console.error('Failed to load sales invoices for BEL', e);
+		} finally {
+			isLoadingInvoices = false;
+		}
+	}
+
+	function openCallLogDetails(log: DetailedCallLog) {
+		if (!['Interested', 'Order Placed'].includes(log.outcome)) {
+			toast.info('Invoice linking is only available for "Interested" or "Order Placed" call logs.');
+			return;
+		}
+		selectedCallLog = log;
+		const initialNos = log.invoiceNos
+			? log.invoiceNos.split(',').map((s) => s.trim()).filter(Boolean)
+			: selectedInvoiceMap.get(log.id)
+			? [...selectedInvoiceMap.get(log.id)!]
+			: [];
+		selectedInvoiceNos = [...initialNos];
+		initialLoadedInvoiceNos = [...initialNos];
+		showDetailModal = true;
+		loadSalesInvoices();
+	}
+
+	async function saveCallLogInvoices() {
+		if (!selectedCallLog || isSavingInvoices) return;
+		isSavingInvoices = true;
+		try {
+			const res = await graphqlMutation<{ updateCrmCallLogInvoices: { success: boolean; message: string } }>(
+				UpdateCrmCallLogInvoicesDocument,
+				{
+					variables: {
+						callLogId: selectedCallLog.id,
+						invoiceNos: selectedInvoiceNos
+					}
+				}
+			);
+
+			if (res.success && res.data?.updateCrmCallLogInvoices.success) {
+				toast.success(res.data.updateCrmCallLogInvoices.message || 'Invoices linked to call log successfully');
+				const joinedNos = selectedInvoiceNos.length > 0 ? selectedInvoiceNos.join(',') : null;
+				const savedAmount = totalSelectedInvoicesAmount;
+				const savedTyres = totalSelectedInvoicesTyres;
+
+				selectedCallLog.invoiceNos = joinedNos;
+				selectedCallLog.invoiceAmount = savedAmount;
+				selectedCallLog.tyreQuantity = savedTyres;
+				initialLoadedInvoiceNos = [...selectedInvoiceNos];
+				if (selectedInvoiceNos.length > 0) {
+					selectedInvoiceMap.set(selectedCallLog.id, [...selectedInvoiceNos]);
+				} else {
+					selectedInvoiceMap.delete(selectedCallLog.id);
+				}
+
+				allCallLogs = allCallLogs.map((l) =>
+					l.id === selectedCallLog!.id
+						? { ...l, invoiceNos: joinedNos, invoiceAmount: savedAmount, tyreQuantity: savedTyres }
+						: l
+				);
+			} else {
+				toast.error(
+					res.data?.updateCrmCallLogInvoices.message ||
+					res.errors?.[0]?.message ||
+					'Failed to save invoices'
+				);
+			}
+		} catch (e: any) {
+			console.error('Failed to save call log invoices', e);
+			toast.error(e?.message || 'Error saving invoices');
+		} finally {
+			isSavingInvoices = false;
+		}
+	}
+
+	function removeSelectedInvoice(no: string) {
+		selectedInvoiceNos = selectedInvoiceNos.filter((n) => n !== no);
+		if (selectedCallLog) {
+			if (selectedInvoiceNos.length > 0) {
+				selectedInvoiceMap.set(selectedCallLog.id, [...selectedInvoiceNos]);
+			} else {
+				selectedInvoiceMap.delete(selectedCallLog.id);
+			}
+		}
+	}
+
+	$effect(() => {
+		if (selectedCallLog && selectedInvoiceNos) {
+			if (selectedInvoiceNos.length > 0) {
+				selectedInvoiceMap.set(selectedCallLog.id, [...selectedInvoiceNos]);
+			} else {
+				selectedInvoiceMap.delete(selectedCallLog.id);
+			}
+		}
+	});
+
+	// Helper to calculate full local day boundaries converted to UTC ISO for GraphQL
+	function toUtcDayRange(range?: { start?: any; end?: any }) {
+		if (!range || (!range.start && !range.end)) return { gte: null, lte: null };
+		const tz = getLocalTimeZone();
+
+		function toStartDate(val: any): Date {
+			if (val?.toDate) return val.toDate(tz);
+			if (val instanceof Date) return new Date(val);
+			if (typeof val === 'string') {
+				const [y, m, d] = val.split('-').map(Number);
+				return new Date(y, m - 1, d, 0, 0, 0, 0);
+			}
+			return new Date(val);
+		}
+
+		function toEndDate(val: any): Date {
+			if (val?.toDate) return val.toDate(tz);
+			if (val instanceof Date) return new Date(val);
+			if (typeof val === 'string') {
+				const [y, m, d] = val.split('-').map(Number);
+				return new Date(y, m - 1, d, 23, 59, 59, 999);
+			}
+			return new Date(val);
+		}
+
+		let gte: string | null = null;
+		let lte: string | null = null;
+
+		if (range.start) {
+			const s = toStartDate(range.start);
+			s.setHours(0, 0, 0, 0);
+			gte = s.toISOString();
+		}
+		if (range.end) {
+			const e = toEndDate(range.end);
+			e.setHours(23, 59, 59, 999);
+			lte = e.toISOString();
+		} else if (range.start) {
+			const e = toEndDate(range.start);
+			e.setHours(23, 59, 59, 999);
+			lte = e.toISOString();
+		}
+
+		return { gte, lte };
+	}
+
 	// Helper for date presets
 	function setPreset(preset: 'today' | 'yesterday' | 'week' | 'month' | 'all') {
 		datePreset = preset;
-		const now = new Date();
-		const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().split('T')[0];
-		const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59).toISOString().split('T')[0];
+		const now = today(getLocalTimeZone());
 
 		if (preset === 'today') {
-			fromDate = startOfDay(now);
-			toDate = endOfDay(now);
+			dateRange = { start: now, end: now };
 		} else if (preset === 'yesterday') {
-			const yest = new Date(now);
-			yest.setDate(yest.getDate() - 1);
-			fromDate = startOfDay(yest);
-			toDate = endOfDay(yest);
+			const yest = now.subtract({ days: 1 });
+			dateRange = { start: yest, end: yest };
 		} else if (preset === 'week') {
-			const weekAgo = new Date(now);
-			weekAgo.setDate(weekAgo.getDate() - 7);
-			fromDate = startOfDay(weekAgo);
-			toDate = endOfDay(now);
+			dateRange = { start: now.subtract({ days: 7 }), end: now };
 		} else if (preset === 'month') {
-			const monthAgo = new Date(now);
-			monthAgo.setMonth(monthAgo.getMonth() - 1);
-			fromDate = startOfDay(monthAgo);
-			toDate = endOfDay(now);
+			dateRange = { start: now.subtract({ days: 30 }), end: now };
 		} else if (preset === 'all') {
-			fromDate = '';
-			toDate = '';
+			dateRange = undefined;
+		}
+		currentPage = 1;
+		loadCallLogs();
+	}
+
+	function handleDateRangeChange(val: any) {
+		if (val?.start && !val?.end) {
+			// Selection in progress (start picked, waiting for end date)
+			return;
+		}
+		dateRange = val;
+		if (!val) {
+			datePreset = 'all';
+		} else {
+			datePreset = 'custom';
 		}
 		currentPage = 1;
 		loadCallLogs();
@@ -124,7 +377,8 @@
 		await Promise.all([
 			loadOutcomes(),
 			loadUsers(),
-			loadAllocatedContacts()
+			loadAllocatedContacts(),
+			loadSalesInvoices()
 		]);
 	});
 
@@ -218,16 +472,12 @@
 			const andConditions: any[] = [];
 
 			// Date filtering
-			if (fromDate) {
-				const fDate = new Date(fromDate);
-				andConditions.push({ callDate: { gte: fDate.toISOString() } });
+			const { gte, lte } = toUtcDayRange(dateRange);
+			if (gte) {
+				andConditions.push({ callDate: { gte } });
 			}
-			if (toDate) {
-				const tDate = new Date(toDate);
-				if (toDate.length <= 10) {
-					tDate.setHours(23, 59, 59, 999);
-				}
-				andConditions.push({ callDate: { lte: tDate.toISOString() } });
+			if (lte) {
+				andConditions.push({ callDate: { lte } });
 			}
 
 			// Specific allocated contact selected
@@ -288,7 +538,7 @@
 		try {
 			const res = await graphqlMutation<{ completeCrmReminder: { success: boolean; message: string } }>(
 				CompleteCrmReminderDocument,
-				{ reminderId }
+				{ variables: { reminderId } }
 			);
 			if (res.success && res.data?.completeCrmReminder?.success) {
 				toast.success(res.data.completeCrmReminder.message || 'Reminder completed');
@@ -527,6 +777,16 @@
 	>
 		{#snippet actions()}
 			<div class="flex items-center gap-2">
+				<a
+					href="/crm-masters?tab=ACTIVITY_OUTCOME"
+					target="_blank"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border border-primary/20 bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-2xs"
+					title="Configure Call Outcomes and Pipeline in CRM Masters"
+				>
+					<Icon name="database" class="size-3.5 text-primary" />
+					<span class="hidden sm:inline">Manage Outcomes</span>
+				</a>
+
 				<Button
 					variant="outline"
 					size="sm"
@@ -850,34 +1110,29 @@
 				</button>
 			</div>
 
-			<!-- Custom Inputs -->
+			<!-- VenUI Date Range Picker -->
 			<div class="flex items-center gap-2">
-				<div class="flex items-center gap-1.5 bg-background/50 border border-border/60 rounded-2xl px-3 py-1 text-xs">
-					<span class="text-muted-foreground font-medium">From:</span>
-					<input
-						type="date"
-						bind:value={fromDate}
-						onchange={() => {
-							datePreset = 'custom';
-							currentPage = 1;
-							loadCallLogs();
-						}}
-						class="bg-transparent text-foreground outline-none font-semibold"
+				<div class="w-full sm:w-[260px]">
+					<DatePicker
+						mode="range"
+						bind:value={dateRange}
+						placeholder="Select date range"
+						presets={callLogPresets}
+						onValueChange={handleDateRangeChange}
 					/>
 				</div>
-				<div class="flex items-center gap-1.5 bg-background/50 border border-border/60 rounded-2xl px-3 py-1 text-xs">
-					<span class="text-muted-foreground font-medium">To:</span>
-					<input
-						type="date"
-						bind:value={toDate}
-						onchange={() => {
-							datePreset = 'custom';
-							currentPage = 1;
-							loadCallLogs();
-						}}
-						class="bg-transparent text-foreground outline-none font-semibold"
-					/>
-				</div>
+				{#if dateRange?.start || dateRange?.end}
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-9 px-2.5 rounded-2xl text-xs text-muted-foreground hover:text-foreground"
+						onclick={() => setPreset('all')}
+						title="Clear date filter"
+					>
+						<Icon name="x" class="size-3.5 mr-1" />
+						<span>Clear</span>
+					</Button>
+				{/if}
 			</div>
 		</div>
 	</Card>
@@ -948,7 +1203,19 @@
 						{#each pagedCallLogs as log (log.id)}
 							{@const outcomeStyle = getOutcomeVariant(log.outcome)}
 							{@const activeReminder = remindersMap.get(log.contactId)}
-							<tr class="hover:bg-muted/30 transition-colors group">
+							<tr
+								onclick={() => {
+									if (['Interested', 'Order Placed'].includes(log.outcome)) {
+										openCallLogDetails(log);
+									}
+								}}
+								class={`transition-colors ${
+									['Interested', 'Order Placed'].includes(log.outcome)
+										? 'hover:bg-muted/50 cursor-pointer'
+										: 'hover:bg-muted/20'
+								} group`}
+								title={['Interested', 'Order Placed'].includes(log.outcome) ? 'Click to link sales invoices' : ''}
+							>
 								<!-- Date -->
 								<td class="py-3.5 px-4 whitespace-nowrap">
 									<div class="flex items-center gap-2">
@@ -963,8 +1230,12 @@
 										<div class="space-y-1">
 											<div class="flex items-center gap-2">
 												<button
-													onclick={() => goto(`/crm-calling?contactId=${log.contactId}`)}
+													onclick={(e) => {
+														e.stopPropagation();
+														goto(`/crm-calling?contactId=${log.contactId}`);
+													}}
 													class="font-bold text-foreground hover:text-primary transition-colors text-left block"
+													title="Go to calling workspace"
 												>
 													{log.contact.fullName}
 												</button>
@@ -972,7 +1243,10 @@
 												<!-- Active Reminder Badge / Icon -->
 												{#if activeReminder}
 													<button
-														onclick={() => openReminderDetails(activeReminder)}
+														onclick={(e) => {
+															e.stopPropagation();
+															openReminderDetails(activeReminder);
+														}}
 														class="inline-flex items-center gap-1 px-2 py-0.5 rounded-xl border bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 font-bold text-[11px] hover:bg-amber-500/25 transition-all shadow-sm group/rem"
 														title={`Active Reminder: ${formatDate(activeReminder.reminderDate)} - Click for details`}
 													>
@@ -1019,6 +1293,23 @@
 									{:else}
 										<span class="text-muted-foreground/50 text-xs italic">No notes</span>
 									{/if}
+									{#if log.invoiceNos}
+										{@const invList = log.invoiceNos.split(',').map((s) => s.trim()).filter(Boolean)}
+										{#if invList.length > 0}
+											<div class="mt-1 flex flex-wrap items-center gap-1">
+												<Badge variant="outline" class="gap-1 font-mono text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/30 py-0 px-1.5 rounded-lg bg-emerald-500/10">
+													<Icon name="receipt" class="size-2.5" />
+													<span>{invList.length} {invList.length === 1 ? 'Invoice' : 'Invoices'}</span>
+													{#if log.invoiceAmount != null && log.invoiceAmount > 0}
+														<span>• {formatCurrency(log.invoiceAmount)}</span>
+													{/if}
+													{#if log.tyreQuantity != null && log.tyreQuantity > 0}
+														<span>• {log.tyreQuantity} {log.tyreQuantity === 1 ? 'Tyre' : 'Tyres'}</span>
+													{/if}
+												</Badge>
+											</div>
+										{/if}
+									{/if}
 								</td>
 
 								<!-- Logged By -->
@@ -1035,7 +1326,10 @@
 										<!-- Active Reminder Action Button -->
 										{#if activeReminder}
 											<button
-												onclick={() => openReminderDetails(activeReminder)}
+												onclick={(e) => {
+													e.stopPropagation();
+													openReminderDetails(activeReminder);
+												}}
 												class="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all shadow-sm relative group/btn"
 												title="View Active Reminder Details"
 											>
@@ -1045,7 +1339,10 @@
 
 										<!-- Call action -->
 										<button
-											onclick={() => makeCall(log.contact?.mobileNo)}
+											onclick={(e) => {
+												e.stopPropagation();
+												makeCall(log.contact?.mobileNo);
+											}}
 											class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all shadow-sm"
 											title="Call Contact"
 										>
@@ -1054,24 +1351,29 @@
 
 										<!-- WhatsApp action -->
 										<button
-											onclick={() => sendWhatsapp(log.contact?.mobileNo, log.contact?.fullName)}
+											onclick={(e) => {
+												e.stopPropagation();
+												sendWhatsapp(log.contact?.mobileNo, log.contact?.fullName);
+											}}
 											class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
 											title="WhatsApp Message"
 										>
 											<Icon name="message-square" class="size-3.5" />
 										</button>
 
-										<!-- View Details -->
-										<button
-											onclick={() => {
-												selectedCallLog = log;
-												showDetailModal = true;
-											}}
-											class="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all shadow-sm"
-											title="View Full Details"
-										>
-											<Icon name="eye" class="size-3.5" />
-										</button>
+										<!-- Link Sales Invoices (only for Interested & Order Placed) -->
+										{#if ['Interested', 'Order Placed'].includes(log.outcome)}
+											<button
+												onclick={(e) => {
+													e.stopPropagation();
+													openCallLogDetails(log);
+												}}
+												class="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all shadow-sm"
+												title="Link Sales Invoices"
+											>
+												<Icon name="receipt" class="size-3.5" />
+											</button>
+										{/if}
 									</div>
 								</td>
 							</tr>
@@ -1320,9 +1622,9 @@
 
 <!-- Modal: Active Reminder Details -->
 <Dialog.Root bind:open={showReminderModal}>
-	<Dialog.Content class="sm:max-w-md rounded-3xl p-6 space-y-4">
+	<Dialog.Content class="sm:max-w-md max-h-[90dvh] sm:max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-3xl border border-border shadow-2xl">
 		{#if selectedReminder}
-			<Dialog.Header>
+			<Dialog.Header class="px-6 py-4 border-b border-border/50 shrink-0 bg-background pr-12">
 				<Dialog.Title class="text-lg font-bold flex items-center gap-2 text-amber-600 dark:text-amber-400">
 					<Icon name="bell" class="size-5 text-amber-600 dark:text-amber-400 animate-pulse" />
 					<span>Active Call Reminder</span>
@@ -1332,7 +1634,7 @@
 				</Dialog.Description>
 			</Dialog.Header>
 
-			<div class="space-y-3 text-sm">
+			<div class="p-6 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm custom-scrollbar">
 				<!-- Contact Info -->
 				<div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1">
 					<p class="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">Contact</p>
@@ -1369,7 +1671,7 @@
 				</div>
 			</div>
 
-			<Dialog.Footer class="pt-2 flex flex-col sm:flex-row gap-2">
+			<Dialog.Footer class="px-6 py-3.5 border-t border-border/50 shrink-0 bg-muted/10 flex flex-col sm:flex-row gap-2 mt-auto">
 				<Button
 					variant="default"
 					size="sm"
@@ -1410,17 +1712,18 @@
 
 <!-- Modal: Call Log Full Detail -->
 <Dialog.Root bind:open={showDetailModal}>
-	<Dialog.Content class="sm:max-w-md rounded-3xl p-6 space-y-4">
-		{#if selectedCallLog}
+	<Dialog.Content class="sm:max-w-lg max-h-[90dvh] sm:max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-3xl border border-border shadow-2xl">
+		{#if selectedCallLog && ['Interested', 'Order Placed'].includes(selectedCallLog.outcome)}
 			{@const outcomeStyle = getOutcomeVariant(selectedCallLog.outcome)}
-			<Dialog.Header>
+			<Dialog.Header class="px-6 py-4 border-b border-border/50 shrink-0 bg-background pr-12">
 				<Dialog.Title class="text-lg font-bold flex items-center gap-2">
-					<Icon name="phone-call" class="size-5 text-primary" />
-					<span>Call Log Details</span>
+					<Icon name="receipt" class="size-5 text-primary" />
+					<span>Link Sales Invoices</span>
 				</Dialog.Title>
+				<Dialog.Description class="sr-only">Call log details, notes and linked sales invoices</Dialog.Description>
 			</Dialog.Header>
 
-			<div class="space-y-3 text-sm">
+			<div class="p-6 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm custom-scrollbar">
 				<div class="p-3.5 rounded-2xl bg-muted/40 border border-border/60 space-y-1">
 					<p class="text-xs font-semibold text-muted-foreground uppercase">Contact</p>
 					<h4 class="font-bold text-base">{selectedCallLog.contact?.fullName || 'Unknown Contact'}</h4>
@@ -1453,16 +1756,147 @@
 					</p>
 				</div>
 
+				<!-- Sales Invoice Selection (Last 30 Days - BEL) -->
+				<div class="p-3.5 rounded-2xl bg-muted/30 border border-border/40 space-y-2">
+					<div class="flex items-center justify-between">
+						<span class="text-[11px] font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+							<Icon name="file-text" class="size-3.5 text-primary" />
+							<span>Sales Invoices (Last 30 Days &bull; BEL)</span>
+						</span>
+						<div class="flex items-center gap-1.5">
+							{#if isLoadingInvoices}
+								<div class="flex items-center gap-1 text-[11px] text-muted-foreground">
+									<Loader2 class="size-3 animate-spin text-primary" />
+									<span>Loading...</span>
+								</div>
+							{:else if salesInvoices.length > 0}
+								{#if selectedInvoiceNos.length > 0}
+									<Badge variant="default" class="rounded-xl px-2 py-0 text-[10px] font-semibold bg-primary text-primary-foreground">
+										{selectedInvoiceNos.length} selected
+									</Badge>
+								{/if}
+								<Badge variant="secondary" class="rounded-xl px-1.5 py-0 text-[10px] font-normal">
+									{salesInvoices.length} invoices
+								</Badge>
+							{/if}
+							{#if hasInvoiceChanges}
+								<Button
+									variant="default"
+									size="sm"
+									class="h-6 px-2.5 text-[11px] rounded-lg gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+									onclick={saveCallLogInvoices}
+									disabled={isSavingInvoices}
+								>
+									{#if isSavingInvoices}
+										<Loader2 class="size-3 animate-spin" />
+									{:else}
+										<Icon name="check" class="size-3" />
+									{/if}
+									<span>Save</span>
+								</Button>
+							{/if}
+						</div>
+					</div>
+
+					<Select
+						options={salesInvoices}
+						bind:value={selectedInvoiceNos}
+						multiple={true}
+						showSelectAll={false}
+						columns={invoiceColumns}
+						valueKey="no"
+						labelKey="no"
+						placeholder={isLoadingInvoices ? "Loading BEL invoices..." : "Select sales invoices..."}
+						searchPlaceholder="Search invoice no, customer, date..."
+						class="w-full rounded-xl bg-background"
+						contentClass="w-[calc(100vw-2rem)] sm:w-[480px]"
+						clearable={true}
+						disabled={isLoadingInvoices}
+					/>
+
+					{#if selectedInvoices.length > 0}
+						<div class="space-y-1.5 pt-1">
+							<div class="flex items-center justify-between px-1 text-[11px] text-muted-foreground font-semibold">
+								<span>Selected ({selectedInvoices.length})</span>
+								<div class="flex items-center gap-2 font-mono">
+									{#if totalSelectedInvoicesTyres > 0}
+										<span class="text-amber-600 dark:text-amber-400 font-bold">
+											{totalSelectedInvoicesTyres} {totalSelectedInvoicesTyres === 1 ? 'Tyre' : 'Tyres'}
+										</span>
+										<span>&bull;</span>
+									{/if}
+									<span class="text-emerald-600 dark:text-emerald-400 font-bold">
+										Total: {formatCurrency(totalSelectedInvoicesAmount)}
+									</span>
+								</div>
+							</div>
+							<div class="max-h-[160px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
+								{#each selectedInvoices as inv (inv.no)}
+									<div class="p-2.5 rounded-xl bg-background/90 border border-border/60 text-xs flex items-center justify-between gap-2 shadow-xs group">
+										<div class="min-w-0 flex-1 space-y-0.5">
+											<div class="flex items-center justify-between gap-2">
+												<span class="font-mono font-bold text-foreground flex items-center gap-1 text-xs">
+													<Icon name="receipt" class="size-3 text-primary" />
+													{inv.no}
+												</span>
+												<div class="flex items-center gap-2 font-mono text-xs">
+													{#if inv.quantity != null && inv.quantity > 0}
+														<span class="text-amber-600 dark:text-amber-400 font-semibold">
+															{inv.quantity} {inv.quantity === 1 ? 'tyre' : 'tyres'}
+														</span>
+													{/if}
+													<span class="font-bold text-emerald-600 dark:text-emerald-400">
+														{formatCurrency(inv.amount)}
+													</span>
+												</div>
+											</div>
+											<div class="flex items-center justify-between text-muted-foreground text-[11px]">
+												<span class="truncate max-w-[220px]" title={inv.name}>{inv.name}</span>
+												<span>{formatInvoiceDate(inv.date)}</span>
+											</div>
+										</div>
+										<button
+											type="button"
+											onclick={() => removeSelectedInvoice(inv.no)}
+											class="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+											title="Remove invoice"
+										>
+											<Icon name="x" class="size-3.5" />
+										</button>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+
 				<div class="p-3 rounded-2xl bg-muted/20 border border-border/30 text-xs text-muted-foreground flex justify-between">
 					<span>Logged By: <strong class="text-foreground">{selectedCallLog.createdBy}</strong></span>
 				</div>
 			</div>
 
-			<Dialog.Footer class="pt-2">
+			<Dialog.Footer class="px-6 py-3.5 border-t border-border/50 shrink-0 bg-muted/10 flex flex-col sm:flex-row gap-2 mt-auto">
+				{#if hasInvoiceChanges}
+					<Button
+						variant="default"
+						size="sm"
+						class="w-full sm:flex-1 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-sm"
+						onclick={saveCallLogInvoices}
+						disabled={isSavingInvoices}
+					>
+						{#if isSavingInvoices}
+							<Loader2 class="size-4 animate-spin" />
+						{:else}
+							<Icon name="check" class="size-4" />
+						{/if}
+						<span>Save Invoices ({selectedInvoiceNos.length})</span>
+					</Button>
+				{/if}
+
 				<Button
-					variant="default"
+					variant={hasInvoiceChanges ? "outline" : "default"}
 					size="sm"
-					class="w-full rounded-2xl"
+					class="w-full sm:w-auto rounded-2xl px-5"
 					onclick={() => (showDetailModal = false)}
 				>
 					Close
@@ -1471,3 +1905,16 @@
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 6px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background-color: hsl(var(--muted-foreground) / 0.3);
+		border-radius: 20px;
+	}
+</style>

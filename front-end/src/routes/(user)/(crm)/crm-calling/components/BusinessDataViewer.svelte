@@ -10,13 +10,15 @@
 		invoices,
 		claims,
 		loading,
-		onPrintDocument
+		onPrintDocument,
+		printingDocNo = null
 	}: {
 		type: 'business' | 'claims';
 		invoices: ContactInvoice[];
 		claims: ContactClaim[];
 		loading: boolean;
 		onPrintDocument: (no: string, docType: string) => void;
+		printingDocNo?: string | null;
 	} = $props();
 
 	// Sales History Table State
@@ -195,8 +197,11 @@
 						</button>
 					{/if}
 				</div>
-				<div class="text-xs text-muted-foreground font-medium self-end sm:self-center px-1">
-					Showing {filteredInvoices.length} of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}
+				<div class="text-xs text-muted-foreground font-medium self-end sm:self-center px-1 flex items-center gap-1.5">
+					{#if loading}
+						<Loader2 class="size-3 animate-spin text-primary shrink-0" />
+					{/if}
+					<span>Showing {filteredInvoices.length} of {invoices.length} {invoices.length === 1 ? 'invoice' : 'invoices'}</span>
 				</div>
 			</div>
 
@@ -293,14 +298,18 @@
 						</thead>
 						<tbody class="divide-y divide-border">
 							{#each filteredInvoices as inv (inv.no)}
-								<tr onclick={() => onPrintDocument(inv.no, 'Invoice')} class="hover:bg-muted/10 transition-colors cursor-pointer group">
+								<tr onclick={() => onPrintDocument(inv.no, 'Invoice')} class="hover:bg-muted/10 transition-colors cursor-pointer group {printingDocNo === inv.no ? 'opacity-70 bg-muted/20 pointer-events-none' : ''}">
 									<td class="p-3 whitespace-nowrap font-medium text-muted-foreground">
 										{formatInvoiceDate(inv.date)}
 									</td>
 									<td class="p-3 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
 										<div class="flex items-center gap-1.5">
 											<span>{inv.no}</span>
-											<Icon name="file-text" class="size-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-500 shrink-0" />
+											{#if printingDocNo === inv.no}
+												<Loader2 class="size-3.5 animate-spin text-indigo-600 dark:text-indigo-400 shrink-0" />
+											{:else}
+												<Icon name="file-text" class="size-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-500 shrink-0" />
+											{/if}
 										</div>
 									</td>
 									<td class="p-3 max-w-[180px] sm:max-w-[220px]">
@@ -360,8 +369,11 @@
 						</button>
 					{/if}
 				</div>
-				<div class="text-xs text-muted-foreground font-medium self-end sm:self-center px-1">
-					Showing {filteredClaims.length} of {claims.length} {claims.length === 1 ? 'claim' : 'claims'}
+				<div class="text-xs text-muted-foreground font-medium self-end sm:self-center px-1 flex items-center gap-1.5">
+					{#if loading}
+						<Loader2 class="size-3 animate-spin text-primary shrink-0" />
+					{/if}
+					<span>Showing {filteredClaims.length} of {claims.length} {claims.length === 1 ? 'claim' : 'claims'}</span>
 				</div>
 			</div>
 
@@ -458,14 +470,18 @@
 						</thead>
 						<tbody class="divide-y divide-border">
 							{#each filteredClaims as claim (claim.no)}
-								<tr onclick={() => onPrintDocument(claim.no, 'Claim')} class="hover:bg-muted/10 transition-colors cursor-pointer group">
+								<tr onclick={() => onPrintDocument(claim.no, 'Claim')} class="hover:bg-muted/10 transition-colors cursor-pointer group {printingDocNo === claim.no ? 'opacity-70 bg-muted/20 pointer-events-none' : ''}">
 									<td class="p-3 whitespace-nowrap font-medium text-muted-foreground">
 										{formatInvoiceDate(claim.date)}
 									</td>
 									<td class="p-3 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
 										<div class="flex items-center gap-1.5">
 											<span>{claim.no}</span>
-											<Icon name="file-text" class="size-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-500 shrink-0" />
+											{#if printingDocNo === claim.no}
+												<Loader2 class="size-3.5 animate-spin text-indigo-600 dark:text-indigo-400 shrink-0" />
+											{:else}
+												<Icon name="file-text" class="size-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-500 shrink-0" />
+											{/if}
 										</div>
 										{#if claim.mobileNo}
 											<div class="text-[10px] font-normal text-muted-foreground font-sans mt-0.5">{claim.mobileNo}</div>

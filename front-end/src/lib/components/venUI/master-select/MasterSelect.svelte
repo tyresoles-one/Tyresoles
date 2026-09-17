@@ -678,14 +678,16 @@
 			<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 		</Popover.Trigger>
 		<Popover.Content
-			class="min-w-[200px] p-0 max-w-[calc(100vw-2rem)] w-[var(--bits-popover-anchor-width)]"
-			style="max-height: 250px;"
+			class="w-[var(--bits-popover-anchor-width)] min-w-[200px] p-0 overflow-hidden flex flex-col z-50 rounded-xl border border-border bg-popover shadow-xl max-w-[calc(100vw-2rem)]"
+			style="max-height: min(300px, calc(var(--bits-popover-content-available-height, 100vh) - 20px));"
+			collisionPadding={{ top: 16, bottom: 40, left: 16, right: 16 }}
+			avoidCollisions={true}
 			align="start"
 			sideOffset={4}
 		>
-			<Command.Root shouldFilter={false} class="flex flex-col h-full">
+			<Command.Root shouldFilter={false} class="flex flex-col flex-1 min-h-0 overflow-hidden">
 				<Command.Input placeholder="Search..." bind:value={searchQuery} />
-				<Command.List class="overflow-x-hidden overflow-y-auto flex-1 max-h-[200px]">
+				<Command.List class="overflow-x-hidden overflow-y-auto flex-1 min-h-0 max-h-[260px]">
 					{#if loading}
 						<div class="flex items-center justify-center py-8 text-muted-foreground">
 							<Loader2 class="size-5 animate-spin" />

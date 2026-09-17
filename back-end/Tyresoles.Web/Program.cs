@@ -42,6 +42,8 @@ using Tyresoles.Web.Features.WindowsServices;
 using Tyresoles.Data.Features.Merger;
 using Tyresoles.Data.Features.Admin.EmailAccounts;
 using Tyresoles.Web.Features.EmailAccounts;
+using Tyresoles.Web.Services.Email;
+using Tyresoles.Web.GraphQL;
 using StackExchange.Redis;
 using Microsoft.Data.SqlClient;
 
@@ -289,6 +291,18 @@ builder.Services.PostConfigure<Tyresoles.Reporting.Configuration.ReportingOption
 
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService, Tyresoles.Data.Features.Crm.Services.LiveLeadDiscoveryService>();
+
+// Email Campaign Marketing Services
+builder.Services.Configure<AmazonSesSmtpSettings>(builder.Configuration.GetSection(AmazonSesSmtpSettings.SectionName));
+builder.Services.AddSingleton<ISpamScoringService, SpamScoringService>();
+builder.Services.AddScoped<IEmailCampaignSenderService, EmailCampaignSenderService>();
+builder.Services.AddHostedService<EmailCampaignBackgroundService>();
+
+// WhatsApp Campaign Marketing Services
+builder.Services.Configure<Tyresoles.Web.Services.Whatsapp.WhatsappSettings>(builder.Configuration.GetSection("WhatsappSettings"));
+builder.Services.AddScoped<Tyresoles.Web.Services.Whatsapp.IWhatsappCloudApiService, Tyresoles.Web.Services.Whatsapp.WhatsappCloudApiService>();
+builder.Services.AddHostedService<Tyresoles.Web.Services.Whatsapp.WhatsappCampaignBackgroundService>();
 
 // Single GraphQL server: subscriptions + schema (avoid registering two default executors).
 var gqlExecutor = builder.Services.AddGraphQLServer();
@@ -316,7 +330,11 @@ gqlExecutor
     .AddSubscriptionType<Tyresoles.Web.GraphQL.Subscription>()
     .AddTypeExtension<VendorTypeExtension>()
     .AddTypeExtension<EmailAccountQueryExtension>()
-    .AddTypeExtension<EmailAccountMutationExtension>();
+    .AddTypeExtension<EmailAccountMutationExtension>()
+    .AddTypeExtension<CrmCampaignQueryExtension>()
+    .AddTypeExtension<CrmCampaignMutationExtension>()
+    .AddTypeExtension<Tyresoles.Web.GraphQL.CrmWhatsappCampaignQueryExtension>()
+    .AddTypeExtension<Tyresoles.Web.GraphQL.CrmWhatsappCampaignMutationExtension>();
 
 var app = builder.Build();
 
@@ -542,6 +560,36 @@ try
                 );
             END
 
+            IF OBJECT_ID('dbo.CrmSourceChannel', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmSourceChannel] (
+                    [Id] int NOT NULL IDENTITY(1,1),
+                    [Name] nvarchar(200) NOT NULL,
+                    [Code] nvarchar(100) NULL,
+                    [ParentId] int NULL,
+                    [IsActive] bit NOT NULL CONSTRAINT [DF_CrmSourceChannel_IsActive] DEFAULT 1,
+                    [Description] nvarchar(500) NULL,
+                    [CreatedAt] datetime2 NOT NULL CONSTRAINT [DF_CrmSourceChannel_CreatedAt] DEFAULT SYSUTCDATETIME(),
+                    CONSTRAINT [PK_CrmSourceChannel] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmSourceChannel_CrmSource_ParentId] FOREIGN KEY ([ParentId]) REFERENCES dbo.[CrmSource] ([Id]) ON DELETE SET NULL
+                );
+
+                INSERT INTO dbo.[CrmSourceChannel] ([Name], [Code], [Description]) VALUES
+                    ('Web-Harvester', 'WEB-HARVESTER', 'Automated web directory and listing harvester'),
+                    ('Google-Maps', 'GOOGLE-MAPS', 'Google Maps and Places business discovery'),
+                    ('IndiaMART', 'INDIAMART', 'IndiaMART B2B marketplace leads'),
+                    ('TradeIndia', 'TRADEINDIA', 'TradeIndia marketplace inquiries'),
+                    ('Justdial', 'JUSTDIAL', 'Justdial local search listings'),
+                    ('Direct-Call', 'DIRECT-CALL', 'Inbound and cold phone calling inquiries'),
+                    ('WhatsApp', 'WHATSAPP', 'WhatsApp messaging & inbound campaign replies'),
+                    ('Field-Visit', 'FIELD-VISIT', 'On-ground yard and fleet field audits'),
+                    ('Website-Form', 'WEBSITE-FORM', 'Tyresoles website lead form submissions'),
+                    ('Referral', 'REFERRAL', 'Existing customer and dealer word-of-mouth referrals'),
+                    ('Directory', 'DIRECTORY', 'Trade and transport association directories'),
+                    ('Tender', 'TENDER', 'Government and corporate tender notices'),
+                    ('Fleet-Audit', 'FLEET-AUDIT', 'Direct fleet yard survey and tyre inspection');
+            END
+
             IF OBJECT_ID('dbo.CrmStage', 'U') IS NULL
             BEGIN
                 CREATE TABLE dbo.[CrmStage] (
@@ -600,6 +648,8 @@ try
                     [IsActive] bit NOT NULL,
                     [CreatedBy] nvarchar(max) NULL,
                     [AssignedTo] nvarchar(max) NULL,
+                    [Website] nvarchar(max) NULL,
+                    [Snippet] nvarchar(max) NULL,
                     CONSTRAINT [PK_CrmContact] PRIMARY KEY ([Id])
                 );
             END
@@ -638,6 +688,86 @@ try
                 END
             END
 
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'LeadSourceType') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [LeadSourceType] nvarchar(100) NOT NULL CONSTRAINT DF_CrmContact_LeadSourceType DEFAULT 'Manual';
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'LeadSourceChannel') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [LeadSourceChannel] nvarchar(100) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'SourceUrl') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [SourceUrl] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'Division') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [Division] nvarchar(100) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'TargetProduct') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [TargetProduct] nvarchar(200) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'QualityScore') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [QualityScore] decimal(5,2) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'ScrapingQuery') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [ScrapingQuery] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'HarvestedAt') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [HarvestedAt] datetime2 NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'Website') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [Website] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'Snippet') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [Snippet] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'PrefLanguage') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [PrefLanguage] nvarchar(100) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'Location') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [Location] nvarchar(200) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'CreatedBy') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [CreatedBy] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'CreatedAt') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [CreatedAt] datetime2 NOT NULL CONSTRAINT DF_CrmContact_CreatedAt DEFAULT SYSUTCDATETIME();
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'ModifiedAt') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [ModifiedAt] datetime2 NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmContact', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmContact', 'ModifiedBy') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmContact] ADD [ModifiedBy] nvarchar(max) NULL;
+            END
+
             IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NULL
             BEGIN
                 CREATE TABLE dbo.[CrmCallLog] (
@@ -651,6 +781,48 @@ try
                     CONSTRAINT [FK_CrmCallLog_CrmContact_ContactId] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE CASCADE
                 );
                 CREATE INDEX [IX_CrmCallLog_ContactId] ON dbo.[CrmCallLog] ([ContactId]);
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmCallLog', 'InvoiceNos') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmCallLog] ADD [InvoiceNos] nvarchar(max) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmCallLog', 'InvoiceAmount') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmCallLog] ADD [InvoiceAmount] decimal(18,2) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmCallLog', 'TyreQuantity') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmCallLog] ADD [TyreQuantity] decimal(18,2) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLogInvoice', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmCallLogInvoice] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [CallLogId] uniqueidentifier NOT NULL,
+                    [InvoiceNo] nvarchar(100) NOT NULL,
+                    [Amount] decimal(18,2) NOT NULL CONSTRAINT [DF_CrmCallLogInvoice_Amount] DEFAULT(0),
+                    [TyreQuantity] decimal(18,2) NOT NULL CONSTRAINT [DF_CrmCallLogInvoice_TyreQuantity] DEFAULT(0),
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmCallLogInvoice] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmCallLogInvoice_CrmCallLog_CallLogId] FOREIGN KEY ([CallLogId]) REFERENCES dbo.[CrmCallLog] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmCallLogInvoice_CallLogId] ON dbo.[CrmCallLogInvoice] ([CallLogId]);
+                CREATE INDEX [IX_CrmCallLogInvoice_InvoiceNo] ON dbo.[CrmCallLogInvoice] ([InvoiceNo]);
+            END
+            ELSE
+            BEGIN
+                IF COL_LENGTH('dbo.CrmCallLogInvoice', 'Amount') IS NULL
+                BEGIN
+                    ALTER TABLE dbo.[CrmCallLogInvoice] ADD [Amount] decimal(18,2) NOT NULL CONSTRAINT [DF_CrmCallLogInvoice_Amount] DEFAULT(0);
+                END
+                IF COL_LENGTH('dbo.CrmCallLogInvoice', 'TyreQuantity') IS NULL
+                BEGIN
+                    ALTER TABLE dbo.[CrmCallLogInvoice] ADD [TyreQuantity] decimal(18,2) NOT NULL CONSTRAINT [DF_CrmCallLogInvoice_TyreQuantity] DEFAULT(0);
+                END
             END
 
             IF OBJECT_ID('dbo.CrmCallReminder', 'U') IS NULL
@@ -702,27 +874,7 @@ try
                 VALUES ('ContactsPerAgent', '10', 'Maximum active allocated contacts per calling agent');
             END
 
-            -- Migrate any pre-existing assignments from CrmContact.AssignedTo into CrmAgentContact
-            IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CrmContact' AND COLUMN_NAME = 'AssignedTo')
-            BEGIN
-                INSERT INTO dbo.[CrmAgentContact] ([Id], [AgentUsername], [ContactId], [AllocatedAt], [CallCount])
-                SELECT 
-                    NEWID(), 
-                    [AssignedTo], 
-                    [Id], 
-                    GETUTCDATE(), 
-                    0
-                FROM dbo.[CrmContact] AS c
-                WHERE c.[AssignedTo] IS NOT NULL 
-                  AND c.[AssignedTo] <> '' 
-                  AND c.[IsActive] = 1
-                  AND NOT EXISTS (
-                      SELECT 1 FROM dbo.[CrmAgentContact] AS ac 
-                      WHERE ac.[ContactId] = c.[Id] 
-                        AND ac.[AgentUsername] = c.[AssignedTo] 
-                        AND ac.[DeallocatedAt] IS NULL
-                  );
-            END
+            -- Auto-migration of CrmContact.AssignedTo into CrmAgentContact removed to strictly enforce manual on-demand contact allocation
 
             IF OBJECT_ID('dbo.CrmWhatsappImage', 'U') IS NULL
             BEGIN
@@ -771,6 +923,328 @@ try
             IF COL_LENGTH('dbo.CrmProduct', 'WhatsappImageCode') IS NULL
             BEGIN
                 ALTER TABLE dbo.[CrmProduct] ADD [WhatsappImageCode] nvarchar(200) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappTemplate', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmWhatsappTemplate', 'LanguageCode') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [LanguageCode] nvarchar(50) NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmLanguage', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmLanguage] (
+                    [Id] int IDENTITY(1,1) NOT NULL,
+                    [Code] nvarchar(50) NOT NULL,
+                    [Name] nvarchar(200) NOT NULL,
+                    CONSTRAINT [PK_CrmLanguage] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_CrmLanguage_Code] ON dbo.[CrmLanguage] ([Code]);
+                INSERT INTO dbo.[CrmLanguage] ([Code], [Name]) VALUES
+                    ('en', 'English'),
+                    ('hi', 'Hindi'),
+                    ('mr', 'Marathi'),
+                    ('gu', 'Gujarati'),
+                    ('ta', 'Tamil'),
+                    ('te', 'Telugu'),
+                    ('kn', 'Kannada'),
+                    ('bn', 'Bengali'),
+                    ('pa', 'Punjabi');
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailCampaign', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailCampaign] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Name] nvarchar(250) NOT NULL,
+                    [Subject] nvarchar(500) NOT NULL,
+                    [PreviewText] nvarchar(500) NULL,
+                    [FromName] nvarchar(150) NOT NULL,
+                    [FromEmail] nvarchar(250) NOT NULL,
+                    [ReplyToEmail] nvarchar(250) NULL,
+                    [CampaignType] nvarchar(50) NOT NULL,
+                    [ContentType] nvarchar(50) NOT NULL,
+                    [BodyHtml] nvarchar(max) NULL,
+                    [BodyText] nvarchar(max) NULL,
+                    [Status] nvarchar(50) NOT NULL,
+                    [ScheduledAt] datetime2 NULL,
+                    [StartedAt] datetime2 NULL,
+                    [CompletedAt] datetime2 NULL,
+                    [TargetSegmentFilterJson] nvarchar(max) NULL,
+                    [TotalRecipients] int NOT NULL DEFAULT 0,
+                    [SentCount] int NOT NULL DEFAULT 0,
+                    [DeliveredCount] int NOT NULL DEFAULT 0,
+                    [OpenedCount] int NOT NULL DEFAULT 0,
+                    [UniqueOpenedCount] int NOT NULL DEFAULT 0,
+                    [ClickedCount] int NOT NULL DEFAULT 0,
+                    [UniqueClickedCount] int NOT NULL DEFAULT 0,
+                    [BouncedCount] int NOT NULL DEFAULT 0,
+                    [UnsubscribedCount] int NOT NULL DEFAULT 0,
+                    [SpamComplaintCount] int NOT NULL DEFAULT 0,
+                    [CreatedBy] nvarchar(128) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NULL,
+                    CONSTRAINT [PK_CrmEmailCampaign] PRIMARY KEY ([Id])
+                );
+                CREATE INDEX [IX_CrmEmailCampaign_Status_ScheduledAt] ON dbo.[CrmEmailCampaign] ([Status], [ScheduledAt]);
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailTemplate', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailTemplate] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Name] nvarchar(250) NOT NULL,
+                    [Category] nvarchar(100) NOT NULL,
+                    [Subject] nvarchar(500) NOT NULL,
+                    [PreviewText] nvarchar(500) NULL,
+                    [BodyHtml] nvarchar(max) NULL,
+                    [BodyText] nvarchar(max) NULL,
+                    [IsActive] bit NOT NULL DEFAULT 1,
+                    [CreatedBy] nvarchar(128) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NULL,
+                    CONSTRAINT [PK_CrmEmailTemplate] PRIMARY KEY ([Id])
+                );
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailCampaignRecipient', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailCampaignRecipient] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [CampaignId] uniqueidentifier NOT NULL,
+                    [ContactId] uniqueidentifier NULL,
+                    [EmailAddress] nvarchar(250) NOT NULL,
+                    [FullName] nvarchar(250) NOT NULL,
+                    [CompanyName] nvarchar(250) NULL,
+                    [Status] nvarchar(50) NOT NULL,
+                    [TrackingToken] nvarchar(64) NOT NULL,
+                    [SentAt] datetime2 NULL,
+                    [DeliveredAt] datetime2 NULL,
+                    [OpenedAt] datetime2 NULL,
+                    [OpenCount] int NOT NULL DEFAULT 0,
+                    [ClickedAt] datetime2 NULL,
+                    [ClickCount] int NOT NULL DEFAULT 0,
+                    [BouncedAt] datetime2 NULL,
+                    [BounceType] nvarchar(50) NULL,
+                    [BounceReason] nvarchar(max) NULL,
+                    [ErrorMessage] nvarchar(max) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmEmailCampaignRecipient] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmEmailCampaignRecipient_CrmEmailCampaign] FOREIGN KEY ([CampaignId]) REFERENCES dbo.[CrmEmailCampaign] ([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_CrmEmailCampaignRecipient_CrmContact] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE SET NULL
+                );
+                CREATE INDEX [IX_CrmEmailCampaignRecipient_CampaignId_Status] ON dbo.[CrmEmailCampaignRecipient] ([CampaignId], [Status]);
+                CREATE UNIQUE INDEX [IX_CrmEmailCampaignRecipient_TrackingToken] ON dbo.[CrmEmailCampaignRecipient] ([TrackingToken]);
+                CREATE INDEX [IX_CrmEmailCampaignRecipient_EmailAddress] ON dbo.[CrmEmailCampaignRecipient] ([EmailAddress]);
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailSuppressionList', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailSuppressionList] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [EmailAddress] nvarchar(250) NOT NULL,
+                    [Reason] nvarchar(50) NOT NULL,
+                    [DiagnosticCode] nvarchar(max) NULL,
+                    [SourceCampaignId] uniqueidentifier NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmEmailSuppressionList] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_CrmEmailSuppressionList_EmailAddress] ON dbo.[CrmEmailSuppressionList] ([EmailAddress]);
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailTrackingLink', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailTrackingLink] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [CampaignId] uniqueidentifier NOT NULL,
+                    [OriginalUrl] nvarchar(max) NOT NULL,
+                    [LinkHash] nvarchar(64) NOT NULL,
+                    [ClickCount] int NOT NULL DEFAULT 0,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmEmailTrackingLink] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmEmailTrackingLink_CrmEmailCampaign] FOREIGN KEY ([CampaignId]) REFERENCES dbo.[CrmEmailCampaign] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmEmailTrackingLink_CampaignId_LinkHash] ON dbo.[CrmEmailTrackingLink] ([CampaignId], [LinkHash]);
+            END
+
+            IF OBJECT_ID('dbo.CrmEmailEventLog', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmEmailEventLog] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [CampaignId] uniqueidentifier NOT NULL,
+                    [RecipientId] uniqueidentifier NULL,
+                    [EmailAddress] nvarchar(250) NOT NULL,
+                    [EventType] nvarchar(50) NOT NULL,
+                    [Details] nvarchar(max) NULL,
+                    [UserAgent] nvarchar(max) NULL,
+                    [IpAddress] nvarchar(100) NULL,
+                    [IsMachineOpen] bit NOT NULL DEFAULT 0,
+                    [Timestamp] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmEmailEventLog] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmEmailEventLog_CrmEmailCampaign] FOREIGN KEY ([CampaignId]) REFERENCES dbo.[CrmEmailCampaign] ([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_CrmEmailEventLog_CampaignId_EventType] ON dbo.[CrmEmailEventLog] ([CampaignId], [EventType]);
+                CREATE INDEX [IX_CrmEmailEventLog_RecipientId] ON dbo.[CrmEmailEventLog] ([RecipientId]);
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappTemplate', 'U') IS NOT NULL
+            BEGIN
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'MetaTemplateId') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [MetaTemplateId] nvarchar(150) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'Category') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [Category] nvarchar(50) NOT NULL DEFAULT 'MARKETING';
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'Status') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [Status] nvarchar(50) NOT NULL DEFAULT 'APPROVED';
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'HeaderType') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [HeaderType] nvarchar(50) NOT NULL DEFAULT 'NONE';
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'HeaderText') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [HeaderText] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'HeaderMediaUrl') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [HeaderMediaUrl] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'BodyText') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [BodyText] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'FooterText') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [FooterText] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'ButtonsJson') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [ButtonsJson] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'ComponentsJson') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [ComponentsJson] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'SampleValuesJson') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [SampleValuesJson] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'VariableMappingsJson') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [VariableMappingsJson] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'QualityScore') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [QualityScore] nvarchar(50) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'RejectedReason') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [RejectedReason] nvarchar(max) NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'SyncedAt') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [SyncedAt] datetime2 NULL;
+                IF COL_LENGTH('dbo.CrmWhatsappTemplate', 'UpdatedAt') IS NULL
+                    ALTER TABLE dbo.[CrmWhatsappTemplate] ADD [UpdatedAt] datetime2 NULL;
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappCampaign', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappCampaign] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Name] nvarchar(250) NOT NULL,
+                    [TemplateId] uniqueidentifier NULL,
+                    [TemplateName] nvarchar(250) NULL,
+                    [LanguageCode] nvarchar(50) NULL DEFAULT 'en',
+                    [SenderPhoneNumberId] nvarchar(100) NULL,
+                    [DisplayPhoneNumber] nvarchar(50) NULL,
+                    [Status] nvarchar(50) NOT NULL DEFAULT 'Draft',
+                    [ScheduledAt] datetime2 NULL,
+                    [StartedAt] datetime2 NULL,
+                    [CompletedAt] datetime2 NULL,
+                    [TargetSegmentFilterJson] nvarchar(max) NULL,
+                    [VariableMappingsJson] nvarchar(max) NULL,
+                    [HeaderMediaUrl] nvarchar(max) NULL,
+                    [TotalRecipients] int NOT NULL DEFAULT 0,
+                    [SentCount] int NOT NULL DEFAULT 0,
+                    [DeliveredCount] int NOT NULL DEFAULT 0,
+                    [ReadCount] int NOT NULL DEFAULT 0,
+                    [RepliedCount] int NOT NULL DEFAULT 0,
+                    [FailedCount] int NOT NULL DEFAULT 0,
+                    [CostPerMessage] decimal(18,4) NOT NULL DEFAULT 0.80,
+                    [EstimatedCost] decimal(18,2) NULL,
+                    [ActualCost] decimal(18,2) NULL,
+                    [FailureReason] nvarchar(max) NULL,
+                    [CreatedBy] nvarchar(128) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [UpdatedAt] datetime2 NULL,
+                    CONSTRAINT [PK_CrmWhatsappCampaign] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmWhatsappCampaign_Template] FOREIGN KEY ([TemplateId]) REFERENCES dbo.[CrmWhatsappTemplate] ([Id]) ON DELETE SET NULL
+                );
+                CREATE INDEX [IX_CrmWhatsappCampaign_Status_ScheduledAt] ON dbo.[CrmWhatsappCampaign] ([Status], [ScheduledAt]);
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappCampaignRecipient', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappCampaignRecipient] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [CampaignId] uniqueidentifier NOT NULL,
+                    [ContactId] uniqueidentifier NULL,
+                    [PhoneNumber] nvarchar(50) NOT NULL,
+                    [FullName] nvarchar(250) NOT NULL,
+                    [CompanyName] nvarchar(250) NULL,
+                    [Status] nvarchar(50) NOT NULL DEFAULT 'Queued',
+                    [MetaMessageId] nvarchar(150) NULL,
+                    [SentAt] datetime2 NULL,
+                    [DeliveredAt] datetime2 NULL,
+                    [ReadAt] datetime2 NULL,
+                    [RepliedAt] datetime2 NULL,
+                    [ReplyMessageText] nvarchar(max) NULL,
+                    [ErrorCode] int NULL,
+                    [ErrorMessage] nvarchar(max) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappCampaignRecipient] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_CrmWhatsappCampaignRecipient_Campaign] FOREIGN KEY ([CampaignId]) REFERENCES dbo.[CrmWhatsappCampaign] ([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_CrmWhatsappCampaignRecipient_Contact] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE SET NULL
+                );
+                CREATE INDEX [IX_CrmWhatsappCampaignRecipient_CampaignId_Status] ON dbo.[CrmWhatsappCampaignRecipient] ([CampaignId], [Status]);
+                CREATE INDEX [IX_CrmWhatsappCampaignRecipient_MetaMessageId] ON dbo.[CrmWhatsappCampaignRecipient] ([MetaMessageId]);
+                CREATE INDEX [IX_CrmWhatsappCampaignRecipient_PhoneNumber] ON dbo.[CrmWhatsappCampaignRecipient] ([PhoneNumber]);
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappSuppressionList', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappSuppressionList] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [PhoneNumber] nvarchar(50) NOT NULL,
+                    [Reason] nvarchar(50) NOT NULL,
+                    [ContactId] uniqueidentifier NULL,
+                    [Source] nvarchar(50) NOT NULL DEFAULT 'Webhook',
+                    [Notes] nvarchar(max) NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappSuppressionList] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_CrmWhatsappSuppressionList_PhoneNumber] ON dbo.[CrmWhatsappSuppressionList] ([PhoneNumber]);
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappInboundMessage', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappInboundMessage] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [FromPhoneNumber] nvarchar(50) NOT NULL,
+                    [ProfileName] nvarchar(250) NULL,
+                    [MetaMessageId] nvarchar(150) NOT NULL,
+                    [ContextWamid] nvarchar(150) NULL,
+                    [CampaignId] uniqueidentifier NULL,
+                    [ContactId] uniqueidentifier NULL,
+                    [MessageType] nvarchar(50) NOT NULL DEFAULT 'text',
+                    [MessageBody] nvarchar(max) NULL,
+                    [ButtonPayload] nvarchar(max) NULL,
+                    [IsProcessed] bit NOT NULL DEFAULT 0,
+                    [FollowupStatus] nvarchar(50) NOT NULL DEFAULT 'Pending',
+                    [ReceivedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappInboundMessage] PRIMARY KEY ([Id])
+                );
+                CREATE INDEX [IX_CrmWhatsappInboundMessage_MetaMessageId] ON dbo.[CrmWhatsappInboundMessage] ([MetaMessageId]);
+                CREATE INDEX [IX_CrmWhatsappInboundMessage_ContextWamid] ON dbo.[CrmWhatsappInboundMessage] ([ContextWamid]);
+                CREATE INDEX [IX_CrmWhatsappInboundMessage_FromPhoneNumber] ON dbo.[CrmWhatsappInboundMessage] ([FromPhoneNumber]);
+            END
+
+            IF OBJECT_ID('dbo.CrmWhatsappWebhookLog', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.[CrmWhatsappWebhookLog] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [EventType] nvarchar(50) NOT NULL DEFAULT 'unknown',
+                    [FromPhoneNumber] nvarchar(50) NULL,
+                    [MetaMessageId] nvarchar(150) NULL,
+                    [ProcessingStatus] nvarchar(50) NOT NULL DEFAULT 'Received',
+                    [RawPayload] nvarchar(max) NOT NULL,
+                    [SignatureHeader] nvarchar(500) NULL,
+                    [ErrorMessage] nvarchar(max) NULL,
+                    [CampaignId] uniqueidentifier NULL,
+                    [RecipientId] uniqueidentifier NULL,
+                    [ReceivedAt] datetime2 NOT NULL,
+                    CONSTRAINT [PK_CrmWhatsappWebhookLog] PRIMARY KEY ([Id])
+                );
+                CREATE INDEX [IX_CrmWhatsappWebhookLog_ReceivedAt] ON dbo.[CrmWhatsappWebhookLog] ([ReceivedAt]);
+                CREATE INDEX [IX_CrmWhatsappWebhookLog_EventType] ON dbo.[CrmWhatsappWebhookLog] ([EventType]);
+                CREATE INDEX [IX_CrmWhatsappWebhookLog_ProcessingStatus] ON dbo.[CrmWhatsappWebhookLog] ([ProcessingStatus]);
+                CREATE INDEX [IX_CrmWhatsappWebhookLog_MetaMessageId] ON dbo.[CrmWhatsappWebhookLog] ([MetaMessageId]);
+                CREATE INDEX [IX_CrmWhatsappWebhookLog_FromPhoneNumber] ON dbo.[CrmWhatsappWebhookLog] ([FromPhoneNumber]);
             END
         ");
     }
@@ -862,6 +1336,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
+var wwwrootDir = System.IO.Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+if (System.IO.Directory.Exists(wwwrootDir))
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 // Emit one Tyresoles.Sql log at startup so the category appears in the log file; SQL queries log when you run them (e.g. login mutation).
 app.Lifetime.ApplicationStarted.Register(() =>
 {
@@ -869,7 +1350,10 @@ app.Lifetime.ApplicationStarted.Register(() =>
     logger.LogInformation("Query logging active. Run a GraphQL mutation (e.g. login) to see SQL entries.");
 });
 
-app.MapGet("/", () => Results.Redirect("/graphql", permanent: false));
+if (!Directory.Exists(wwwrootDir))
+{
+    app.MapGet("/", () => Results.Redirect("/graphql", permanent: false));
+}
 
 app.MapGet("/api/reports/{reportName}/pdf", async (
     string reportName,
@@ -918,6 +1402,11 @@ app.MapDriveSyncEndpoints();
 app.MapWindowsServiceEndpoints();
 app.MapControllers();
 app.MapRemoteAssistWebSocket();
+
+if (Directory.Exists(wwwrootDir))
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
 

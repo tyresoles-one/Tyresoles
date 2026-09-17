@@ -18,5 +18,18 @@ namespace Tyresoles.Data.Features.Sales
 
         /// <summary>Loads <c>E-Inv Json</c> from NAV, deserializes, and verifies on NIC (PDF path). Same flow as Tyresoles.Live <c>Database.VerifyEInoice</c>.</summary>
         Task<string?> VerifyEInvoiceAsync(ITenantScope scope, string type, string no, CancellationToken ct = default);
+
+        /// <summary>Fetches all Sales Invoice Header & Sales Cr_Memo Header records where [E-Inv Skip] = 1 without updating them.</summary>
+        Task<ClearEInvErrorsResult> GetSkippedEInvoiceErrorsAsync(ITenantScope scope, CancellationToken ct = default);
+
+        /// <summary>Fetches all Sales Invoice Header & Sales Cr_Memo Header records where [E-Inv Skip] = 1 and updates [E-Inv Skip] = 0 where No_ in (fetched nos.).</summary>
+        Task<ClearEInvErrorsResult> ClearEInvoiceErrorsAsync(ITenantScope scope, CancellationToken ct = default);
+    }
+
+    public sealed class ClearEInvErrorsResult
+    {
+        public List<string> InvoicesCleared { get; set; } = new();
+        public List<string> CrMemosCleared { get; set; } = new();
+        public int TotalCleared => InvoicesCleared.Count + CrMemosCleared.Count;
     }
 }

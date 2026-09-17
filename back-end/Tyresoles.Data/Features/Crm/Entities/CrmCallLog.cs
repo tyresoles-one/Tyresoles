@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Tyresoles.Data.Features.Crm.Entities;
 
@@ -11,4 +12,8 @@ public class CrmCallLog
     public string Outcome { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
+    public string? InvoiceNos { get; set; }
+    public decimal? InvoiceAmount { get; set; }
+    public decimal? TyreQuantity { get; set; }
+    public List<CrmCallLogInvoice> Invoices { get; set; } = new();
 }

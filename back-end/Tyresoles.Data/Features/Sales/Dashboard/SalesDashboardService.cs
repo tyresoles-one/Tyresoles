@@ -1171,23 +1171,67 @@ namespace Tyresoles.Data.Features.Sales.Dashboard
             public int Other { get; set; }
         }
 
+        private static TimeZoneInfo GetIndiaTimeZone()
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+            }
+        }
+
+        private static DateTime? TryParseToIndiaDateOnly(string? value, TimeZoneInfo tz)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dto))
+            {
+                var local = TimeZoneInfo.ConvertTime(dto, tz);
+                return local.Date;
+            }
+
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var utc))
+            {
+                var utcDto = new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc), TimeSpan.Zero);
+                var local = TimeZoneInfo.ConvertTime(utcDto, tz);
+                return local.Date;
+            }
+
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return dt.Date;
+
+            return null;
+        }
+
         public async Task<List<OutstandingDashboardRow>> GetDashboardOutstandingAsync(
             ITenantScope scope,
             SalesReportParams p,
             CancellationToken cancellationToken = default)
         {
-            DateTime asOfDt = DateTime.Today;
-            if (!string.IsNullOrWhiteSpace(p.To) && DateTime.TryParse(p.To, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtTo))
+            var tz = GetIndiaTimeZone();
+            DateTime asOfDt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+            if (!string.IsNullOrWhiteSpace(p.To))
             {
-                asOfDt = dtTo.Date;
+                var d = TryParseToIndiaDateOnly(p.To, tz);
+                if (d.HasValue) asOfDt = d.Value;
             }
-            else if (!string.IsNullOrWhiteSpace(p.From) && DateTime.TryParse(p.From, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtFrom))
+            else if (!string.IsNullOrWhiteSpace(p.From))
             {
-                asOfDt = dtFrom.Date;
+                var d = TryParseToIndiaDateOnly(p.From, tz);
+                if (d.HasValue) asOfDt = d.Value;
             }
-            else if (!string.IsNullOrWhiteSpace(p.WorkDate) && DateTime.TryParse(p.WorkDate, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtWork))
+            else if (!string.IsNullOrWhiteSpace(p.WorkDate))
             {
-                asOfDt = dtWork.Date;
+                var d = TryParseToIndiaDateOnly(p.WorkDate, tz);
+                if (d.HasValue) asOfDt = d.Value;
             }
 
             string custT = T(scope, "Customer", isShared: false);

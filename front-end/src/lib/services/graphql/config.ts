@@ -153,11 +153,10 @@ export function handleGraphQLError(
   
   const isUnauthorized = 
     code === 401 || 
-    rawErrorMessage.includes(' 401') || 
-    rawErrorMessage.includes(': 401') ||
-    String(error).includes('401') ||
+    (/\b401\b/.test(rawErrorMessage) && (rawErrorMessage.toLowerCase().includes('status') || rawErrorMessage.toLowerCase().includes('unauthorized') || rawErrorMessage.toLowerCase().includes('unauthenticated') || rawErrorMessage.startsWith('401'))) ||
     errors.some(e => 
       e.extensions?.code === 'UNAUTHENTICATED' || 
+      e.extensions?.code === 'AUTH_NOT_AUTHENTICATED' ||
       e.message?.toLowerCase().includes('unauthorized') ||
       e.message?.toLowerCase().includes('unauthenticated')
     );

@@ -284,16 +284,37 @@
 
   function toIso(date: unknown): string {
     if (!date) return "";
-    if (typeof date === "string") return new Date(date).toISOString();
-    if (
-      date &&
-      typeof date === "object" &&
-      "toDate" in date &&
-      typeof (date as { toDate: unknown }).toDate === "function"
-    ) {
-      return (date as { toDate: (tz: unknown) => Date }).toDate(
-        getLocalTimeZone(),
-      ).toISOString();
+    if (typeof date === "string") {
+      if (/^\d{4}-\d{2}-\d{2}/.test(date)) {
+        return date.substring(0, 10);
+      }
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+      return date;
+    }
+    if (date && typeof date === "object") {
+      if ("year" in date && "month" in date && "day" in date) {
+        const y = String((date as { year: number }).year);
+        const m = String((date as { month: number }).month).padStart(2, "0");
+        const d = String((date as { day: number }).day).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+      if ("toDate" in date && typeof (date as { toDate: unknown }).toDate === "function") {
+        try {
+          const d = (date as { toDate: (tz: unknown) => Date }).toDate(getLocalTimeZone());
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        } catch {
+          // ignore
+        }
+      }
     }
     return "";
   }

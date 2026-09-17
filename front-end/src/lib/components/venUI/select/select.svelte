@@ -210,17 +210,19 @@
   </Popover.Trigger>
   <Popover.Content
     class={cn(
-      "w-[var(--bits-popover-anchor-width)] min-w-[200px] p-0",
+      "w-[var(--bits-popover-anchor-width)] min-w-[200px] p-0 overflow-hidden flex flex-col z-50 rounded-xl border border-border bg-popover shadow-xl",
       "max-w-[calc(100vw-2rem)]",
       contentClass
     )}
-    style="max-height: min(400px, var(--bits-popover-content-available-height, 80vh));"
-    align="start"
+    collisionPadding={{ top: 16, bottom: 40, left: 16, right: 16 }}
+    avoidCollisions={true}
     sideOffset={4}
+    align="start"
+    style="max-height: min(300px, calc(var(--bits-popover-content-available-height, 100vh) - 20px));"
   >
-    <Command.Root shouldFilter={false} class="flex flex-col h-full">
+    <Command.Root shouldFilter={false} class="flex flex-col flex-1 min-h-0 overflow-hidden">
       <Command.Input placeholder={searchPlaceholder} bind:value={searchQuery} />
-      <Command.List class="overflow-x-hidden overflow-y-auto flex-1 h-full max-h-none">
+      <Command.List class="overflow-x-hidden overflow-y-auto flex-1 min-h-0 max-h-[260px]">
         <Command.Empty>{emptyText}</Command.Empty>
         {#if multiple && showSelectAll && options.length > 0 && !isTableMode}
           <Command.Group class="overflow-visible min-w-full w-max border-b">

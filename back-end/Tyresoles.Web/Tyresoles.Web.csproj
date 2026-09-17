@@ -14,6 +14,7 @@
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Data" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Subscriptions.Redis" Version="13.9.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -214,5 +215,34 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- Lead Harvester and Scraping Tools Publishing -->
+  <ItemGroup>
+    <Content Include="..\..\harvester\**\*"
+             Exclude="..\..\harvester\__pycache__\**;..\..\harvester\**\__pycache__\**;..\..\harvester\data\**;..\..\harvester\**\*.pyc;..\..\harvester\**\*.db*"
+             Link="harvester\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\Tyresoles.Data\Tools\**\*"
+             Link="Tools\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="CopyHarvesterToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_HarvesterFiles Include="..\..\harvester\**\*"
+                       Exclude="..\..\harvester\__pycache__\**;..\..\harvester\**\__pycache__\**;..\..\harvester\data\**;..\..\harvester\**\*.pyc;..\..\harvester\**\*.db*" />
+      <_ToolFiles Include="..\Tyresoles.Data\Tools\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_HarvesterFiles)"
+          DestinationFiles="@(_HarvesterFiles->'$(PublishDir)harvester\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_ToolFiles)"
+          DestinationFiles="@(_ToolFiles->'$(PublishDir)Tools\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

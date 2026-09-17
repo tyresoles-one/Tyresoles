@@ -18,6 +18,9 @@ export type DetailedCallLog = {
 	outcome: string;
 	notes?: string | null;
 	createdBy: string;
+	invoiceNos?: string | null;
+	invoiceAmount?: number | null;
+	tyreQuantity?: number | null;
 	contact?: CrmContactInfo | null;
 };
 
@@ -82,6 +85,9 @@ export const GetAllCrmCallLogsDocument = buildQuery`
 				outcome
 				notes
 				createdBy
+				invoiceNos
+				invoiceAmount
+				tyreQuantity
 				contact {
 					id
 					fullName
@@ -175,3 +181,35 @@ export const CompleteCrmReminderDocument = buildMutation`
 		}
 	}
 ` as unknown as TypedDocumentNode<{ completeCrmReminder: { success: boolean; message: string } }, { reminderId: string }>;
+
+export type DocumentDto = {
+	no: string;
+	date: string;
+	customerNo: string;
+	name: string;
+	amount: number;
+	quantity?: number;
+};
+
+export const GetMyDocumentsDocument = buildQuery`
+	query GetMyDocuments($input: SalesReportParamsInput!) {
+		getMyDocuments(parameters: $input) {
+			no
+			date
+			customerNo
+			name
+			amount
+			quantity
+		}
+	}
+` as unknown as TypedDocumentNode<{ getMyDocuments: DocumentDto[] }, { input: any }>;
+
+export const UpdateCrmCallLogInvoicesDocument = buildMutation`
+	mutation UpdateCrmCallLogInvoices($callLogId: UUID!, $invoiceNos: [String!]!) {
+		updateCrmCallLogInvoices(callLogId: $callLogId, invoiceNos: $invoiceNos) {
+			success
+			message
+		}
+	}
+` as unknown as TypedDocumentNode<{ updateCrmCallLogInvoices: { success: boolean; message: string } }, { callLogId: string; invoiceNos: string[] }>;
+

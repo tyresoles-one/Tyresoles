@@ -32,8 +32,11 @@ public class Mutation
     public async Task<CrmMasterItem> CreateCrmMasterItem(
         CrmMasterType type,
         string name,
+        string? code,
         int? parentId,
         bool? isPositive,
+        string? description,
+        bool? isActive,
         [Service] CrmDbContext db,
         CancellationToken ct)
     {
@@ -57,6 +60,19 @@ public class Mutation
                 db.CrmSources.Add(srcItem);
                 await db.SaveChangesAsync(ct);
                 id = srcItem.Id;
+                break;
+            case CrmMasterType.SourceChannel:
+                var scItem = new CrmSourceChannel
+                {
+                    Name = name,
+                    Code = code,
+                    ParentId = parentId,
+                    Description = description,
+                    IsActive = isActive ?? true
+                };
+                db.CrmSourceChannels.Add(scItem);
+                await db.SaveChangesAsync(ct);
+                id = scItem.Id;
                 break;
             case CrmMasterType.Stage:
                 var stItem = new CrmStage { Name = name };
@@ -112,8 +128,18 @@ public class Mutation
                 await db.SaveChangesAsync(ct);
                 id = appItem.Id;
                 break;
+            case CrmMasterType.Language:
+                var langCode = string.IsNullOrWhiteSpace(code)
+                    ? (name.Length <= 5 ? name.ToLowerInvariant() : name.Substring(0, 5).ToLowerInvariant())
+                    : code.Trim();
+                var langItem = new CrmLanguage { Name = name, Code = langCode };
+                db.CrmLanguages.Add(langItem);
+                await db.SaveChangesAsync(ct);
+                id = langItem.Id;
+                code = langItem.Code;
+                break;
         }
-        return new CrmMasterItem { Id = id, Name = name, ParentId = parentId, IsPositive = isPositive ?? false };
+        return new CrmMasterItem { Id = id, Code = code, Name = name, ParentId = parentId, IsPositive = isPositive ?? false, Description = description, IsActive = isActive ?? true };
     }
 
     [Authorize]
@@ -122,8 +148,11 @@ public class Mutation
         CrmMasterType type,
         int id,
         string name,
+        string? code,
         int? parentId,
         bool? isPositive,
+        string? description,
+        bool? isActive,
         [Service] CrmDbContext db,
         CancellationToken ct)
     {
@@ -143,6 +172,17 @@ public class Mutation
                 var srcItem = await db.CrmSources.FindAsync(new object[] { id }, ct);
                 if (srcItem == null) return null;
                 srcItem.Name = name;
+                break;
+            case CrmMasterType.SourceChannel:
+                var scItem = await db.CrmSourceChannels.FindAsync(new object[] { id }, ct);
+                if (scItem == null) return null;
+                scItem.Name = name;
+                scItem.Code = code;
+                scItem.ParentId = parentId;
+                if (description != null) scItem.Description = description;
+                if (isActive.HasValue) scItem.IsActive = isActive.Value;
+                description = scItem.Description;
+                isActive = scItem.IsActive;
                 break;
             case CrmMasterType.Stage:
                 var stItem = await db.CrmStages.FindAsync(new object[] { id }, ct);
@@ -193,9 +233,16 @@ public class Mutation
                 if (appItem == null) return null;
                 appItem.Name = name;
                 break;
+            case CrmMasterType.Language:
+                var langItem = await db.CrmLanguages.FindAsync(new object[] { id }, ct);
+                if (langItem == null) return null;
+                langItem.Name = name;
+                if (!string.IsNullOrWhiteSpace(code)) langItem.Code = code.Trim();
+                code = langItem.Code;
+                break;
         }
         await db.SaveChangesAsync(ct);
-        return new CrmMasterItem { Id = id, Name = name, ParentId = parentId, IsPositive = isPositive ?? false };
+        return new CrmMasterItem { Id = id, Code = code, Name = name, ParentId = parentId, IsPositive = isPositive ?? false, Description = description, IsActive = isActive ?? true };
     }
 
     [Authorize]
@@ -222,6 +269,11 @@ public class Mutation
                 var srcItem = await db.CrmSources.FindAsync(new object[] { id }, ct);
                 if (srcItem == null) return false;
                 db.CrmSources.Remove(srcItem);
+                break;
+            case CrmMasterType.SourceChannel:
+                var scItem = await db.CrmSourceChannels.FindAsync(new object[] { id }, ct);
+                if (scItem == null) return false;
+                db.CrmSourceChannels.Remove(scItem);
                 break;
             case CrmMasterType.Stage:
                 var stItem = await db.CrmStages.FindAsync(new object[] { id }, ct);
@@ -268,6 +320,11 @@ public class Mutation
                 if (appItem == null) return false;
                 db.CrmFleetApplications.Remove(appItem);
                 break;
+            case CrmMasterType.Language:
+                var langItem = await db.CrmLanguages.FindAsync(new object[] { id }, ct);
+                if (langItem == null) return false;
+                db.CrmLanguages.Remove(langItem);
+                break;
         }
         await db.SaveChangesAsync(ct);
         return true;
@@ -278,14 +335,19 @@ public class Mutation
     public async Task<CrmContact> SaveCrmContact(
         CrmContactInput input,
         [Service] CrmDbContext db,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
         CancellationToken ct)
     {
+        var currentUsername = httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+        var isNew = input.Id == null || input.Id == Guid.Empty;
         CrmContact? contact;
-        if (input.Id == null || input.Id == Guid.Empty)
+        if (isNew)
         {
             contact = new CrmContact
             {
-                Id = Guid.NewGuid()
+                Id = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = !string.IsNullOrWhiteSpace(input.CreatedBy) ? input.CreatedBy : currentUsername
             };
             db.CrmContacts.Add(contact);
         }
@@ -295,6 +357,16 @@ public class Mutation
             if (contact == null)
             {
                 throw new GraphQLException($"CrmContact with Id {input.Id.Value} not found.");
+            }
+            contact.ModifiedAt = DateTime.UtcNow;
+            contact.ModifiedBy = currentUsername;
+            if (contact.CreatedAt == null)
+            {
+                contact.CreatedAt = input.CreatedAt ?? DateTime.UtcNow;
+            }
+            if (string.IsNullOrWhiteSpace(contact.CreatedBy) && !string.IsNullOrWhiteSpace(input.CreatedBy))
+            {
+                contact.CreatedBy = input.CreatedBy;
             }
         }
 
@@ -315,10 +387,226 @@ public class Mutation
         contact.Products = input.Products;
         contact.Tags = input.Tags;
         contact.IsActive = input.IsActive;
-        contact.CreatedBy = input.CreatedBy;
+        if (!string.IsNullOrWhiteSpace(input.LeadSourceType)) contact.LeadSourceType = input.LeadSourceType;
+        contact.LeadSourceChannel = input.LeadSourceChannel;
+        if (!string.IsNullOrWhiteSpace(input.SourceUrl)) contact.SourceUrl = input.SourceUrl;
+        if (!string.IsNullOrWhiteSpace(input.Division)) contact.Division = input.Division;
+        if (!string.IsNullOrWhiteSpace(input.TargetProduct)) contact.TargetProduct = input.TargetProduct;
+        if (input.QualityScore.HasValue) contact.QualityScore = input.QualityScore;
+        if (!string.IsNullOrWhiteSpace(input.ScrapingQuery)) contact.ScrapingQuery = input.ScrapingQuery;
+        if (input.HarvestedAt.HasValue) contact.HarvestedAt = input.HarvestedAt;
+        if (!string.IsNullOrWhiteSpace(input.Website)) contact.Website = input.Website;
+        if (!string.IsNullOrWhiteSpace(input.Snippet)) contact.Snippet = input.Snippet;
+        contact.PrefLanguage = input.PrefLanguage;
+        contact.Location = input.Location;
 
         await db.SaveChangesAsync(ct);
         return contact;
+    }
+
+    [Authorize]
+    [GraphQLName("importHarvestedLeads")]
+    public async Task<LeadImportBatchResult> ImportHarvestedLeads(
+        List<HarvestedLeadInput> leads,
+        [Service] CrmDbContext db,
+        [Service] Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor,
+        CancellationToken ct)
+    {
+        var result = new LeadImportBatchResult
+        {
+            TotalSubmitted = leads?.Count ?? 0
+        };
+
+        if (leads == null || leads.Count == 0)
+        {
+            result.Messages.Add("No leads provided in batch.");
+            return result;
+        }
+
+        var username = httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "system-harvester";
+
+        var existingMobiles = await db.CrmContacts
+            .Where(c => c.MobileNo != null && c.MobileNo != "")
+            .Select(c => c.MobileNo!)
+            .ToHashSetAsync(ct);
+
+        foreach (var lead in leads)
+        {
+            if (string.IsNullOrWhiteSpace(lead.FullName) && string.IsNullOrWhiteSpace(lead.CompanyName))
+            {
+                result.SkippedCount++;
+                continue;
+            }
+
+            if (lead.CompanyName != null && (
+                (lead.CompanyName.StartsWith("No ", StringComparison.OrdinalIgnoreCase) && lead.CompanyName.EndsWith("Results Found", StringComparison.OrdinalIgnoreCase)) ||
+                lead.CompanyName.StartsWith("Live Google Maps Search:", StringComparison.OrdinalIgnoreCase)))
+            {
+                result.SkippedCount++;
+                result.Messages.Add($"Skipped placeholder result: {lead.CompanyName}");
+                continue;
+            }
+
+            var rawMobile = lead.MobileNo ?? "";
+            var cleanDigits = System.Text.RegularExpressions.Regex.Replace(rawMobile, @"[^\d]", "");
+            string normalizedMobile;
+            if (cleanDigits.Length >= 10)
+            {
+                normalizedMobile = cleanDigits.Substring(cleanDigits.Length - 10);
+            }
+            else if (cleanDigits.Length > 0)
+            {
+                normalizedMobile = cleanDigits;
+            }
+            else
+            {
+                normalizedMobile = "";
+            }
+
+            if (!string.IsNullOrEmpty(normalizedMobile) && existingMobiles.Contains(normalizedMobile))
+            {
+                result.DuplicateCount++;
+                continue;
+            }
+
+            var contactName = !string.IsNullOrWhiteSpace(lead.FullName) 
+                ? lead.FullName.Trim() 
+                : (lead.CompanyName?.Trim() ?? "Commercial Lead");
+
+            var tagsList = new List<string>();
+            tagsList.Add("Automated");
+            if (!string.IsNullOrWhiteSpace(lead.LeadSourceChannel)) tagsList.Add($"Source:{lead.LeadSourceChannel}");
+            if (!string.IsNullOrWhiteSpace(lead.Division)) tagsList.Add(lead.Division);
+            if (!string.IsNullOrWhiteSpace(lead.TargetProduct)) tagsList.Add(lead.TargetProduct);
+            if (!string.IsNullOrWhiteSpace(lead.City)) tagsList.Add(lead.City);
+            if (!string.IsNullOrWhiteSpace(lead.Tags))
+            {
+                var extra = lead.Tags.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                tagsList.AddRange(extra);
+            }
+
+            var resolvedState = !string.IsNullOrWhiteSpace(lead.State) && !lead.State.Trim().Equals("India", StringComparison.OrdinalIgnoreCase)
+                ? lead.State.Trim()
+                : Tyresoles.Data.Features.Crm.Services.LiveLeadDiscoveryService.ResolveState(lead.City, lead.Address);
+
+            var contact = new CrmContact
+            {
+                Id = Guid.NewGuid(),
+                ContactType = string.IsNullOrWhiteSpace(lead.ContactType) ? "Lead" : lead.ContactType.Trim(),
+                Location = !string.IsNullOrWhiteSpace(lead.Location) ? lead.Location.Trim() : null,
+                FullName = contactName,
+                CompanyName = lead.CompanyName?.Trim(),
+                MobileNo = normalizedMobile,
+                MobileNo2 = lead.MobileNo2?.Trim(),
+                EmailIds = lead.EmailIds?.Trim(),
+                Address = lead.Address?.Trim(),
+                City = lead.City?.Trim(),
+                State = resolvedState,
+                RespCenter = lead.RespCenter?.Trim(),
+                Division = lead.Division?.Trim() ?? "Tyresoles",
+                TargetProduct = lead.TargetProduct?.Trim(),
+                LeadSourceType = string.IsNullOrWhiteSpace(lead.LeadSourceType) ? "Automated" : lead.LeadSourceType.Trim(),
+                LeadSourceChannel = lead.LeadSourceChannel?.Trim() ?? "Google-Maps",
+                SourceUrl = lead.SourceUrl?.Trim(),
+                Website = lead.Website?.Trim(),
+                Snippet = lead.Snippet?.Trim(),
+                QualityScore = lead.QualityScore,
+                ScrapingQuery = lead.ScrapingQuery?.Trim(),
+                Tags = string.Join(", ", tagsList.Distinct()),
+                IsActive = true,
+                CreatedBy = username,
+                CreatedAt = DateTime.UtcNow,
+                HarvestedAt = DateTime.UtcNow
+            };
+
+            db.CrmContacts.Add(contact);
+            if (!string.IsNullOrEmpty(normalizedMobile))
+            {
+                existingMobiles.Add(normalizedMobile);
+            }
+            result.ImportedCount++;
+        }
+
+        await db.SaveChangesAsync(ct);
+        result.Messages.Add($"Successfully imported {result.ImportedCount} leads. Skipped {result.DuplicateCount} duplicates.");
+        return result;
+    }
+
+    [Authorize]
+    [GraphQLName("fetchWebUrlBatch")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrawlPipelineResultDto> FetchWebUrlBatch(
+        string url,
+        int pages,
+        bool? reset,
+        string? division,
+        string? targetProduct,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.FetchWebUrlBatchAsync(url, pages, reset ?? false, division ?? "Tyresoles", targetProduct ?? "Commercial Retreading", ct);
+    }
+
+    [Authorize]
+    [GraphQLName("processStagedLeads")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrawlPipelineResultDto> ProcessStagedLeads(
+        string? url,
+        int? limit,
+        bool? dryRun,
+        string? defaultLeadSourceType,
+        string? defaultLeadSourceChannel,
+        string? defaultRespCenter,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.ProcessStagedLeadsAsync(
+            url,
+            limit ?? 50,
+            dryRun ?? false,
+            defaultLeadSourceType,
+            defaultLeadSourceChannel,
+            defaultRespCenter,
+            ct);
+    }
+
+    [Authorize]
+    [GraphQLName("resetCrawlCheckpoint")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrawlCheckpointDto> ResetCrawlCheckpoint(
+        string url,
+        bool? clearStaging,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.ResetCrawlCheckpointAsync(url, clearStaging ?? false, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("autoExtractWebLeads")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.AutoExtractResultDto> AutoExtractWebLeads(
+        string url,
+        int? pages,
+        bool? autoIngest,
+        bool? reset,
+        string? division,
+        string? targetProduct,
+        bool? dryRun,
+        string? defaultLeadSourceType,
+        string? defaultLeadSourceChannel,
+        string? defaultRespCenter,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.AutoExtractWebLeadsAsync(
+            url,
+            pages ?? 1,
+            autoIngest ?? true,
+            reset ?? false,
+            division ?? "Tyresoles",
+            targetProduct ?? "Commercial Retreading",
+            dryRun ?? false,
+            defaultLeadSourceType,
+            defaultLeadSourceChannel,
+            defaultRespCenter,
+            ct);
     }
 
     [Authorize]
@@ -488,6 +776,7 @@ public class Mutation
 
         temp.Name = input.Name;
         temp.Language = input.Language;
+        temp.LanguageCode = input.LanguageCode;
         temp.MessageText = input.MessageText;
 
         await db.SaveChangesAsync(ct);
@@ -1294,7 +1583,9 @@ public class Mutation
         DateTime? followUpDate,
         string? followUpNotes,
         bool? contactIsActive,
+        List<string>? invoiceNos,
         [Service] CrmDbContext db,
+        [Service] IDataverseDataService dataService,
         ClaimsPrincipal claimsPrincipal,
         CancellationToken ct)
     {
@@ -1305,6 +1596,36 @@ public class Mutation
                 ?? claimsPrincipal.Identity?.Name
                 ?? "";
 
+            var cleanInvoices = invoiceNos
+                ?.Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+
+            decimal totalAmount = 0;
+            decimal totalTyres = 0;
+            var invoiceDataMap = new Dictionary<string, (decimal Amount, decimal TyreQuantity)>(StringComparer.OrdinalIgnoreCase);
+
+            if (cleanInvoices.Count > 0)
+            {
+                using var scope = dataService.ForTenant("NavLive");
+                var (sql, prms) = BuildInClause("[Document No_]", "doc", cleanInvoices);
+                var lines = await scope.Query<SalesInvoiceLine>()
+                    .Where(sql, prms)
+                    .Where(l => l.ItemCategoryCode == "ECOMILE" || l.ItemCategoryCode == "ECOMLE" || l.ItemCategoryCode == "RETD")
+                    .ToArrayAsync(ct).ConfigureAwait(false);
+
+                foreach (var group in lines.GroupBy(l => l.DocumentNo, StringComparer.OrdinalIgnoreCase))
+                {
+                    var amt = group.Sum(l => l.AmountToCustomer);
+                    var qty = group.Sum(l => l.Quantity);
+                    invoiceDataMap[group.Key] = (amt, qty);
+                }
+
+                totalAmount = invoiceDataMap.Values.Sum(v => v.Amount);
+                totalTyres = invoiceDataMap.Values.Sum(v => v.TyreQuantity);
+            }
+
             // Create call log
             var callLog = new CrmCallLog
             {
@@ -1313,10 +1634,27 @@ public class Mutation
                 CallDate = DateTime.UtcNow,
                 Outcome = outcome,
                 Notes = notes,
-                CreatedBy = callerUserId
+                CreatedBy = callerUserId,
+                InvoiceNos = cleanInvoices.Count > 0 ? string.Join(",", cleanInvoices) : null,
+                InvoiceAmount = cleanInvoices.Count > 0 ? totalAmount : null,
+                TyreQuantity = cleanInvoices.Count > 0 ? totalTyres : null
             };
 
             db.CrmCallLogs.Add(callLog);
+
+            foreach (var inv in cleanInvoices)
+            {
+                var data = invoiceDataMap.TryGetValue(inv, out var d) ? d : (Amount: 0m, TyreQuantity: 0m);
+                db.CrmCallLogInvoices.Add(new CrmCallLogInvoice
+                {
+                    Id = Guid.NewGuid(),
+                    CallLogId = callLog.Id,
+                    InvoiceNo = inv,
+                    Amount = data.Amount,
+                    TyreQuantity = data.TyreQuantity,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             // Update contact's LastCallDate and LastCallOutcome
             var contact = await db.CrmContacts.FindAsync(new object[] { contactId }, ct);
@@ -1365,6 +1703,118 @@ public class Mutation
         {
             return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
         }
+    }
+
+    [Authorize]
+    [GraphQLName("updateCrmCallLogInvoices")]
+    public async Task<MutationResult> UpdateCrmCallLogInvoices(
+        Guid callLogId,
+        List<string> invoiceNos,
+        [Service] CrmDbContext db,
+        [Service] IDataverseDataService dataService,
+        CancellationToken ct)
+    {
+        try
+        {
+            var callLog = await db.CrmCallLogs.FirstOrDefaultAsync(x => x.Id == callLogId, ct);
+            if (callLog == null)
+            {
+                return new MutationResult { Success = false, Message = "Call log not found." };
+            }
+
+            var cleanInvoices = invoiceNos
+                ?.Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+
+            decimal totalAmount = 0;
+            decimal totalTyres = 0;
+            var invoiceDataMap = new Dictionary<string, (decimal Amount, decimal TyreQuantity)>(StringComparer.OrdinalIgnoreCase);
+
+            if (cleanInvoices.Count > 0)
+            {
+                using var scope = dataService.ForTenant("NavLive");
+                var (sql, prms) = BuildInClause("[Document No_]", "doc", cleanInvoices);
+                var lines = await scope.Query<SalesInvoiceLine>()
+                    .Where(sql, prms)
+                    .Where(l => l.ItemCategoryCode == "ECOMILE" || l.ItemCategoryCode == "ECOMLE" || l.ItemCategoryCode == "RETD")
+                    .ToArrayAsync(ct).ConfigureAwait(false);
+
+                foreach (var group in lines.GroupBy(l => l.DocumentNo, StringComparer.OrdinalIgnoreCase))
+                {
+                    var amt = group.Sum(l => l.AmountToCustomer);
+                    var qty = group.Sum(l => l.Quantity);
+                    invoiceDataMap[group.Key] = (amt, qty);
+                }
+
+                totalAmount = invoiceDataMap.Values.Sum(v => v.Amount);
+                totalTyres = invoiceDataMap.Values.Sum(v => v.TyreQuantity);
+            }
+
+            callLog.InvoiceNos = cleanInvoices.Count > 0 ? string.Join(",", cleanInvoices) : null;
+            callLog.InvoiceAmount = cleanInvoices.Count > 0 ? totalAmount : null;
+            callLog.TyreQuantity = cleanInvoices.Count > 0 ? totalTyres : null;
+
+            // Synchronize CrmCallLogInvoice relational records
+            var existing = await db.CrmCallLogInvoices.Where(x => x.CallLogId == callLogId).ToListAsync(ct);
+            var toRemove = existing.Where(e => !cleanInvoices.Contains(e.InvoiceNo, StringComparer.OrdinalIgnoreCase)).ToList();
+            var existingNos = existing.Select(e => e.InvoiceNo).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var toAdd = cleanInvoices
+                .Where(inv => !existingNos.Contains(inv))
+                .Select(inv => {
+                    var data = invoiceDataMap.TryGetValue(inv, out var d) ? d : (Amount: 0m, TyreQuantity: 0m);
+                    return new CrmCallLogInvoice
+                    {
+                        Id = Guid.NewGuid(),
+                        CallLogId = callLogId,
+                        InvoiceNo = inv,
+                        Amount = data.Amount,
+                        TyreQuantity = data.TyreQuantity,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                })
+                .ToList();
+
+            if (toRemove.Count > 0)
+            {
+                db.CrmCallLogInvoices.RemoveRange(toRemove);
+            }
+            if (toAdd.Count > 0)
+            {
+                db.CrmCallLogInvoices.AddRange(toAdd);
+            }
+            foreach (var ex in existing.Where(e => cleanInvoices.Contains(e.InvoiceNo, StringComparer.OrdinalIgnoreCase)))
+            {
+                if (invoiceDataMap.TryGetValue(ex.InvoiceNo, out var d))
+                {
+                    ex.Amount = d.Amount;
+                    ex.TyreQuantity = d.TyreQuantity;
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+            return new MutationResult { Success = true, Message = "Call log invoices updated successfully." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    private static (string sql, Dictionary<string, object> parameters) BuildInClause(string quotedColumn, string paramPrefix, IReadOnlyList<string> values)
+    {
+        if (values == null || values.Count == 0)
+            return ("1=0", new Dictionary<string, object>());
+        var dict = new Dictionary<string, object>();
+        var names = new List<string>();
+        for (int i = 0; i < values.Count; i++)
+        {
+            var key = "@" + paramPrefix + i;
+            names.Add(key);
+            dict[key] = values[i];
+        }
+        return ($"{quotedColumn} IN ({string.Join(", ", names)})", dict);
     }
 
     [Authorize]
@@ -1451,14 +1901,17 @@ public class Mutation
     public class AllocateAgentContactsInput
     {
         public int? CoolDownDays { get; set; }
+        public string? RespCenter { get; set; }
         public List<string>? RespCenters { get; set; }
         public List<string>? Products { get; set; }
+        public string? Area { get; set; }
         public List<string>? Areas { get; set; }
         public List<string>? States { get; set; }
         public List<string>? Cities { get; set; }
         public List<string>? Types { get; set; }
         public List<string>? Categories { get; set; }
         public List<string>? Tags { get; set; }
+        public int? Limit { get; set; }
     }
 
     [Authorize]
@@ -1480,6 +1933,26 @@ public class Mutation
             if (string.IsNullOrEmpty(callerUserId))
             {
                 return new AllocateAgentContactsPayload { Success = false, Message = "User username not found in claims." };
+            }
+
+            // Parse legacy or single RespCenter/Area if provided
+            if (!string.IsNullOrWhiteSpace(input?.RespCenter))
+            {
+                input.RespCenters ??= new List<string>();
+                var split = input.RespCenter.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var s in split)
+                {
+                    if (!input.RespCenters.Contains(s)) input.RespCenters.Add(s);
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(input?.Area))
+            {
+                input.Areas ??= new List<string>();
+                var split = input.Area.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var s in split)
+                {
+                    if (!input.Areas.Contains(s)) input.Areas.Add(s);
+                }
             }
 
             // Retrieve agent's responsibility center locations from NAV
@@ -1530,9 +2003,9 @@ public class Mutation
                 await db.SaveChangesAsync(ct);
             }
 
-            // Manual allocation triggered via dialog should fetch up to contactsLimit
+            // Manual allocation triggered via dialog should fetch up to contactsLimit (or input.Limit if specified)
             // regardless of currently allocated count.
-            int needed = contactsLimit;
+            int needed = (input?.Limit.HasValue == true && input.Limit.Value > 0) ? input.Limit.Value : contactsLimit;
 
                 var cooldownCutoffRetry = DateTime.UtcNow.AddDays(-3);
                 var cooldownCutoffGeneral = DateTime.UtcNow.AddDays(-30);
@@ -1704,6 +2177,11 @@ public class Mutation
 
             if (allocation != null)
             {
+                if (allocation.CallCount > 0 || allocation.LastCallDate != null || !string.IsNullOrWhiteSpace(allocation.LastCallOutcome))
+                {
+                    return new MutationResult { Success = false, Message = "Only pending and untouched contacts can be deallocated." };
+                }
+
                 allocation.DeallocatedAt = DateTime.UtcNow;
                 allocation.DeallocatedBy = callerUserId;
                 await db.SaveChangesAsync(ct);
@@ -1741,14 +2219,26 @@ public class Mutation
             var now = DateTime.UtcNow;
 
             var updatedCount = await db.CrmAgentContacts
-                .Where(ac => contactIds.Contains(ac.ContactId) && ac.DeallocatedAt == null)
+                .Where(ac => contactIds.Contains(ac.ContactId) 
+                    && ac.DeallocatedAt == null 
+                    && ac.CallCount == 0 
+                    && ac.LastCallDate == null 
+                    && (ac.LastCallOutcome == null || ac.LastCallOutcome == ""))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(ac => ac.DeallocatedAt, now)
                     .SetProperty(ac => ac.DeallocatedBy, callerUserId), ct);
 
+            if (updatedCount == 0)
+            {
+                return new MutationResult { 
+                    Success = false, 
+                    Message = "No untouched contacts were deallocated. Contacted leads cannot be deallocated." 
+                };
+            }
+
             return new MutationResult { 
                 Success = true, 
-                Message = $"{updatedCount} contact{(updatedCount == 1 ? "" : "s")} deallocated successfully." 
+                Message = $"{updatedCount} untouched contact{(updatedCount == 1 ? "" : "s")} deallocated successfully." 
             };
         }
         catch (Exception ex)

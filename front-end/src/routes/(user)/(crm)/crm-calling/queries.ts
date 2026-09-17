@@ -12,7 +12,10 @@ export type CrmContact = {
 	erpCustomerNos?: string | null;
 	erpAreaCodes?: string | null;
 	products?: string | null;
+	prefLanguage?: string | null;
+	location?: string | null;
 	lastCallDate?: string | null;
+	lastCallOutcome?: string | null;
 };
 
 export type CrmAgentContact = {
@@ -20,6 +23,11 @@ export type CrmAgentContact = {
 	agentUsername: string;
 	contactId: string;
 	contact: CrmContact;
+	allocatedAt?: string;
+	lastCallOutcome?: string | null;
+	lastCallDate?: string | null;
+	lastCallNotes?: string | null;
+	callCount?: number;
 };
 
 export type GetCrmAgentContactsResult = {
@@ -82,6 +90,7 @@ export type CrmWhatsappTemplate = {
 	id: string;
 	name: string;
 	language: string;
+	languageCode?: string | null;
 	messageText: string;
 	createdAt: string;
 };
@@ -103,16 +112,26 @@ export const GetCrmAgentContactsDocument = buildQuery`
 				id
 				agentUsername
 				contactId
+				allocatedAt
+				lastCallOutcome
+				lastCallDate
+				lastCallNotes
+				callCount
 				contact {
 					id
 					fullName
 					companyName
 					mobileNo
 					city
+					state
 					respCenter
 					erpCustomerNos
 					erpAreaCodes
 					products
+					prefLanguage
+					location
+					lastCallDate
+					lastCallOutcome
 				}
 			}
 			totalCount
@@ -133,6 +152,10 @@ export const GetCrmContactByIdDocument = buildQuery`
 			erpCustomerNos
 			erpAreaCodes
 			products
+			prefLanguage
+			location
+			lastCallDate
+			lastCallOutcome
 		}
 	}
 ` as unknown as TypedDocumentNode<{ contact: CrmContact | null }, { id: string }>;
@@ -223,6 +246,7 @@ export const GetCrmWhatsappTemplatesDocument = buildQuery`
 			id
 			name
 			language
+			languageCode
 			messageText
 			createdAt
 		}
@@ -297,6 +321,49 @@ export const GetCrmMyCallingSummaryDocument = buildQuery`
 	}
 ` as unknown as TypedDocumentNode<{ summary: { outcome: string; count: number }[] }, { date?: string }>;
 
+export type DetailedCallLog = {
+	id: string;
+	contactId: string;
+	callDate: string;
+	outcome: string;
+	notes?: string | null;
+	createdBy: string;
+	contact?: {
+		id: string;
+		fullName: string;
+		companyName?: string | null;
+		mobileNo?: string | null;
+		city?: string | null;
+		state?: string | null;
+		respCenter?: string | null;
+	} | null;
+};
+
+export const GetAllCrmCallLogsDocument = buildQuery`
+	query GetAllCrmCallLogs($skip: Int, $take: Int, $where: CrmCallLogFilterInput, $order: [CrmCallLogSortInput!]) {
+		crmCallLogs: getAllCrmCallLogs(skip: $skip, take: $take, where: $where, order: $order) {
+			items {
+				id
+				contactId
+				callDate
+				outcome
+				notes
+				createdBy
+				contact {
+					id
+					fullName
+					companyName
+					mobileNo
+					city
+					state
+					respCenter
+				}
+			}
+			totalCount
+		}
+	}
+` as unknown as TypedDocumentNode<{ crmCallLogs: { items: DetailedCallLog[]; totalCount: number } }, { skip?: number; take?: number; where?: any; order?: any }>;
+
 export const CompleteCrmReminderDocument = buildMutation`
 	mutation CompleteCrmReminder($reminderId: UUID!) {
 		completeCrmReminder(reminderId: $reminderId) {
@@ -315,6 +382,10 @@ export const AllocateAgentContactsDocument = buildMutation`
 				id
 				agentUsername
 				contactId
+				lastCallOutcome
+				lastCallDate
+				lastCallNotes
+				callCount
 				contact {
 					id
 					fullName
@@ -325,6 +396,8 @@ export const AllocateAgentContactsDocument = buildMutation`
 					erpCustomerNos
 					erpAreaCodes
 					products
+					lastCallDate
+					lastCallOutcome
 				}
 			}
 		}
@@ -339,6 +412,15 @@ export const DeallocateCrmContactDocument = buildMutation`
 		}
 	}
 ` as unknown as TypedDocumentNode<{ deallocateCrmContact: { success: boolean; message: string } }, { contactId: string }>;
+
+export const DeallocateCrmContactsDocument = buildMutation`
+	mutation DeallocateCrmContacts($contactIds: [UUID!]!) {
+		deallocateCrmContacts(contactIds: $contactIds) {
+			success
+			message
+		}
+	}
+` as unknown as TypedDocumentNode<{ deallocateCrmContacts: { success: boolean; message: string } }, { contactIds: string[] }>;
 
 export const PrintDocumentsMutation = buildMutation`
 	mutation PrintDocuments($input: SalesReportParamsInput!) {
@@ -372,3 +454,22 @@ export const GetCrmContactProductsDocument = buildQuery`
 		getCrmContactProducts(respCenter: $respCenter)
 	}
 ` as unknown as TypedDocumentNode<{ getCrmContactProducts: string[] }, { respCenter?: string }>;
+
+export type CrmAgentSummary = {
+	agentUsername: string;
+	totalAllocated: number;
+	activeAllocated: number;
+	totalCalls: number;
+};
+
+export const GetCrmAgentSummaryReportDocument = buildQuery`
+	query GetCrmAgentSummaryReport {
+		getCrmAgentSummaryReport {
+			agentUsername
+			totalAllocated
+			activeAllocated
+			totalCalls
+		}
+	}
+` as unknown as TypedDocumentNode<{ getCrmAgentSummaryReport: CrmAgentSummary[] }, {}>;
+

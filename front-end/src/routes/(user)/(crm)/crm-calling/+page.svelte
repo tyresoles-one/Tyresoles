@@ -8,9 +8,11 @@
 	import AllocateContactsDialog from './AllocateContactsDialog.svelte';
 	import ContactList from './components/ContactList.svelte';
 	import Workspace from './components/Workspace.svelte';
+	import CallingStatsBar from './components/CallingStatsBar.svelte';
 	import { Icon } from '$lib/components/venUI/icon';
 	import { Button } from '$lib/components/ui/button';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
+
 
 	import {
 		GetCrmAgentContactsDocument,
@@ -21,10 +23,10 @@
 		GetCrmContactClaimsDocument,
 		LogCrmCallDocument,
 		UndoCrmCallDocument,
-		GetCrmMyCallingSummaryDocument,
 		CompleteCrmReminderDocument,
 		AllocateAgentContactsDocument,
 		DeallocateCrmContactDocument,
+		DeallocateCrmContactsDocument,
 		PrintDocumentsMutation,
 		type CrmContact,
 		type CallLog,
@@ -49,27 +51,45 @@
 
 	let isSavingLog = $state(false);
 	let isUndoingLog = $state<string | null>(null);
+	let completingReminderId = $state<string | null>(null);
 	
 	let pdfData = $state<Uint8Array | null>(null);
 	let pdfFileName = $state<string>('');
 	let showPdfViewer = $state(false);
 	let loadingPdf = $state(false);
+	let printingDocNo = $state<string | null>(null);
 
-	let showSummaryModal = $state(false);
-	let callingSummary = $state<{ outcome: string; count: number }[]>([]);
-	let loadingSummary = $state(false);
+	let isFetchingContactDetails = $derived(loadingHistory || loadingInvoices || loadingClaims);
 
 	let allocateDialogOpen = $state(false);
 	let isAllocating = $state(false);
 	let isDeallocating = $state(false);
+	let isBulkDeallocating = $state(false);
+	let statsBarRef = $state<any>(null);
 
 	// Custom List State
 	let allocatedAgentContacts = $state<CrmAgentContact[]>([]);
 	let isListLoading = $state(false);
 	let searchQuery = $state('');
 	let filterCallDate = $state('pending');
-	let pageSize = $state(50);
+	let pageSize = $state(10);
 	let isListCollapsed = $state(false);
+
+	function cleanUsername(raw?: string | null): string {
+		if (!raw) return '';
+		return raw.replace(/^tyresoles\\/i, '').trim();
+	}
+
+	function isToday(dateStr?: string | null): boolean {
+		if (!dateStr) return false;
+		const d = new Date(dateStr);
+		const now = new Date();
+		return (
+			d.getFullYear() === now.getFullYear() &&
+			d.getMonth() === now.getMonth() &&
+			d.getDate() === now.getDate()
+		);
+	}
 
 	// Mocking list object structure so ContactList.svelte doesn't break.
 	// In ContactList.svelte we access list.searchQuery.value, list.loading, list.items, list.hasMore, list.onLoadMore
@@ -91,7 +111,18 @@
 	});
 
 	let filteredContacts = $derived.by(() => {
-		let items = allocatedAgentContacts.map(ac => ac.contact).filter(c => !!c);
+		let items = allocatedAgentContacts
+			.map((ac) => {
+				const c = ac.contact;
+				if (!c) return null;
+				return {
+					...c,
+					lastCallDate: ac.lastCallDate || c.lastCallDate,
+					lastCallOutcome: ac.lastCallOutcome || c.lastCallOutcome,
+					callCount: ac.callCount
+				};
+			})
+			.filter(Boolean) as (CrmContact & { callCount?: number })[];
 		
 		// Apply search filter manually
 		if (searchQuery) {
@@ -104,14 +135,63 @@
 			);
 		}
 
-		if (filterCallDate === 'pending') {
-			const todayStr = new Date().toDateString();
+		if (filterCallDate === 'today') {
+			// Shows today's contacts:
+			// 1. Contacts called today (even if finished calling!)
+			// 2. Untouched / pending contacts ready to be called today
+			return items.filter(c => {
+				if (isToday(c.lastCallDate)) return true;
+				if (!c.lastCallDate || !c.lastCallOutcome || c.lastCallOutcome.trim() === '' || c.callCount === 0) return true;
+				return false;
+			});
+		} else if (filterCallDate === 'called_today') {
+			// Strictly contacts called today
+			return items.filter(c => isToday(c.lastCallDate));
+		} else if (filterCallDate === 'pending') {
+			// Untouched / pending contacts: NO call logged or never called!
+			return items.filter(c => !c.lastCallOutcome || c.lastCallOutcome.trim() === '' || !c.lastCallDate || c.callCount === 0);
+		} else if (filterCallDate === 'all') {
+			return items;
+		} else if (filterCallDate === 'recent_7d') {
+			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+			return items.filter(c => {
+				if (!c.lastCallDate) return false;
+				return new Date(c.lastCallDate).getTime() >= sevenDaysAgo;
+			});
+		} else if (filterCallDate === 'connected') {
+			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+			return items.filter(c => {
+				if (!c.lastCallDate || new Date(c.lastCallDate).getTime() < sevenDaysAgo) return false;
+				const norm = (c.lastCallOutcome || '').toLowerCase();
+				return !norm.includes('unreachable') && !norm.includes('no answer') && !norm.includes('ringing') && !norm.includes('switched off') && !norm.includes('not reachable') && !norm.includes('missed') && !norm.includes('busy');
+			});
+		} else if (filterCallDate === 'not_called_7d') {
+			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 			return items.filter(c => {
 				if (!c.lastCallDate) return true;
-				return new Date(c.lastCallDate).toDateString() !== todayStr;
+				return new Date(c.lastCallDate).getTime() < sevenDaysAgo;
+			});
+		} else if (filterCallDate === 'followup') {
+			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+			return items.filter(c => {
+				if (!c.lastCallDate || new Date(c.lastCallDate).getTime() < sevenDaysAgo) return false;
+				const norm = (c.lastCallOutcome || '').toLowerCase();
+				return norm.includes('follow') || norm.includes('callback') || norm.includes('reminder') || norm.includes('busy');
+			});
+		} else if (filterCallDate === 'positive') {
+			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+			return items.filter(c => {
+				if (!c.lastCallDate || new Date(c.lastCallDate).getTime() < sevenDaysAgo) return false;
+				const norm = (c.lastCallOutcome || '').toLowerCase();
+				return !norm.includes('not interested') && (norm.includes('interested') || norm.includes('sale') || norm.includes('order') || norm.includes('won') || norm.includes('completed'));
+			});
+		} else {
+			// Specific outcome match from compact filter
+			return items.filter(c => {
+				if (!c.lastCallOutcome) return false;
+				return c.lastCallOutcome.trim().toLowerCase() === filterCallDate.trim().toLowerCase();
 			});
 		}
-		return items;
 	});
 
 	$effect(() => {
@@ -134,15 +214,39 @@
 	async function loadAllocatedContacts() {
 		isListLoading = true;
 		try {
+			const raw = $authStore.username || '';
+			const clean = cleanUsername(raw);
+
+			// Only show contacts for the same day; on next date, it starts as a clean blank list
+			const now = new Date();
+			const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+			const startOfTodayIso = startOfToday.toISOString();
+
+			const whereClause: any = {
+				deallocatedAt: { eq: null },
+				allocatedAt: { gte: startOfTodayIso }
+			};
+			if (clean) {
+				whereClause.or = [
+					{ agentUsername: { eq: raw } },
+					{ agentUsername: { eq: clean } },
+					{ agentUsername: { contains: clean } }
+				];
+			}
+
 			const res = await graphqlQuery<any>(GetCrmAgentContactsDocument, {
 				variables: {
-					take: pageSize, // load the exact limit
-					where: { agentUsername: { eq: $authStore.username }, deallocatedAt: { eq: null } },
+					take: 500, // Load active pool of contacts
+					where: whereClause,
 					order: [{ contact: { lastCallDate: 'ASC' } }]
 				}
 			});
 			if (res.success && res.data?.crmAgentContacts?.items) {
-				allocatedAgentContacts = res.data.crmAgentContacts.items;
+				// Client-side same-day safeguard: only keep contacts allocated or called today
+				allocatedAgentContacts = res.data.crmAgentContacts.items.filter((ac: any) => 
+					isToday(ac.allocatedAt) || isToday(ac.lastCallDate)
+				);
+				filterCallDate = 'pending';
 			}
 		} catch (err) {
 			console.error('Failed to load initial contacts', err);
@@ -191,16 +295,13 @@
 		}
 	}
 
-	async function loadCallingSummary() {
-		showSummaryModal = true;
-		loadingSummary = true;
-		try {
-			const res = await graphqlQuery<{ summary: { outcome: string; count: number }[] }>(GetCrmMyCallingSummaryDocument, {});
-			if (res.success && res.data) callingSummary = res.data.summary;
-		} catch (err) {
-			console.error(err);
-		} finally {
-			loadingSummary = false;
+
+	function handleSelectContactById(contactId: string) {
+		const found =
+			filteredContacts.find((c) => c.id === contactId) ||
+			allocatedAgentContacts.find((ac) => ac.contactId === contactId || ac.contact?.id === contactId)?.contact;
+		if (found) {
+			selectedContact = found;
 		}
 	}
 
@@ -221,7 +322,32 @@
 				toast.success('Call log saved successfully.');
 				await loadHistory(selectedContact.id);
 				activeTab = 'history';
+
+				const nowIso = new Date().toISOString();
+				selectedContact.lastCallDate = nowIso;
+				selectedContact.lastCallOutcome = data.outcome;
+
+				allocatedAgentContacts = allocatedAgentContacts.map((ac) => {
+					if (ac.contactId === selectedContact!.id || ac.contact?.id === selectedContact!.id) {
+						return {
+							...ac,
+							lastCallDate: nowIso,
+							lastCallOutcome: data.outcome,
+							callCount: (ac.callCount || 0) + 1,
+							contact: ac.contact
+								? {
+										...ac.contact,
+										lastCallDate: nowIso,
+										lastCallOutcome: data.outcome
+									}
+								: ac.contact
+						};
+					}
+					return ac;
+				});
+				statsBarRef?.loadData?.();
 			} else {
+
 				toast.error(res.error || 'Failed to save call log.');
 			}
 		} catch (err) {
@@ -239,8 +365,35 @@
 			const res = await graphqlMutation<{ undoCrmCall: { success: boolean; message: string } }>(UndoCrmCallDocument, { variables: { callLogId } });
 			if (res.success && res.data?.undoCrmCall.success) {
 				toast.success('Call log undone successfully.');
-				if (selectedContact) await loadHistory(selectedContact.id);
+				if (selectedContact) {
+					await loadHistory(selectedContact.id);
+					const latest = callLogs.length > 0 ? callLogs[0] : null;
+					const newDate = latest ? latest.callDate : null;
+					const newOutcome = latest ? latest.outcome : null;
+					selectedContact.lastCallDate = newDate;
+					selectedContact.lastCallOutcome = newOutcome;
+
+					allocatedAgentContacts = allocatedAgentContacts.map((ac) => {
+						if (ac.contactId === selectedContact!.id || ac.contact?.id === selectedContact!.id) {
+							return {
+								...ac,
+								lastCallDate: newDate,
+								lastCallOutcome: newOutcome,
+								contact: ac.contact
+									? {
+											...ac.contact,
+											lastCallDate: newDate,
+											lastCallOutcome: newOutcome
+										}
+									: ac.contact
+							};
+						}
+						return ac;
+					});
+				}
+				statsBarRef?.loadData?.();
 			} else {
+
 				toast.error(res.error || 'Failed to undo call log.');
 			}
 		} catch (err) {
@@ -252,6 +405,7 @@
 	}
 
 	async function handleCompleteReminder(reminderId: string) {
+		completingReminderId = reminderId;
 		try {
 			const res = await graphqlMutation<{ completeCrmReminder: { success: boolean; message: string } }>(CompleteCrmReminderDocument, { variables: { reminderId } });
 			if (res.success && res.data?.completeCrmReminder.success) {
@@ -263,10 +417,22 @@
 		} catch (err) {
 			console.error(err);
 			toast.error('An error occurred.');
+		} finally {
+			completingReminderId = null;
 		}
 	}
 
 	async function handleDeallocateContact(contactId: string) {
+		const target = allocatedAgentContacts.find(c => c.contactId === contactId || c.contact?.id === contactId);
+		const c = target?.contact;
+		const callCount = target?.callCount ?? c?.callCount ?? 0;
+		const lastDate = target?.lastCallDate || c?.lastCallDate;
+		const outcome = target?.lastCallOutcome || c?.lastCallOutcome;
+		if (callCount > 0 || lastDate || (outcome && outcome.trim() !== '')) {
+			toast.error('Only pending and untouched contacts can be deallocated.');
+			return;
+		}
+
 		if (!confirm('Are you sure you want to deallocate this contact?')) return;
 		isDeallocating = true;
 		try {
@@ -274,7 +440,9 @@
 			if (res.success && res.data?.deallocateCrmContact.success) {
 				toast.success('Contact deallocated successfully.');
 				selectedContact = null;
+				isListCollapsed = false;
 				allocatedAgentContacts = allocatedAgentContacts.filter(c => c.contactId !== contactId);
+				statsBarRef?.loadData?.();
 			} else {
 				toast.error(res.error || 'Failed to deallocate contact.');
 			}
@@ -285,19 +453,120 @@
 		}
 	}
 
+	async function handleBulkDeallocate(contactIds: string[]) {
+		if (!contactIds || contactIds.length === 0) return;
+
+		// Guard: only allow deallocation for untouched contacts
+		const untouchedIds = contactIds.filter(id => {
+			const target = allocatedAgentContacts.find(c => c.contactId === id || c.contact?.id === id);
+			const c = target?.contact;
+			const callCount = target?.callCount ?? c?.callCount ?? 0;
+			const lastDate = target?.lastCallDate || c?.lastCallDate;
+			const outcome = target?.lastCallOutcome || c?.lastCallOutcome;
+			return callCount === 0 && !lastDate && (!outcome || outcome.trim() === '');
+		});
+
+		if (untouchedIds.length === 0) {
+			toast.error('Cannot deallocate: only pending and untouched contacts can be deallocated.');
+			return;
+		}
+
+		if (!confirm(`Are you sure you want to deallocate ${untouchedIds.length} untouched contact${untouchedIds.length === 1 ? '' : 's'}?`)) return;
+		isBulkDeallocating = true;
+		try {
+			const res = await graphqlMutation<{ deallocateCrmContacts: { success: boolean; message: string } }>(
+				DeallocateCrmContactsDocument,
+				{ variables: { contactIds: untouchedIds } }
+			);
+			if (res.success && res.data?.deallocateCrmContacts.success) {
+				toast.success(res.data.deallocateCrmContacts.message || `Successfully deallocated ${untouchedIds.length} contact${untouchedIds.length === 1 ? '' : 's'}.`);
+				const deallocatedSet = new Set(untouchedIds);
+				if (selectedContact && deallocatedSet.has(selectedContact.id)) {
+					selectedContact = null;
+					isListCollapsed = false;
+				}
+				allocatedAgentContacts = allocatedAgentContacts.filter(c => !deallocatedSet.has(c.contactId));
+				statsBarRef?.loadData?.();
+			} else {
+				toast.error(res.error || res.data?.deallocateCrmContacts.message || 'Failed to deallocate contacts.');
+			}
+		} catch (err: any) {
+			console.error(err);
+			toast.error(err.message || 'An error occurred during deallocation.');
+		} finally {
+			isBulkDeallocating = false;
+		}
+	}
+
+	const ALLOCATION_FILTER_STORAGE_KEY = 'crm_calling_last_allocation_filters';
+
+	function getSavedAllocationFilters(): any | null {
+		try {
+			const stored = localStorage.getItem(ALLOCATION_FILTER_STORAGE_KEY);
+			if (!stored) return null;
+			const parsed = JSON.parse(stored);
+			if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+				return parsed;
+			}
+		} catch (e) {
+			console.error('Failed to read stored allocation filters', e);
+		}
+		return null;
+	}
+
+	async function handleQuickLoadContacts(limit: number = 10) {
+		const savedFilters = getSavedAllocationFilters();
+
+		// If filter is not saved, clicking get contact button should show filter dialog
+		if (!savedFilters) {
+			allocateDialogOpen = true;
+			return;
+		}
+
+		// Otherwise, load contacts using saved filter
+		await handleAllocateContacts({
+			...savedFilters,
+			limit
+		});
+	}
+
 	async function handleAllocateContacts(filters: any) {
 		isAllocating = true;
 		try {
+			// Normalize filters so only valid fields on AllocateAgentContactsInput are sent
+			const payload: any = {
+				coolDownDays: filters.coolDownDays ?? null,
+				respCenters: Array.isArray(filters.respCenters)
+					? filters.respCenters
+					: (filters.respCenter ? filters.respCenter.split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+				areas: Array.isArray(filters.areas)
+					? filters.areas
+					: (filters.areas ? filters.areas.split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+				products: filters.products || [],
+				states: filters.states || [],
+				cities: filters.cities || [],
+				types: filters.types || [],
+				categories: filters.categories || [],
+				tags: filters.tags || [],
+				limit: filters.limit ?? 10
+			};
+
 			const res = await graphqlMutation<{ allocateAgentContacts: { success: boolean; message: string; allocatedContacts: CrmAgentContact[] } }>(
 				AllocateAgentContactsDocument, 
-				{ variables: { input: filters } }
+				{ variables: { input: payload } }
 			);
 			if (res.success && res.data?.allocateAgentContacts.success) {
 				const newContacts = res.data.allocateAgentContacts.allocatedContacts || [];
 				toast.success(res.data.allocateAgentContacts.message || `Successfully allocated ${newContacts.length} new contacts.`);
 				
-				// Append new contacts to the active list
-				allocatedAgentContacts = [...allocatedAgentContacts, ...newContacts];
+				// Append new contacts to the active list without duplicates
+				const existingIds = new Set(allocatedAgentContacts.map(c => c.contactId || c.contact?.id));
+				const fresh = newContacts.filter(c => !existingIds.has(c.contactId || c.contact?.id));
+				allocatedAgentContacts = [...allocatedAgentContacts, ...fresh];
+				if (newContacts.length > 0) {
+					filterCallDate = 'pending';
+				}
+				statsBarRef?.loadData?.();
 			} else {
 				toast.error(res.error || res.data?.allocateAgentContacts.message || 'Failed to allocate contacts.');
 			}
@@ -312,6 +581,7 @@
 	async function handlePrintDocument(docNo: string, view: string) {
 		if (loadingPdf) return;
 		loadingPdf = true;
+		printingDocNo = docNo;
 		try {
 			const res = await graphqlMutation<{ printDocuments: string }>(PrintDocumentsMutation, {
 				variables: { input: { view, nos: [docNo], reportOutput: 'PDF' } }
@@ -331,6 +601,7 @@
 			toast.error(err.message || `Error printing ${view}.`);
 		} finally {
 			loadingPdf = false;
+			printingDocNo = null;
 		}
 	}
 
@@ -341,8 +612,10 @@
 				const limit = parseInt(settingRes.data.getCrmSetting.value, 10);
 				if (!isNaN(limit) && limit > 0) pageSize = limit;
 			}
-			await loadAllocatedContacts();
 			
+			// Initial load of agent's allocated contacts
+			await loadAllocatedContacts();
+
 			// Background prefetch Whatsapp data so it loads instantly when requested
 			import('./queries').then((q) => {
 				graphqlQuery(q.GetCrmWhatsappImagesDocument, {
@@ -359,6 +632,15 @@
 		}
 	});
 
+	$effect(() => {
+		const user = $authStore.username;
+		untrack(() => {
+			if (user && allocatedAgentContacts.length === 0 && !isListLoading) {
+				loadAllocatedContacts();
+			}
+		});
+	});
+
 	function handleCallMobile(mobile: string) {
 		window.open(`tel:${mobile}`);
 	}
@@ -368,45 +650,61 @@
 	<title>CRM Call Center | Tyresoles</title>
 </svelte:head>
 
-<div class="min-h-screen bg-background text-foreground flex flex-col md:flex-row select-none">
-	<div class={isListCollapsed ? 'hidden' : 'block'}>
-		<ContactList
-			list={listMock}
-			{filteredContacts}
+<div class="h-screen max-h-screen overflow-hidden bg-background text-foreground flex flex-col select-none">
+	<!-- Top Performance & Goal Trend Bar (Compact & Collapsible) -->
+	<CallingStatsBar
+		bind:this={statsBarRef}
+		bind:filterCallDate
+		onSelectContactById={handleSelectContactById}
+	/>
+
+	<!-- Two-column Calling Center Area -->
+	<div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+		<div class={isListCollapsed ? 'hidden' : 'block'}>
+			<ContactList
+				list={listMock}
+				{filteredContacts}
+				bind:selectedContact
+				bind:filterCallDate
+				{isAllocating}
+				{isFetchingContactDetails}
+				{isBulkDeallocating}
+				onBulkDeallocate={handleBulkDeallocate}
+				onSelectContact={(c) => {
+					selectedContact = c;
+					isListCollapsed = true;
+				}}
+				onRequestMoreContacts={() => (allocateDialogOpen = true)}
+				onQuickLoadContacts={handleQuickLoadContacts}
+			/>
+		</div>
+
+		<Workspace
 			bind:selectedContact
-			bind:filterCallDate
-			{isAllocating}
-			onSelectContact={(c) => {
-				selectedContact = c;
-				isListCollapsed = true;
-			}}
-			onLoadSummary={loadCallingSummary}
-			onRequestMoreContacts={() => (allocateDialogOpen = true)}
+			bind:isListCollapsed
+			bind:activeTab
+			{isDeallocating}
+			onDeallocate={handleDeallocateContact}
+			onCallMobile={handleCallMobile}
+			{callLogs}
+			{reminders}
+			{invoices}
+			{claims}
+			{loadingHistory}
+			{loadingInvoices}
+			{loadingClaims}
+			{printingDocNo}
+			onSaveCallLog={handleSaveCallLog}
+			onUndoCallLog={handleUndoCallLog}
+			onCompleteReminder={handleCompleteReminder}
+			{completingReminderId}
+			onPrintDocument={handlePrintDocument}
+			{isSavingLog}
+			{isUndoingLog}
 		/>
 	</div>
-
-	<Workspace
-		bind:selectedContact
-		bind:isListCollapsed
-		bind:activeTab
-		{isDeallocating}
-		onDeallocate={handleDeallocateContact}
-		onCallMobile={handleCallMobile}
-		{callLogs}
-		{reminders}
-		{invoices}
-		{claims}
-		{loadingHistory}
-		{loadingInvoices}
-		{loadingClaims}
-		onSaveCallLog={handleSaveCallLog}
-		onUndoCallLog={handleUndoCallLog}
-		onCompleteReminder={handleCompleteReminder}
-		onPrintDocument={handlePrintDocument}
-		{isSavingLog}
-		{isUndoingLog}
-	/>
 </div>
+
 
 <!-- PDF Viewer Modal -->
 <Dialog.Root bind:open={showPdfViewer}>
@@ -434,54 +732,6 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-<!-- Summary Modal -->
-<Dialog.Root bind:open={showSummaryModal}>
-	<Dialog.Content class="sm:max-w-[425px]">
-		<Dialog.Header>
-			<Dialog.Title class="flex items-center gap-2">
-				<Icon name="bar-chart-2" class="text-indigo-500" />
-				My Calling Summary
-			</Dialog.Title>
-			<Dialog.Description>
-				Summary of your call logs for today.
-			</Dialog.Description>
-		</Dialog.Header>
-
-		<div class="py-4">
-			{#if loadingSummary}
-				<div class="flex justify-center py-6">
-					<Loader2 class="size-6 animate-spin text-primary" />
-				</div>
-			{:else if callingSummary.length === 0}
-				<div class="text-center text-muted-foreground text-sm py-6">
-					No calls logged today.
-				</div>
-			{:else}
-				<div class="space-y-3">
-					{#each callingSummary as item}
-						<div class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
-							<span class="font-semibold text-sm">{item.outcome}</span>
-							<span class="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold px-2.5 py-0.5 rounded-full text-xs">
-								{item.count}
-							</span>
-						</div>
-					{/each}
-					<div class="flex items-center justify-between p-3 rounded-lg bg-primary/10 mt-2">
-						<span class="font-bold text-sm text-primary">Total Calls</span>
-						<span class="font-bold text-primary text-sm">
-							{callingSummary.reduce((sum, item) => sum + item.count, 0)}
-						</span>
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		<Dialog.Footer>
-			<Button variant="outline" onclick={() => showSummaryModal = false}>Close</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
-
 <AllocateContactsDialog bind:open={allocateDialogOpen} onAllocate={handleAllocateContacts} />
 
 <style>
@@ -495,12 +745,14 @@
 	:global(.line-clamp-1) {
 		display: -webkit-box;
 		-webkit-line-clamp: 1;
+		line-clamp: 1;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
 	:global(.line-clamp-2) {
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}

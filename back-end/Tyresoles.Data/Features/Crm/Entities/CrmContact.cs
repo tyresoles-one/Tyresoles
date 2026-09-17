@@ -23,6 +23,22 @@ public class CrmContact
     public string? Tags { get; set; }
     public bool IsActive { get; set; }
     public string? CreatedBy { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public string? ModifiedBy { get; set; }
+    public DateTime? ModifiedAt { get; set; }
     public DateTime? LastCallDate { get; set; }
     public string? LastCallOutcome { get; set; }
+
+    public string LeadSourceType { get; set; } = "Manual";
+    public string? LeadSourceChannel { get; set; }
+    public string? SourceUrl { get; set; }
+    public string? Division { get; set; }
+    public string? TargetProduct { get; set; }
+    public decimal? QualityScore { get; set; }
+    public string? ScrapingQuery { get; set; }
+    public DateTime? HarvestedAt { get; set; }
+    public string? Website { get; set; }
+    public string? Snippet { get; set; }
+    public string? PrefLanguage { get; set; }
+    public string? Location { get; set; }
 }

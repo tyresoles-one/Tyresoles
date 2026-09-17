@@ -10,7 +10,7 @@ export async function fetchOutstandingData(
       reportName: "Outstanding",
       to: params.asOfDate,
       search: params.search?.trim() || undefined,
-      regions: params.region && params.region !== "ALL" ? [params.region] : undefined,
+      regions: params.regions?.length ? params.regions : undefined,
       product: params.product && params.product !== "ALL" ? params.product : undefined,
       type: params.product && params.product !== "ALL" ? params.product : undefined,
       respCenters: params.respCenters?.length ? params.respCenters : undefined,

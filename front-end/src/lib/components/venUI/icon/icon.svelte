@@ -41,7 +41,8 @@
 		'check-circle-2': 'circle-check',
 		'check-circle': 'circle-check',
 		'x-circle': 'circle-x',
-		'check-square': 'square-check'
+		'check-square': 'square-check',
+		'sliders': 'sliders-horizontal'
 	};
 
 	$effect(() => {

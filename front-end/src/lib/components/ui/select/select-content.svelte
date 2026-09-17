@@ -10,6 +10,7 @@
 	let {
 		ref = $bindable(null),
 		class: className,
+		collisionPadding = { top: 16, bottom: 40, left: 16, right: 16 },
 		sideOffset = 4,
 		portalProps,
 		children,
@@ -24,6 +25,7 @@
 	<SelectPrimitive.Content
 		bind:ref
 		{sideOffset}
+		{collisionPadding}
 		{preventScroll}
 		data-slot="select-content"
 		class={cn(

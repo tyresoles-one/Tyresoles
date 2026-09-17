@@ -263,6 +263,7 @@ public sealed class SalesReportService : ISalesReportService
                 .ToArrayAsync(cancellationToken).ConfigureAwait(false);
 
             var amountMap = lines.GroupBy(l => l.DocumentNo).ToDictionary(g => g.Key, g => g.Sum(l => l.AmountToCustomer));
+            var qtyMap = lines.GroupBy(l => l.DocumentNo).ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
 
             return headers.Select(h => new DocumentDto
             {
@@ -270,7 +271,8 @@ public sealed class SalesReportService : ISalesReportService
                 Date = h.PostingDate,
                 CustomerNo = h.SellToCustomerNo,
                 Name = h.SellToCustomerName,
-                Amount = amountMap.TryGetValue(h.No, out var amt) ? amt : 0
+                Amount = amountMap.TryGetValue(h.No, out var amt) ? amt : 0,
+                Quantity = qtyMap.TryGetValue(h.No, out var qty) ? qty : 0
             }).ToArray();
         }
         else // Invoice
@@ -348,10 +350,11 @@ public sealed class SalesReportService : ISalesReportService
             var (docNoSql, docNoPrms) = BuildInClause("[Document No_]", "doc", docNos);
             var lines = await scope.Query<SalesInvoiceLine>()
                 .Where(docNoSql, docNoPrms)
-                .Where(l => l.ItemCategoryCode == "ECOMILE" || l.ItemCategoryCode == "RETD")
+                .Where(l => l.ItemCategoryCode == "ECOMILE" || l.ItemCategoryCode == "ECOMLE" || l.ItemCategoryCode == "RETD")
                 .ToArrayAsync(cancellationToken).ConfigureAwait(false);
 
             var amountMap = lines.GroupBy(l => l.DocumentNo).ToDictionary(g => g.Key, g => g.Sum(l => l.AmountToCustomer));
+            var qtyMap = lines.GroupBy(l => l.DocumentNo).ToDictionary(g => g.Key, g => g.Sum(l => l.Quantity));
 
             return headers.Select(h => new DocumentDto
             {
@@ -359,7 +362,8 @@ public sealed class SalesReportService : ISalesReportService
                 Date = h.PostingDate,
                 CustomerNo = h.SellToCustomerNo,
                 Name = h.SellToCustomerName,
-                Amount = amountMap.TryGetValue(h.No, out var amt) ? amt : 0
+                Amount = amountMap.TryGetValue(h.No, out var amt) ? amt : 0,
+                Quantity = qtyMap.TryGetValue(h.No, out var qty) ? qty : 0
             }).ToArray();
         }
     }

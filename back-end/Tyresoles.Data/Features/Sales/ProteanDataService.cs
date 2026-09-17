@@ -79,6 +79,76 @@ public class ProteanService: IProteanService
         EInvoiceResult? response = JsonSerializer.Deserialize<EInvoiceResult>(json, options);
         return await VerifyEInvoiceBrowserAsync(response, ct).ConfigureAwait(false);
     }
+
+    /// <inheritdoc/>
+    public async Task<ClearEInvErrorsResult> GetSkippedEInvoiceErrorsAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        var invTable = scope.GetQualifiedTableName("Sales Invoice Header");
+        var crnTable = scope.GetQualifiedTableName("Sales Cr_Memo Header");
+        var cutoffDate = DateTime.Today.AddDays(-30);
+
+        var invNos = (await scope.QueryAsync<string>(
+            $"SELECT [No_] FROM {invTable} WHERE [E-Inv Skip] = 1 AND [Posting Date] >= @CutoffDate",
+            new { CutoffDate = cutoffDate },
+            ct).ConfigureAwait(false)).ToList();
+
+        var crnNos = (await scope.QueryAsync<string>(
+            $"SELECT [No_] FROM {crnTable} WHERE [E-Inv Skip] = 1 AND [Posting Date] >= @CutoffDate",
+            new { CutoffDate = cutoffDate },
+            ct).ConfigureAwait(false)).ToList();
+
+        return new ClearEInvErrorsResult
+        {
+            InvoicesCleared = invNos,
+            CrMemosCleared = crnNos
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<ClearEInvErrorsResult> ClearEInvoiceErrorsAsync(ITenantScope scope, CancellationToken ct = default)
+    {
+        var invTable = scope.GetQualifiedTableName("Sales Invoice Header");
+        var crnTable = scope.GetQualifiedTableName("Sales Cr_Memo Header");
+        var cutoffDate = DateTime.Today.AddDays(-30);
+
+        var invNos = (await scope.QueryAsync<string>(
+            $"SELECT [No_] FROM {invTable} WHERE [E-Inv Skip] = 1 AND [Posting Date] >= @CutoffDate",
+            new { CutoffDate = cutoffDate },
+            ct).ConfigureAwait(false)).ToList();
+
+        var crnNos = (await scope.QueryAsync<string>(
+            $"SELECT [No_] FROM {crnTable} WHERE [E-Inv Skip] = 1 AND [Posting Date] >= @CutoffDate",
+            new { CutoffDate = cutoffDate },
+            ct).ConfigureAwait(false)).ToList();
+
+        if (invNos.Count > 0)
+        {
+            foreach (var batch in invNos.Chunk(1000))
+            {
+                await scope.ExecuteNonQueryAsync(
+                    $"UPDATE {invTable} SET [E-Inv Skip] = 0 WHERE [No_] IN @Nos",
+                    new { Nos = batch },
+                    ct).ConfigureAwait(false);
+            }
+        }
+
+        if (crnNos.Count > 0)
+        {
+            foreach (var batch in crnNos.Chunk(1000))
+            {
+                await scope.ExecuteNonQueryAsync(
+                    $"UPDATE {crnTable} SET [E-Inv Skip] = 0 WHERE [No_] IN @Nos",
+                    new { Nos = batch },
+                    ct).ConfigureAwait(false);
+            }
+        }
+
+        return new ClearEInvErrorsResult
+        {
+            InvoicesCleared = invNos,
+            CrMemosCleared = crnNos
+        };
+    }
     
     public async Task<List<SalesLineForEInvoice>> GetPendingRecords(ITenantScope scope, CancellationToken ct = default)
     {

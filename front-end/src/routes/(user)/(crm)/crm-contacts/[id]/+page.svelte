@@ -43,8 +43,44 @@
 		products: null,
 		tags: null,
 		isActive: true,
-		createdBy: null
+		createdBy: null,
+		createdAt: null,
+		modifiedBy: null,
+		modifiedAt: null,
+		prefLanguage: null,
+		location: null,
+		leadSourceType: 'Manual',
+		leadSourceChannel: null,
+		sourceUrl: null,
+		qualityScore: null,
+		harvestedAt: null
 	});
+
+	let leadSourceTypeOptions = $state<{ value: string; label: string }[]>([
+		{ value: 'Manual', label: 'Manual' },
+		{ value: 'Automated', label: 'Automated' },
+		{ value: 'Inbound', label: 'Inbound Inquiry' },
+		{ value: 'Referral', label: 'Referral' },
+		{ value: 'Trade Show', label: 'Trade Show / Event' },
+		{ value: 'Cold Outreach', label: 'Cold Outreach' },
+		{ value: 'Campaign', label: 'Campaign (WhatsApp/Email)' },
+		{ value: 'Tender', label: 'Tender / Contract' },
+		{ value: 'Other', label: 'Other' }
+	]);
+
+	let leadSourceChannels = $state<{ value: string; label: string }[]>([
+		{ value: 'Web-Harvester', label: 'Web-Harvester' },
+		{ value: 'Google-Maps', label: 'Google-Maps' },
+		{ value: 'IndiaMART', label: 'IndiaMART' },
+		{ value: 'TradeIndia', label: 'TradeIndia' },
+		{ value: 'Justdial', label: 'Justdial' },
+		{ value: 'Direct-Call', label: 'Direct-Call' },
+		{ value: 'WhatsApp', label: 'WhatsApp' },
+		{ value: 'Field-Visit', label: 'Field-Visit' },
+		{ value: 'Website-Form', label: 'Website-Form' },
+		{ value: 'Referral', label: 'Referral' },
+		{ value: 'Directory', label: 'Industry Directory' }
+	]);
 
 	let masterSelectForm = {
 		get values() { return editingContact; },
@@ -53,12 +89,15 @@
 	};
 	let contactTypes = $state<{ value: string; label: string }[]>([]);
 	let contactCategories = $state<{ value: string; label: string }[]>([]);
+	let languages = $state<{ value: string; label: string }[]>([]);
+	let isCapturingLocation = $state(false);
 	const uniqueTags = ['VIP', 'Hot', 'Cold', 'Follow Up', 'Key Account'];
 
 	const GetCrmMasterItemsDocument = buildQuery`
 		query GetCrmMasterItems($type: CrmMasterType!, $where: CrmMasterItemFilterInput) {
 			crmMasterItems: getCrmMasterItems(type: $type, where: $where) {
 				id
+				code
 				name
 			}
 		}
@@ -86,6 +125,16 @@
 				tags
 				isActive
 				createdBy
+				createdAt
+				modifiedBy
+				modifiedAt
+				prefLanguage
+				location
+				leadSourceType
+				leadSourceChannel
+				sourceUrl
+				qualityScore
+				harvestedAt
 			}
 		}
 	` as unknown as TypedDocumentNode<any, { id: string }>;
@@ -95,6 +144,14 @@
 			saveCrmContact(input: $input) {
 				id
 				fullName
+				prefLanguage
+				location
+				leadSourceType
+				leadSourceChannel
+				createdBy
+				createdAt
+				modifiedBy
+				modifiedAt
 			}
 		}
 	` as unknown as TypedDocumentNode<any, { input: any }>;
@@ -108,14 +165,88 @@
 	onMount(async () => {
 		loadContactTypes();
 		loadContactCategories();
+		loadLanguages();
+		loadLeadSources();
+		loadLeadSourceChannels();
 		if (!isNew) {
 			await loadContact();
 		}
 	});
 
+	async function loadLeadSources() {
+		try {
+			const res = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
+				variables: { type: 'SOURCE' }
+			});
+			if (res.success && res.data?.crmMasterItems?.length) {
+				leadSourceTypeOptions = res.data.crmMasterItems.map((x: any) => ({
+					value: x.name,
+					label: x.name
+				}));
+			}
+		} catch (err) {
+			console.error('Failed to load lead sources', err);
+		}
+	}
+
+	async function loadLeadSourceChannels() {
+		try {
+			const res = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
+				variables: { type: 'SOURCE_CHANNEL' }
+			});
+			if (res.success && res.data?.crmMasterItems?.length) {
+				leadSourceChannels = res.data.crmMasterItems.map((x: any) => ({
+					value: x.name,
+					label: x.code ? `${x.name} (${x.code})` : x.name
+				}));
+			}
+		} catch (err) {
+			console.error('Failed to load lead source channels', err);
+		}
+	}
+
+	async function loadLanguages() {
+		try {
+			const res = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
+				variables: { type: 'LANGUAGE' }
+			});
+			if (res.success && res.data?.crmMasterItems) {
+				languages = res.data.crmMasterItems.map((x: any) => ({
+					value: x.name,
+					label: x.code ? `${x.name} (${x.code})` : x.name
+				}));
+			}
+		} catch (err) {
+			console.error('Failed to load languages', err);
+		}
+	}
+
+	function captureLiveLocation() {
+		if (!('geolocation' in navigator)) {
+			toast.error('Geolocation is not supported by your browser.');
+			return;
+		}
+		isCapturingLocation = true;
+		navigator.geolocation.getCurrentPosition(
+			(pos) => {
+				const lat = pos.coords.latitude.toFixed(6);
+				const lng = pos.coords.longitude.toFixed(6);
+				editingContact.location = `${lat}, ${lng}`;
+				toast.success(`Live GPS location captured: ${editingContact.location}`);
+				isCapturingLocation = false;
+			},
+			(err) => {
+				console.error('Error obtaining location', err);
+				toast.error(err.message || 'Unable to retrieve live location. Ensure location permissions are granted.');
+				isCapturingLocation = false;
+			},
+			{ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+		);
+	}
+
 	async function loadContactTypes() {
 		try {
-			const res = await graphqlQuery(GetCrmMasterItemsDocument, {
+			const res = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
 				variables: { type: 'CONTACT_TYPE' }
 			});
 			if (res.success && res.data?.crmMasterItems) {
@@ -135,7 +266,7 @@
 
 	async function loadContactCategories() {
 		try {
-			const res = await graphqlQuery(GetCrmMasterItemsDocument, {
+			const res = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
 				variables: { type: 'CONTACT_CATEGORY' }
 			});
 			if (res.success && res.data?.crmMasterItems) {
@@ -156,7 +287,7 @@
 	async function loadContact() {
 		try {
 			loading = true;
-			const res = await graphqlQuery(GetCrmContactByIdDocument, { variables: { id } });
+			const res = await graphqlQuery<any>(GetCrmContactByIdDocument, { variables: { id } });
 			if (res.success && res.data?.crmContact) {
 				editingContact = { ...res.data.crmContact };
 			} else {
@@ -195,14 +326,25 @@
 				products: editingContact.products || null,
 				tags: editingContact.tags || null,
 				isActive: !!editingContact.isActive,
-				createdBy: editingContact.createdBy || null
+				createdBy: editingContact.createdBy || null,
+				prefLanguage: editingContact.prefLanguage || null,
+				location: editingContact.location || null,
+				leadSourceType: editingContact.leadSourceType || 'Manual',
+				leadSourceChannel: editingContact.leadSourceChannel || null
 			};
 
-			const res = await graphqlMutation(SaveCrmContactDocument, { variables: { input } });
+			const res = await graphqlMutation<any>(SaveCrmContactDocument, { variables: { input } });
 			if (res.success && res.data?.saveCrmContact) {
 				toast.success('Contact saved successfully.');
 				if (isNew) {
 					goto(`/crm-contacts/${res.data.saveCrmContact.id}`);
+				} else {
+					editingContact.modifiedAt = res.data.saveCrmContact.modifiedAt;
+					editingContact.modifiedBy = res.data.saveCrmContact.modifiedBy;
+					editingContact.createdAt = res.data.saveCrmContact.createdAt;
+					editingContact.createdBy = res.data.saveCrmContact.createdBy;
+					editingContact.leadSourceType = res.data.saveCrmContact.leadSourceType;
+					editingContact.leadSourceChannel = res.data.saveCrmContact.leadSourceChannel;
 				}
 			} else {
 				toast.error(res.error || 'Failed to save contact');
@@ -219,7 +361,7 @@
 		
 		isDeleting = true;
 		try {
-			const res = await graphqlMutation(DeleteCrmContactDocument, { variables: { id } });
+			const res = await graphqlMutation<any>(DeleteCrmContactDocument, { variables: { id } });
 			if (res.success && res.data?.deleteCrmContact) {
 				toast.success('Contact deleted successfully.');
 				goto('/crm-contacts');
@@ -245,11 +387,29 @@
 			<Button variant="ghost" size="sm" class="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" onclick={() => goto('/crm-contacts')}>
 				<Icon name="arrow-left" class="size-4" /> Back
 			</Button>
-			<h1 class="text-2xl font-bold">{isNew ? 'New Contact' : editingContact.fullName}</h1>
-			{#if !isNew && editingContact.companyName}
-				<span class="text-muted-foreground text-sm mt-1">{editingContact.companyName}</span>
-			{/if}
-			<div class="ml-auto flex gap-2">
+			<div>
+				<div class="flex items-center gap-3">
+					<h1 class="text-2xl font-bold">{isNew ? 'New Contact' : editingContact.fullName}</h1>
+					{#if !isNew && editingContact.leadSourceType}
+						<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {editingContact.leadSourceType === 'Automated' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/40' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300/40'}">
+							{editingContact.leadSourceType}
+						</span>
+					{/if}
+				</div>
+				{#if !isNew && editingContact.companyName}
+					<span class="text-muted-foreground text-sm mt-0.5 block">{editingContact.companyName}</span>
+				{/if}
+			</div>
+			<div class="ml-auto flex items-center gap-2">
+				<a
+					href="/crm-masters?category=leads"
+					target="_blank"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-xs"
+					title="Configure Contact Types, Categories, and Sources in CRM Masters"
+				>
+					<Icon name="database" class="size-3.5 text-primary" />
+					<span class="hidden sm:inline">CRM Masters</span>
+				</a>
 				{#if !isNew}
 					<Button variant="destructive" size="sm" class="gap-2 rounded-xl shadow-xs" onclick={confirmDelete} disabled={isDeleting}>
 						{#if isDeleting}<Loader2 class="size-3 animate-spin shrink-0" />{:else}<Icon name="trash" class="size-3.5" />{/if}
@@ -312,16 +472,53 @@
 								</Field.Field>
 
 								<Field.Field class="w-full">
-									<Field.Label for="contact-type" class="text-muted-foreground">Contact Type</Field.Label>
+									<div class="flex items-center justify-between">
+										<Field.Label for="contact-type" class="text-muted-foreground mb-0">Contact Type</Field.Label>
+										<a
+											href="/crm-masters?tab=CONTACT_TYPE"
+											target="_blank"
+											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+											title="Configure Contact Types in CRM Masters"
+										>
+											Manage <Icon name="external-link" class="size-2.5" />
+										</a>
+									</div>
 									<Field.Content>
 										<Select options={contactTypes} bind:value={editingContact.contactType} placeholder="Select type..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 									</Field.Content>
 								</Field.Field>
 
 								<Field.Field class="w-full">
-									<Field.Label for="contact-category" class="text-muted-foreground">Contact Category</Field.Label>
+									<div class="flex items-center justify-between">
+										<Field.Label for="contact-category" class="text-muted-foreground mb-0">Contact Category</Field.Label>
+										<a
+											href="/crm-masters?tab=CONTACT_CATEGORY"
+											target="_blank"
+											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+											title="Configure Contact Categories in CRM Masters"
+										>
+											Manage <Icon name="external-link" class="size-2.5" />
+										</a>
+									</div>
 									<Field.Content>
 										<Select options={contactCategories} bind:value={editingContact.contactCategory} placeholder="Select category..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
+									</Field.Content>
+								</Field.Field>
+
+								<Field.Field class="w-full">
+									<div class="flex items-center justify-between">
+										<Field.Label for="contact-language" class="text-muted-foreground mb-0">Pref Language</Field.Label>
+										<a
+											href="/crm-masters?tab=LANGUAGE"
+											target="_blank"
+											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+											title="Configure Languages in CRM Masters"
+										>
+											Manage <Icon name="external-link" class="size-2.5" />
+										</a>
+									</div>
+									<Field.Content>
+										<Select options={languages} bind:value={editingContact.prefLanguage} placeholder="Select preferred language..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 									</Field.Content>
 								</Field.Field>
 								
@@ -335,6 +532,70 @@
 										<Switch bind:checked={editingContact.isActive} />
 										<span class="text-sm font-medium text-muted-foreground">Active</span>
 									</label>
+								</div>
+
+								<div class="pt-4 border-t border-border/50 space-y-4">
+									<h3 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Lead Source</h3>
+									<Field.Field class="w-full">
+										<div class="flex items-center justify-between">
+											<Field.Label for="contact-lead-source-type" class="text-muted-foreground mb-0">Lead Source Type</Field.Label>
+											<a
+												href="/crm-masters?tab=SOURCE"
+												target="_blank"
+												class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+												title="Configure Lead Sources in CRM Masters"
+											>
+												Manage <Icon name="external-link" class="size-2.5" />
+											</a>
+										</div>
+										<Field.Content>
+											<Select options={leadSourceTypeOptions} bind:value={editingContact.leadSourceType} placeholder="Select source type..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
+										</Field.Content>
+									</Field.Field>
+
+									<Field.Field class="w-full">
+										<div class="flex items-center justify-between">
+											<Field.Label for="contact-lead-source-channel" class="text-muted-foreground mb-0">Lead Source Channel</Field.Label>
+											<a
+												href="/crm-masters?tab=SOURCE_CHANNEL"
+												target="_blank"
+												class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+												title="Configure Source Channels in CRM Masters"
+											>
+												Manage <Icon name="external-link" class="size-2.5" />
+											</a>
+										</div>
+										<Field.Content>
+											<div class="relative">
+												<Input
+													id="contact-lead-source-channel"
+													list="channel-options"
+													bind:value={editingContact.leadSourceChannel}
+													placeholder="e.g. Google-Maps, Web-Harvester, Direct-Call"
+													class="rounded-xl h-9"
+												/>
+												<datalist id="channel-options">
+													{#each leadSourceChannels as ch}
+														<option value={ch.value}>{ch.label}</option>
+													{/each}
+												</datalist>
+											</div>
+										</Field.Content>
+									</Field.Field>
+
+									{#if editingContact.sourceUrl}
+										<div class="flex items-center justify-between text-xs pt-1">
+											<span class="text-muted-foreground truncate max-w-[180px]" title={editingContact.sourceUrl}>Source: {editingContact.sourceUrl}</span>
+											<a
+												href={editingContact.sourceUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="inline-flex items-center gap-1 font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 hover:underline shrink-0"
+											>
+												<Icon name="external-link" class="size-3" /> Visit Link
+											</a>
+										</div>
+									{/if}
 								</div>
 							</div>
 
@@ -368,6 +629,49 @@
 										<Textarea id="contact-address" bind:value={editingContact.address} placeholder="Enter street address" class="rounded-xl min-h-[60px]" />
 									</Field.Content>
 								</Field.Field>
+
+								<Field.Field class="w-full">
+									<div class="flex items-center justify-between mb-1">
+										<Field.Label for="contact-location" class="text-muted-foreground mb-0">Live Location (GPS)</Field.Label>
+										{#if editingContact.location}
+											<a
+												href={`https://www.google.com/maps?q=${encodeURIComponent(editingContact.location)}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 hover:underline"
+											>
+												<Icon name="map-pin" class="size-3" />
+												View Map
+											</a>
+										{/if}
+									</div>
+									<Field.Content>
+										<div class="flex gap-2 items-center">
+											<Input
+												id="contact-location"
+												bind:value={editingContact.location}
+												placeholder="e.g. 19.0760, 72.8777"
+												class="rounded-xl h-9 font-mono text-xs flex-1"
+											/>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												class="rounded-xl h-9 px-3 gap-1.5 shrink-0 bg-secondary/50 hover:bg-secondary"
+												onclick={captureLiveLocation}
+												disabled={isCapturingLocation}
+												title="Capture current live GPS coordinates"
+											>
+												{#if isCapturingLocation}
+													<Loader2 class="size-3.5 animate-spin text-primary" />
+												{:else}
+													<Icon name="crosshair" class="size-3.5 text-primary" />
+												{/if}
+												<span class="text-xs">Live GPS</span>
+											</Button>
+										</div>
+									</Field.Content>
+								</Field.Field>
 							</div>
 
 							<!-- Business Data -->
@@ -387,11 +691,11 @@
 									<Field.Content>
 										<div class="flex flex-col gap-2">
 											<div class="flex flex-wrap gap-2">
-												{#each (editingContact.tags || '').split(',').map(t => t.trim()).filter(Boolean) as tag}
+												{#each (editingContact.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean) as tag}
 													<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium group">
 														{tag}
 														<button type="button" class="hover:text-destructive transition-colors" onclick={() => {
-															editingContact.tags = (editingContact.tags || '').split(',').map(t => t.trim()).filter(Boolean).filter(t => t !== tag).join(', ');
+															editingContact.tags = (editingContact.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean).filter((t: string) => t !== tag).join(', ');
 														}}>
 															<Icon name="x" class="size-3" />
 														</button>
@@ -406,7 +710,7 @@
 														e.preventDefault();
 														const val = e.currentTarget.value.trim();
 														if (val) {
-															const currentTags = (editingContact.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+															const currentTags = (editingContact.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean);
 															if (!currentTags.includes(val)) {
 																editingContact.tags = [...currentTags, val].join(', ');
 															}
@@ -420,9 +724,37 @@
 								</Field.Field>
 							</div>
 						</div>
+
+						{#if !isNew}
+							<div class="mt-8 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground bg-muted/10 -mx-6 -mb-6 px-6 py-3.5">
+								<div class="flex flex-wrap items-center gap-6">
+									<div>
+										<span class="font-medium text-foreground">Created:</span>
+										{editingContact.createdAt ? new Date(editingContact.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
+										{#if editingContact.createdBy}
+											<span class="text-muted-foreground">by</span> <span class="font-semibold text-foreground">{editingContact.createdBy}</span>
+										{/if}
+									</div>
+									{#if editingContact.modifiedAt || editingContact.modifiedBy}
+										<div class="border-l border-border pl-6">
+											<span class="font-medium text-foreground">Modified:</span>
+											{editingContact.modifiedAt ? new Date(editingContact.modifiedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
+											{#if editingContact.modifiedBy}
+												<span class="text-muted-foreground">by</span> <span class="font-semibold text-foreground">{editingContact.modifiedBy}</span>
+											{/if}
+										</div>
+									{/if}
+								</div>
+								{#if editingContact.harvestedAt}
+									<div class="text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-md border border-amber-500/20 font-medium">
+										Harvested: {new Date(editingContact.harvestedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+									</div>
+								{/if}
+							</div>
+						{/if}
 					{:else if activeTab === 'fleet'}
 						{#if !isNew}
-							<FleetDetails contactId={id} />
+							<FleetDetails contactId={id || ''} />
 						{/if}
 					{/if}
 				</div>

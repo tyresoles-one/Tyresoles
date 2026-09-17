@@ -34,6 +34,7 @@ public class DocumentDto
     public string? CustomerNo { get; set; }
     public string? Name { get; set; }
     public decimal Amount { get; set; }
+    public decimal Quantity { get; set; }
 }
 
 public class PostedSalesCreditMemoRow

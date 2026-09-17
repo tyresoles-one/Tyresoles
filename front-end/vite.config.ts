@@ -43,6 +43,11 @@ export default defineConfig(({ mode }) => {
 					target: env.VITE_PUBLIC_API_URL || 'https://localhost:5002',
 					changeOrigin: true,
 					secure: false // Useful if using self-signed certs for local backend dev
+				},
+				'/api': {
+					target: env.VITE_PUBLIC_API_URL || 'https://localhost:5002',
+					changeOrigin: true,
+					secure: false
 				}
 			},
 			watch: {

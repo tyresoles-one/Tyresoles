@@ -69,7 +69,10 @@
 		});
 	});
 
-	let templateOptions = $derived(preSavedTemplates.map(t => ({ value: t.id, label: `${t.name} (${t.language})` })));
+	let templateOptions = $derived(preSavedTemplates.map(t => ({ 
+		value: t.id, 
+		label: `${t.name} (${t.language}${t.languageCode ? ` - ${t.languageCode.toUpperCase()}` : ''})` 
+	})));
 
 	let currentPriceGroupCode = $derived.by(() => {
 		if (!selectedContact?.respCenter || priceGroupMappings.length === 0) return '';
@@ -405,20 +408,38 @@
 </script>
 
 <!-- WhatsApp Product & Details Share -->
-<div class="border border-border bg-muted/10 rounded-xl p-4 space-y-4">
+<div class="border border-border bg-muted/15 rounded-lg p-3 space-y-2.5">
 	<div class="flex items-center justify-between">
-		<div class="space-y-0.5">
-			<h4 class="text-sm font-semibold">Share Product & Offer on WhatsApp</h4>
-			<p class="text-xs text-muted-foreground">Select a CRM product to fetch regional pricing, image, and send customized WhatsApp offers.</p>
+		<div class="flex items-center gap-2">
+			<Icon name="message-circle" class="size-4 text-emerald-500 shrink-0" />
+			<h4 class="text-xs font-bold text-foreground uppercase tracking-wider">Share Product & Offer on WhatsApp</h4>
 		</div>
-		<Icon name="message-circle-more" class="size-6 text-emerald-500 shrink-0" />
+		<a
+			href="/crm-masters?category=media"
+			target="_blank"
+			class="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-medium flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"
+			title="Configure Products, WhatsApp Templates & Media in CRM Masters"
+		>
+			<Icon name="database" class="size-2.5 text-emerald-500" />
+			<span>Media Masters</span>
+		</a>
 	</div>
 
-	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
 		<!-- Select Product Zone -->
 		<div class="space-y-1.5 flex flex-col">
 			<div class="flex items-center justify-between mb-0.5">
-				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Product</span>
+				<div class="flex items-center gap-2">
+					<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Product</span>
+					<a
+						href="/crm-masters?tab=CRM_PRODUCTS"
+						target="_blank"
+						class="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+						title="Configure CRM Products and pricing in CRM Masters"
+					>
+						Manage <Icon name="external-link" class="size-2.5" />
+					</a>
+				</div>
 				<div class="flex border border-border rounded-lg overflow-hidden bg-muted/20 text-[10px] font-bold">
 					<button
 						type="button"
@@ -450,7 +471,7 @@
 							valueKey="value"
 							labelKey="label"
 							placeholder="Choose CRM Product..."
-							class="rounded-xl h-10 w-full bg-card"
+							class="rounded-lg h-9 w-full bg-background text-xs"
 							onSelect={handleProductChange}
 						/>
 						{#if selectedProductCode}
@@ -459,7 +480,7 @@
 									<Loader2 class="size-3 animate-spin text-emerald-600" />
 									<span>Fetching price...</span>
 								{:else if fetchedPrice != null}
-									<Icon name="tag" class="size-3.5 text-emerald-600" />
+									<Icon name="tag" class="size-3 text-emerald-600" />
 									<span class="font-semibold text-emerald-700 dark:text-emerald-400">Price: ₹{formatPrice(fetchedPrice)}</span>
 									{#if selectedContact?.respCenter}
 										<span class="text-[10px] text-muted-foreground">({selectedContact.respCenter})</span>
@@ -467,13 +488,13 @@
 								{:else if selectedContact?.respCenter}
 									<span class="text-[11px] text-amber-600">No price configured for RC: {selectedContact.respCenter}</span>
 								{:else}
-									<span class="text-[11px] text-muted-foreground">No contact responsibility center set</span>
+									<span class="text-[11px] text-muted-foreground">No RC set</span>
 								{/if}
 							</div>
 						{/if}
 
 						{#if whatsappImagePreview}
-							<div class="relative h-24 border border-border rounded-xl overflow-hidden bg-card flex items-center justify-center">
+							<div class="relative h-20 border border-border rounded-lg overflow-hidden bg-background flex items-center justify-center">
 								<img
 									src={whatsappImagePreview}
 									alt="Product Preview"
@@ -481,8 +502,8 @@
 								/>
 							</div>
 						{:else if selectedProductCode}
-							<div class="text-[11px] text-muted-foreground bg-muted/20 border border-border/50 rounded-xl p-2 text-center">
-								No linked image found for this product. You can select "Local Upload" to attach an image.
+							<div class="text-[11px] text-muted-foreground bg-muted/20 border border-border/50 rounded-lg p-2 text-center">
+								No linked image found for this product. Use "Local Upload" to attach an image.
 							</div>
 						{/if}
 					{/if}
@@ -490,10 +511,10 @@
 			{:else}
 				{#if !whatsappImage}
 					<label
-						class="flex flex-col items-center justify-center h-28 border border-dashed border-border rounded-xl cursor-pointer hover:bg-muted/30 transition-colors"
+						class="flex flex-col items-center justify-center h-20 border border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
 					>
-						<Icon name="upload" class="size-6 text-muted-foreground/60 mb-1" />
-						<span class="text-xs text-muted-foreground font-medium">Click or Drag Image</span>
+						<Icon name="upload" class="size-5 text-muted-foreground/60 mb-1" />
+						<span class="text-[11px] text-muted-foreground font-medium">Click or Drag Image</span>
 						<input
 							type="file"
 							accept="image/*"
@@ -502,7 +523,7 @@
 						/>
 					</label>
 				{:else}
-					<div class="relative h-28 border border-border rounded-xl overflow-hidden bg-card flex items-center justify-center group">
+					<div class="relative h-20 border border-border rounded-lg overflow-hidden bg-background flex items-center justify-center group">
 						<img
 							src={whatsappImagePreview}
 							alt="Preview"
@@ -511,10 +532,10 @@
 						<button
 							type="button"
 							onclick={clearWhatsappImage}
-							class="absolute top-2 right-2 p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg opacity-90 transition-all shadow-md"
+							class="absolute top-1.5 right-1.5 p-1 bg-rose-500 hover:bg-rose-600 text-white rounded-md opacity-90 transition-all shadow-xs"
 							title="Remove image"
 						>
-							<Icon name="trash" class="size-3.5" />
+							<Icon name="trash" class="size-3" />
 						</button>
 					</div>
 				{/if}
@@ -524,24 +545,34 @@
 		<!-- Message Caption & Template -->
 		<div class="space-y-1.5 flex flex-col justify-between">
 			<div class="space-y-2">
-				<div class="space-y-1.5">
-					<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Message Template</span>
+				<div class="space-y-1">
+					<div class="flex items-center justify-between">
+						<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select Template</span>
+						<a
+							href="/crm-masters?tab=WHATSAPP_TEMPLATE"
+							target="_blank"
+							class="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+							title="Configure WhatsApp Templates in CRM Masters"
+						>
+							Templates <Icon name="external-link" class="size-2.5" />
+						</a>
+					</div>
 					<Select
 						options={templateOptions}
 						value={selectedTemplateId}
 						valueKey="value"
 						labelKey="label"
 						placeholder="Choose message template..."
-						class="rounded-xl h-10 w-full bg-card"
+						class="rounded-lg h-9 w-full bg-background text-xs"
 						onSelect={handleTemplateChange}
 					/>
 				</div>
-				<div class="space-y-1.5">
-					<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">WhatsApp Message Text</span>
+				<div class="space-y-1">
+					<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Message Text</span>
 					<Input
 						placeholder="Write message / caption here..."
 						bind:value={whatsappCaption}
-						class="rounded-xl h-10 bg-card"
+						class="rounded-lg h-9 bg-background text-xs"
 					/>
 				</div>
 			</div>
@@ -549,12 +580,12 @@
 			<Button
 				onclick={handleSendWhatsapp}
 				disabled={isCopyingWhatsapp}
-				class="w-full h-10 gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md font-semibold transition-all mt-2"
+				class="w-full h-9 gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-xs font-semibold text-xs transition-all mt-2"
 			>
 				{#if isCopyingWhatsapp}
-					<Loader2 class="size-4 animate-spin shrink-0" />
+					<Loader2 class="size-3.5 animate-spin shrink-0" />
 				{:else}
-					<Icon name="send" class="size-4" />
+					<Icon name="send" class="size-3.5" />
 				{/if}
 				Send via WhatsApp
 			</Button>

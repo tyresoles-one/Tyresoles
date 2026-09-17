@@ -52,6 +52,7 @@ public class Query
             CrmMasterType.ContactType => db.CrmContactTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.ContactCategory => db.CrmContactCategories.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.Source => db.CrmSources.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.SourceChannel => db.CrmSourceChannels.Select(x => new CrmMasterItem { Id = x.Id, Code = x.Code, Name = x.Name, ParentId = x.ParentId, Description = x.Description, IsActive = x.IsActive }),
             CrmMasterType.Stage => db.CrmStages.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.Priority => db.CrmPriorities.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
             CrmMasterType.ActivityType => db.CrmActivityTypes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
@@ -61,8 +62,18 @@ public class Query
             CrmMasterType.VehicleMake => db.CrmFleetVehicleMakes.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name, ParentId = x.ParentId }),
             CrmMasterType.VehicleModel => db.CrmFleetVehicleModels.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name, ParentId = x.ParentId }),
             CrmMasterType.Application => db.CrmFleetApplications.Select(x => new CrmMasterItem { Id = x.Id, Name = x.Name }),
+            CrmMasterType.Language => db.CrmLanguages.Select(x => new CrmMasterItem { Id = x.Id, Code = x.Code, Name = x.Name }),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
         };
+    }
+
+    [Authorize]
+    [GraphQLName("getCrmLanguages")]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<CrmLanguage> GetCrmLanguages([Service] CrmDbContext db)
+    {
+        return db.CrmLanguages;
     }
 
     [Authorize]
@@ -106,6 +117,10 @@ public class Query
         public List<string> States { get; set; } = new();
         public List<string> Cities { get; set; } = new();
         public List<string> Tags { get; set; } = new();
+        public List<string> Divisions { get; set; } = new();
+        public List<string> TargetProducts { get; set; } = new();
+        public List<string> LeadSourceTypes { get; set; } = new();
+        public List<string> LeadSourceChannels { get; set; } = new();
     }
 
     [Authorize]
@@ -121,6 +136,10 @@ public class Query
 
         var states = await query.Where(c => !string.IsNullOrWhiteSpace(c.State)).Select(c => c.State!).Distinct().ToListAsync(ct);
         var cities = await query.Where(c => !string.IsNullOrWhiteSpace(c.City)).Select(c => c.City!).Distinct().ToListAsync(ct);
+        var divisions = await query.Where(c => !string.IsNullOrWhiteSpace(c.Division)).Select(c => c.Division!).Distinct().ToListAsync(ct);
+        var targetProducts = await query.Where(c => !string.IsNullOrWhiteSpace(c.TargetProduct)).Select(c => c.TargetProduct!).Distinct().ToListAsync(ct);
+        var leadSourceTypes = await query.Where(c => !string.IsNullOrWhiteSpace(c.LeadSourceType)).Select(c => c.LeadSourceType!).Distinct().ToListAsync(ct);
+        var leadSourceChannels = await query.Where(c => !string.IsNullOrWhiteSpace(c.LeadSourceChannel)).Select(c => c.LeadSourceChannel!).Distinct().ToListAsync(ct);
         var tagsRaw = await query.Where(c => !string.IsNullOrWhiteSpace(c.Tags)).Select(c => c.Tags!).ToListAsync(ct);
 
         var distinctTags = new HashSet<string>();
@@ -138,8 +157,61 @@ public class Query
         {
             States = states.OrderBy(x => x).ToList(),
             Cities = cities.OrderBy(x => x).ToList(),
+            Divisions = divisions.OrderBy(x => x).ToList(),
+            TargetProducts = targetProducts.OrderBy(x => x).ToList(),
+            LeadSourceTypes = leadSourceTypes.OrderBy(x => x).ToList(),
+            LeadSourceChannels = leadSourceChannels.OrderBy(x => x).ToList(),
             Tags = distinctTags.OrderBy(x => x).ToList()
         };
+    }
+
+    [Authorize]
+    [GraphQLName("discoverLiveWebLeads")]
+    public async Task<List<Tyresoles.Data.Features.Crm.Models.DiscoveredLeadDto>> DiscoverLiveWebLeads(
+        string division,
+        string targetProduct,
+        string city,
+        string? channel,
+        int limit,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.DiscoverLiveLeadsAsync(division, targetProduct, city, channel ?? "Google-Maps", limit, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("scrapeLeadsFromWebUrl")]
+    public async Task<List<Tyresoles.Data.Features.Crm.Models.DiscoveredLeadDto>> ScrapeLeadsFromWebUrl(
+        string url,
+        string? division,
+        string? targetProduct,
+        int limit,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.ScrapeLeadsFromWebUrlAsync(url, division ?? "Tyresoles", targetProduct ?? "Commercial Retreading", limit, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("getCrawlCheckpoint")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrawlCheckpointDto> GetCrawlCheckpoint(
+        string url,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.GetCrawlCheckpointAsync(url, ct);
+    }
+
+    [Authorize]
+    [GraphQLName("getStagedLeads")]
+    public async Task<List<Tyresoles.Data.Features.Crm.Models.StagedLeadItemDto>> GetStagedLeads(
+        string? url,
+        string? status,
+        int? limit,
+        [Service] Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService discoveryService,
+        CancellationToken ct)
+    {
+        return await discoveryService.GetStagedLeadsAsync(url, status, limit ?? 50, ct);
     }
 
     [Authorize]
@@ -165,7 +237,7 @@ public class Query
 
     [Authorize]
     [GraphQLName("getAllCrmCallLogs")]
-    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 1000)]
+    [UseOffsetPaging(IncludeTotalCount = true, MaxPageSize = 2000)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]

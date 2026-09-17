@@ -13,6 +13,8 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   "/rungstprocess": "GST Process",
   "/fixedasset": "Fixed Assets",
   "/crm-contacts": "CRM Contacts",
+  "/crm-campaigns": "CRM Contacts",
+  "/crm-whatsapp-campaigns": "CRM Contacts",
   "/crm-calling": "CRM Calling",
   "/crm-calling-supervisor": "CRM Calling Supervisor",
   "/crm-call-logs": "CRM Call Logs",

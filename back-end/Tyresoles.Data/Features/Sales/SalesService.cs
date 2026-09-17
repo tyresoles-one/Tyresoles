@@ -1065,7 +1065,8 @@ public sealed class SalesService : ISalesService
                     ERPAreaCodes = areaCodesValue,
                     Products = productsValue,
                     IsActive = true,
-                    CreatedBy = "System Import"
+                    CreatedBy = "System Import",
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 _crmDb.CrmContacts.Add(contact);

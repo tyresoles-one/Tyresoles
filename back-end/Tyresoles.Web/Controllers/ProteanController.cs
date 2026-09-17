@@ -218,6 +218,65 @@ public sealed class ProteanController : ControllerBase
     }
 
     /// <summary>
+    /// Returns count and document numbers of all Sales Invoice and Credit Memo records currently skipped ([E-Inv Skip] = 1).
+    /// </summary>
+    [HttpGet("einv-errors")]
+    public async Task<IActionResult> GetSkippedEInvoiceErrors(CancellationToken ct = default)
+    {
+        var scope = _dataService.ForTenant(TenantKey);
+        var result = await _proteanService.GetSkippedEInvoiceErrorsAsync(scope, ct).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            totalSkipped = result.TotalCleared,
+            invoices = result.InvoicesCleared,
+            crMemos = result.CrMemosCleared
+        });
+    }
+
+    /// <summary>
+    /// Automatically clears E-Invoice errors by resetting [E-Inv Skip] = 0 for all sales invoices and credit memos
+    /// that currently have [E-Inv Skip] = 1.
+    /// </summary>
+    [HttpPost("clear-einv-errors")]
+    public async Task<IActionResult> ClearEInvoiceErrors(CancellationToken ct = default)
+    {
+        var scope = _dataService.ForTenant(TenantKey);
+        var result = await _proteanService.ClearEInvoiceErrorsAsync(scope, ct).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            status = "COMPLETED",
+            totalCleared = result.TotalCleared,
+            clearedInvoices = result.InvoicesCleared,
+            clearedCrMemos = result.CrMemosCleared,
+            message = $"Cleared {result.TotalCleared} document(s) with e-invoice errors."
+        });
+    }
+
+    /// <summary>
+    /// Clears all E-Invoice errors ([E-Inv Skip] = 0) and immediately triggers automated pending IRN generation.
+    /// </summary>
+    [HttpPost("clear-and-run-einv")]
+    public async Task<IActionResult> ClearAndRunEInvoiceProcess(CancellationToken ct = default)
+    {
+        var scope = _dataService.ForTenant(TenantKey);
+        var clearResult = await _proteanService.ClearEInvoiceErrorsAsync(scope, ct).ConfigureAwait(false);
+        var (processed, errors) = await _proteanService.RunEInvProcessAsync(scope, _eInvoiceService, ct).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            status = "COMPLETED",
+            totalCleared = clearResult.TotalCleared,
+            clearedInvoices = clearResult.InvoicesCleared,
+            clearedCrMemos = clearResult.CrMemosCleared,
+            processed,
+            errors,
+            message = $"Cleared {clearResult.TotalCleared} skipped document(s). Generated {processed} IRN(s) with {errors} error(s)."
+        });
+    }
+
+    /// <summary>
     /// Processes all pending E-Invoices for the NavLive tenant.
     /// Initiates IRN generation for each candidate in parallel for high throughput.
     /// </summary>
