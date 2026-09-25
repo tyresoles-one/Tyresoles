@@ -92,6 +92,7 @@ export interface AudienceEstimateResult {
 	totalMatchingContacts: number;
 	withValidPhone: number;
 	suppressedCount: number;
+	previouslyCampaignedCount?: number;
 	eligibleRecipients: number;
 }
 
@@ -104,9 +105,20 @@ export interface CrmContactWhatsappPickerItem {
 	cleanWhatsappPhone?: string | null;
 	city?: string | null;
 	state?: string | null;
+	contactType?: string | null;
 	contactCategory?: string | null;
 	respCenter?: string | null;
 	qualityScore?: number | null;
+	isUniqueNumber?: boolean;
+	previousCampaignCount?: number;
+}
+
+export interface CrmContactsFilterOptionsResult {
+	contactTypes: string[];
+	contactCategories: string[];
+	respCenters: string[];
+	states: string[];
+	cities: string[];
 }
 
 export interface CrmContactsWhatsappPickerResult {
@@ -152,6 +164,7 @@ export interface CrmWhatsappInboundMessagesResult {
 }
 
 export interface AudienceWhatsappFilterInput {
+	contactType?: string | null;
 	contactCategory?: string | null;
 	state?: string | null;
 	city?: string | null;
@@ -160,6 +173,7 @@ export interface AudienceWhatsappFilterInput {
 	minQualityScore?: number | null;
 	search?: string | null;
 	selectedContactIds?: string[] | null;
+	onlyUniqueNumbers?: boolean | null;
 }
 
 // QUERIES
@@ -311,6 +325,7 @@ export const ESTIMATE_WHATSAPP_AUDIENCE = buildQuery`
 			totalMatchingContacts
 			withValidPhone
 			suppressedCount
+			previouslyCampaignedCount
 			eligibleRecipients
 		}
 	}
@@ -340,22 +355,38 @@ export const GET_CRM_SETTINGS = buildQuery`
 	}
 `;
 
+export const GET_CRM_CONTACTS_FILTER_OPTIONS = buildQuery`
+	query GetCrmContactsFilterOptions {
+		getCrmContactsFilterOptions {
+			contactTypes
+			contactCategories
+			respCenters
+			states
+			cities
+		}
+	}
+`;
+
 export const GET_CRM_CONTACTS_FOR_WHATSAPP_PICKER = buildQuery`
 	query GetCrmContactsForWhatsappPicker(
 		$search: String
+		$contactType: String
 		$contactCategory: String
 		$state: String
 		$city: String
 		$respCenter: String
+		$onlyUniqueNumbers: Boolean
 		$skip: Int
 		$take: Int
 	) {
 		getCrmContactsForWhatsappPicker(
 			search: $search
+			contactType: $contactType
 			contactCategory: $contactCategory
 			state: $state
 			city: $city
 			respCenter: $respCenter
+			onlyUniqueNumbers: $onlyUniqueNumbers
 			skip: $skip
 			take: $take
 		) {
@@ -369,9 +400,12 @@ export const GET_CRM_CONTACTS_FOR_WHATSAPP_PICKER = buildQuery`
 				cleanWhatsappPhone
 				city
 				state
+				contactType
 				contactCategory
 				respCenter
 				qualityScore
+				isUniqueNumber
+				previousCampaignCount
 			}
 		}
 	}

@@ -777,10 +777,16 @@ try
                     [Outcome] nvarchar(100) NOT NULL,
                     [Notes] nvarchar(max) NULL,
                     [CreatedBy] nvarchar(128) NOT NULL,
+                    [SalesUserId] nvarchar(128) NULL,
                     CONSTRAINT [PK_CrmCallLog] PRIMARY KEY ([Id]),
                     CONSTRAINT [FK_CrmCallLog_CrmContact_ContactId] FOREIGN KEY ([ContactId]) REFERENCES dbo.[CrmContact] ([Id]) ON DELETE CASCADE
                 );
                 CREATE INDEX [IX_CrmCallLog_ContactId] ON dbo.[CrmCallLog] ([ContactId]);
+            END
+
+            IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmCallLog', 'SalesUserId') IS NULL
+            BEGIN
+                ALTER TABLE dbo.[CrmCallLog] ADD [SalesUserId] nvarchar(128) NULL;
             END
 
             IF OBJECT_ID('dbo.CrmCallLog', 'U') IS NOT NULL AND COL_LENGTH('dbo.CrmCallLog', 'InvoiceNos') IS NULL

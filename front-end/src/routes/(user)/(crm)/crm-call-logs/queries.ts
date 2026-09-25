@@ -18,6 +18,7 @@ export type DetailedCallLog = {
 	outcome: string;
 	notes?: string | null;
 	createdBy: string;
+	salesUserId?: string | null;
 	invoiceNos?: string | null;
 	invoiceAmount?: number | null;
 	tyreQuantity?: number | null;
@@ -85,6 +86,7 @@ export const GetAllCrmCallLogsDocument = buildQuery`
 				outcome
 				notes
 				createdBy
+				salesUserId
 				invoiceNos
 				invoiceAmount
 				tyreQuantity

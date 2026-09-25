@@ -54,7 +54,7 @@ public class WhatsappWebhookController : ControllerBase
             {
                 status = "active",
                 service = "Tyresoles WhatsApp Cloud API Webhook",
-                endpoint = "https://app.tyresoles.in/api/campaigns/webhooks/whatsapp",
+                endpoint = "https://api.tyresoles.in/api/campaigns/webhooks/whatsapp",
                 message = "WhatsApp Webhook endpoint is active and listening for Meta events.",
                 instructions = "To verify Meta challenge, submit GET with hub.mode=subscribe, hub.verify_token, and hub.challenge parameters.",
                 timestamp = DateTime.UtcNow

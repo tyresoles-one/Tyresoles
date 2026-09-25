@@ -11,9 +11,11 @@ Features:
 import re
 import time
 import logging
+import threading
 from typing import List, Dict, Any, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse, parse_qs, urlencode, urlunparse
 import urllib.request
+import urllib.error
 from bs4 import BeautifulSoup
 
 from validator import LeadValidator
@@ -65,47 +67,133 @@ CITY_TO_STATE = {
 class WebUrlScraper:
     """Universal web scraper capable of extracting leads from any transport/directory web URL."""
 
-    def __init__(self, timeout: int = 20, delay_between_requests: float = 0.3):
+    def __init__(self, timeout: int = 30, delay_between_requests: float = 0.3):
         self.timeout = timeout
         self.delay = delay_between_requests
         self.headers = DEFAULT_HEADERS.copy()
+        self._local = threading.local()
+        # Seed known anti-bot bypass cookies (e.g. transportfamily.com / BitNinja challenge)
+        self._known_cookies: Dict[str, str] = {
+            "humans_21909": "1"
+        }
 
-    def fetch_html(self, url: str, retries: int = 3) -> Optional[str]:
-        """Fetches page content with realistic headers, error handling, and exponential backoff retries."""
-        for attempt in range(1, retries + 1):
-            # 1. Try requests library first (handles system proxies, connection pooling, Brotli/Gzip)
+    def _get_session(self) -> Any:
+        """Returns a thread-local requests.Session configured with keep-alive and anti-bot cookies."""
+        if not hasattr(self._local, "session"):
             try:
                 import requests
                 import urllib3
                 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                s = requests.Session()
                 req_headers = self.headers.copy()
                 req_headers.pop("Accept-Encoding", None)
-                resp = requests.get(url, headers=req_headers, timeout=self.timeout, verify=False)
-                if resp.status_code == 200:
-                    return resp.text
-                elif resp.status_code in (403, 429, 503):
-                    logger.warning(f"HTTP {resp.status_code} received from {url} on attempt {attempt}")
+                s.headers.update(req_headers)
+                for c_name, c_val in self._known_cookies.items():
+                    s.cookies.set(c_name, c_val)
+                self._local.session = s
             except ImportError:
-                pass
-            except Exception as req_ex:
-                logger.warning(f"Requests fetch failed for {url}: {req_ex}")
+                self._local.session = None
+        return getattr(self._local, "session", None)
 
-            # 2. Fallback to urllib with unverified SSL context (for corporate firewalls/inspection)
+    def _extract_cookie_from_html(self, html: str) -> Optional[Tuple[str, str]]:
+        """Detects and extracts document.cookie assignments from anti-bot challenge scripts."""
+        if not html or "document.cookie" not in html:
+            return None
+        m = re.search(r'document\.cookie\s*=\s*["\']([^=;\s]+)=([^;\'"\s]+)', html)
+        if m:
+            return (m.group(1).strip(), m.group(2).strip())
+        return None
+
+    def fetch_html(self, url: str, retries: int = 4) -> Optional[str]:
+        """
+        Fetches page content with realistic headers, anti-bot challenge auto-bypass,
+        rate-limit handling (409/429/503), error handling, and exponential backoff.
+        """
+        session = self._get_session()
+
+        for attempt in range(1, retries + 1):
+            # 1. Try requests library with thread-local Session
+            if session is not None:
+                try:
+                    if "transportfamily.com" in url:
+                        session.cookies.set("humans_21909", "1")
+
+                    resp = session.get(url, timeout=self.timeout, verify=False)
+
+                    # Handle anti-bot JavaScript / 409 Conflict challenge
+                    if resp.status_code == 409 or (resp.status_code == 200 and "document.cookie" in resp.text and len(resp.text) < 1000):
+                        cookie_pair = self._extract_cookie_from_html(resp.text)
+                        if cookie_pair:
+                            c_name, c_val = cookie_pair
+                            logger.info(f"Detected anti-bot challenge cookie: {c_name}={c_val}. Applying to session and retrying...")
+                            session.cookies.set(c_name, c_val)
+                            self._known_cookies[c_name] = c_val
+                            time.sleep(0.5)
+                            resp = session.get(url, timeout=self.timeout, verify=False)
+
+                    if resp.status_code == 200:
+                        return resp.text
+                    elif resp.status_code == 404:
+                        logger.info(f"Page returned HTTP 404 (Not Found): {url}")
+                        return None
+                    elif resp.status_code in (409, 429, 502, 503, 504):
+                        retry_after = resp.headers.get("Retry-After")
+                        wait_sec = min(10.0, float(retry_after)) if retry_after and retry_after.isdigit() else (attempt * 2.0)
+                        logger.warning(f"HTTP {resp.status_code} received from {url} on attempt {attempt}/{retries}. Backing off {wait_sec:.1f}s...")
+                        time.sleep(wait_sec)
+                        continue
+                    elif resp.status_code == 403:
+                        logger.warning(f"HTTP 403 Forbidden on attempt {attempt}/{retries} for {url}. Waiting {attempt * 2.0:.1f}s...")
+                        time.sleep(attempt * 2.0)
+                        continue
+                    else:
+                        logger.warning(f"HTTP {resp.status_code} from {url} on attempt {attempt}/{retries}")
+                except Exception as req_ex:
+                    logger.warning(f"Requests fetch failed on attempt {attempt}/{retries} for {url}: {req_ex}")
+                    if attempt < retries:
+                        time.sleep(attempt * 2.0)
+                        continue
+
+            # 2. Fallback to urllib with unverified SSL context
             try:
                 import ssl
                 ctx = ssl._create_unverified_context()
-                req = urllib.request.Request(url, headers=self.headers)
+                headers = self.headers.copy()
+                if "transportfamily.com" in url or self._known_cookies:
+                    cookie_str = "; ".join(f"{k}={v}" for k, v in self._known_cookies.items())
+                    headers["Cookie"] = cookie_str
+
+                req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
                     charset = resp.headers.get_content_charset() or "utf-8"
-                    return resp.read().decode(charset, errors="ignore")
+                    content = resp.read().decode(charset, errors="ignore")
+                    if "document.cookie" in content and len(content) < 1000:
+                        cookie_pair = self._extract_cookie_from_html(content)
+                        if cookie_pair:
+                            c_name, c_val = cookie_pair
+                            self._known_cookies[c_name] = c_val
+                            time.sleep(0.5)
+                            continue
+                    return content
+            except urllib.error.HTTPError as http_err:
+                if http_err.code == 404:
+                    logger.info(f"Urllib HTTP 404 (Not Found): {url}")
+                    return None
+                elif http_err.code in (409, 429, 502, 503, 504):
+                    backoff = attempt * 2.0
+                    logger.warning(f"Urllib HTTP {http_err.code} on attempt {attempt}/{retries} for {url}. Retrying in {backoff:.1f}s...")
+                    time.sleep(backoff)
+                else:
+                    logger.warning(f"Urllib HTTP {http_err.code} for {url}: {http_err.reason}")
             except Exception as ex:
                 if attempt < retries:
-                    backoff = attempt * 1.5
-                    logger.warning(f"Fetch attempt {attempt}/{retries} failed for {url}: {ex}. Retrying in {backoff:.1f}s...")
+                    backoff = attempt * 2.0
+                    logger.warning(f"Urllib fetch attempt {attempt}/{retries} failed for {url}: {ex}. Retrying in {backoff:.1f}s...")
                     time.sleep(backoff)
                 else:
                     logger.error(f"Failed to fetch {url} after {retries} attempts: {ex}")
                     return None
+
         return None
 
     def is_single_listing_url(self, url: str) -> bool:

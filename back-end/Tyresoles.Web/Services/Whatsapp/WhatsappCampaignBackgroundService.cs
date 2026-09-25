@@ -150,9 +150,43 @@ public class WhatsappCampaignBackgroundService : BackgroundService
             var hasMediaHeader = templateHeaderType == "IMAGE" || templateHeaderType == "DOCUMENT" || templateHeaderType == "VIDEO"
                 || (activeCampaign.Template == null && !string.IsNullOrEmpty(activeCampaign.HeaderMediaUrl));
 
-            if (hasMediaHeader && !string.IsNullOrEmpty(activeCampaign.HeaderMediaUrl))
+            var effectiveMediaUrl = !string.IsNullOrWhiteSpace(activeCampaign.HeaderMediaUrl)
+                ? activeCampaign.HeaderMediaUrl
+                : activeCampaign.Template?.HeaderMediaUrl;
+
+            if (string.IsNullOrWhiteSpace(effectiveMediaUrl) && hasMediaHeader && !string.IsNullOrWhiteSpace(activeCampaign.Template?.ComponentsJson))
             {
-                var isDoc = templateHeaderType == "DOCUMENT" || activeCampaign.HeaderMediaUrl.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+                try
+                {
+                    using var doc = JsonDocument.Parse(activeCampaign.Template.ComponentsJson);
+                    foreach (var elem in doc.RootElement.EnumerateArray())
+                    {
+                        if (elem.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "HEADER" &&
+                            elem.TryGetProperty("example", out var exProp) &&
+                            exProp.TryGetProperty("header_handle", out var hhProp) &&
+                            hhProp.GetArrayLength() > 0)
+                        {
+                            effectiveMediaUrl = hhProp[0].GetString();
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (hasMediaHeader)
+            {
+                if (string.IsNullOrWhiteSpace(effectiveMediaUrl))
+                {
+                    r.Status = "Failed";
+                    r.ErrorCode = 132012;
+                    r.ErrorMessage = $"Template requires an {templateHeaderType} header, but no Header Media URL was provided.";
+                    activeCampaign.FailedCount++;
+                    failuresInBatch++;
+                    continue;
+                }
+
+                var isDoc = templateHeaderType == "DOCUMENT" || effectiveMediaUrl.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
                 var headerComp = new WhatsappTemplateComponent
                 {
                     Type = "header",
@@ -161,8 +195,8 @@ public class WhatsappCampaignBackgroundService : BackgroundService
                         new()
                         {
                             Type = isDoc ? "document" : "image",
-                            Image = isDoc ? null : new WhatsappMediaParam { Link = activeCampaign.HeaderMediaUrl },
-                            Document = isDoc ? new WhatsappMediaParam { Link = activeCampaign.HeaderMediaUrl, Filename = "Tyresoles_Offer.pdf" } : null
+                            Image = isDoc ? null : new WhatsappMediaParam { Link = effectiveMediaUrl },
+                            Document = isDoc ? new WhatsappMediaParam { Link = effectiveMediaUrl, Filename = "Tyresoles_Offer.pdf" } : null
                         }
                     }
                 };

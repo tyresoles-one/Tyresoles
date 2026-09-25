@@ -28,6 +28,7 @@ CREATE TABLE [dbo].[CrmCallLog] (
     [Outcome] nvarchar(100) NOT NULL,
     [Notes] nvarchar(max) NULL,
     [CreatedBy] nvarchar(128) NOT NULL,
+    [SalesUserId] nvarchar(128) NULL,
     CONSTRAINT [PK_CrmCallLog] PRIMARY KEY ([Id])
 );
 

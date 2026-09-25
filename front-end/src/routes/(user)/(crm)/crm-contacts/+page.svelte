@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { buildQuery, buildMutation, graphqlQuery } from '$lib/services/graphql';
+	import { buildQuery, buildMutation } from '$lib/services/graphql';
 	import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 	import { usePaginatedList } from '$lib/composables';
 	import { Button } from '$lib/components/ui/button';
 	import * as Field from '$lib/components/ui/field';
 	import { Icon } from '$lib/components/venUI/icon';
-	import { toast } from '$lib/components/venUI/toast';
 	import { TableActions } from '$lib/components/venUI/tableActions';
 	import { DataGrid, type DataGridColumn, type FilterRule } from '$lib/components/venUI/datagrid';
 	import { authStore } from '$lib/stores/auth';
@@ -42,15 +41,6 @@
 		location?: string | null;
 	};
 
-	type CrmMasterItem = {
-		id: number;
-		name: string;
-	};
-
-	type CrmMasterItemsResult = {
-		crmMasterItems: CrmMasterItem[];
-	};
-
 	type GetCrmContactsResult = {
 		crmContacts: {
 			items: CrmContact[];
@@ -65,15 +55,6 @@
 	type DeleteCrmContactResult = {
 		deleteCrmContact: boolean;
 	};
-
-	const GetCrmMasterItemsDocument = buildQuery`
-		query GetCrmMasterItems($type: CrmMasterType!, $where: CrmMasterItemFilterInput) {
-			crmMasterItems: getCrmMasterItems(type: $type, where: $where) {
-				id
-				name
-			}
-		}
-	` as unknown as TypedDocumentNode<CrmMasterItemsResult, { type: string; where?: any }>;
 
 	const GetCrmContactsDocument = buildQuery`
 		query GetCrmContacts($skip: Int, $take: Int, $where: CrmContactFilterInput, $order: [CrmContactSortInput!]) {
@@ -255,40 +236,17 @@
 		))
 	);
 
-	let contactTypes = $state<{ value: string; label: string }[]>([]);
-
-	async function loadContactTypes() {
-		try {
-			const res = await graphqlQuery<CrmMasterItemsResult>(GetCrmMasterItemsDocument, {
-				variables: { type: 'CONTACT_TYPE' }
-			});
-			if (res.success && res.data?.crmMasterItems) {
-				contactTypes = res.data.crmMasterItems.map(x => ({
-					value: x.name,
-					label: x.name
-				}));
-			} else if (!res.success) {
-				console.error('Failed to load contact types:', res.error);
-				toast.error('Failed to load Contact Types');
-			}
-		} catch (err) {
-			console.error('Failed to load contact types', err);
-			toast.error('Failed to load Contact Types');
-		}
-	}
-
 	onMount(() => {
-		loadContactTypes();
 		loadStoredFilterRules();
 	});
 
 
 	function handleRowClick(contact: CrmContact) {
-		goto(`/crm-contacts/${contact.id}`);
+		goto(`/crm-contacts/${contact.id}?from=/crm-contacts`);
 	}
 
 	function openAddDialog() {
-		goto('/crm-contacts/new');
+		goto('/crm-contacts/new?from=/crm-contacts');
 	}
 
 	const columns: DataGridColumn<CrmContact>[] = [
@@ -355,25 +313,14 @@
 		mobileCardFallback={true}
 	>
 		{#snippet actions()}
-			<div class="flex items-center gap-2">
-				<a
-					href="/crm-masters?category=leads"
-					target="_blank"
-					class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-xs"
-					title="Manage Contact Types, Categories, and Sources in CRM Masters"
-				>
-					<Icon name="database" class="size-3.5 text-primary" />
-					<span>CRM Masters</span>
-				</a>
-				<Button
-					size="sm"
-					class="gap-2 shrink-0 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-sm rounded-xl px-4 py-2 transition-all"
-					onclick={openAddDialog}
-				>
-					<Icon name="plus" class="size-3.5" />
-					<span>Add Contact</span>
-				</Button>
-			</div>
+			<Button
+				size="sm"
+				class="gap-2 shrink-0 bg-primary hover:bg-primary/95 text-primary-foreground font-medium shadow-sm rounded-xl px-4 py-2 transition-all"
+				onclick={openAddDialog}
+			>
+				<Icon name="plus" class="size-3.5" />
+				<span>Add Contact</span>
+			</Button>
 		{/snippet}
 	</DataGrid>
 </div>

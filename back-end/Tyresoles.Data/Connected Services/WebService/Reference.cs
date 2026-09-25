@@ -136,6 +136,10 @@ namespace WebService
         [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
         System.Threading.Tasks.Task<WebService.PortalForDealer_Result> PortalForDealerAsync(WebService.PortalForDealer request);
         
+        [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:UserPasswordReset", ReplyAction="*")]
+        [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
+        System.Threading.Tasks.Task<WebService.UserPasswordReset_Result> UserPasswordResetAsync(WebService.UserPasswordReset request);
+        
         [System.ServiceModel.OperationContractAttribute(Action="urn:microsoft-dynamics-schemas/codeunit/WebServe:ReqCustEdit", ReplyAction="*")]
         [System.ServiceModel.XmlSerializerFormatAttribute(SupportFaults=true)]
         System.Threading.Tasks.Task<WebService.ReqCustEdit_Result> ReqCustEditAsync(WebService.ReqCustEdit request);
@@ -2020,6 +2024,46 @@ namespace WebService
     [System.Diagnostics.DebuggerStepThroughAttribute()]
     [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
     [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="UserPasswordReset", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class UserPasswordReset
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public string userid;
+        
+        public UserPasswordReset()
+        {
+        }
+        
+        public UserPasswordReset(string userid)
+        {
+            this.userid = userid;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+    [System.ServiceModel.MessageContractAttribute(WrapperName="UserPasswordReset_Result", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
+    public partial class UserPasswordReset_Result
+    {
+        
+        [System.ServiceModel.MessageBodyMemberAttribute(Namespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", Order=0)]
+        public bool return_value;
+        
+        public UserPasswordReset_Result()
+        {
+        }
+        
+        public UserPasswordReset_Result(bool return_value)
+        {
+            this.return_value = return_value;
+        }
+    }
+    
+    [System.Diagnostics.DebuggerStepThroughAttribute()]
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Tools.ServiceModel.Svcutil", "8.0.0")]
+    [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
     [System.ServiceModel.MessageContractAttribute(WrapperName="ReqCustEdit", WrapperNamespace="urn:microsoft-dynamics-schemas/codeunit/WebServe", IsWrapped=true)]
     public partial class ReqCustEdit
     {
@@ -3001,6 +3045,19 @@ namespace WebService
             WebService.PortalForDealer inValue = new WebService.PortalForDealer();
             inValue.dealerCode = dealerCode;
             return ((WebService.WebServe_Port)(this)).PortalForDealerAsync(inValue);
+        }
+        
+        [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]
+        System.Threading.Tasks.Task<WebService.UserPasswordReset_Result> WebService.WebServe_Port.UserPasswordResetAsync(WebService.UserPasswordReset request)
+        {
+            return base.Channel.UserPasswordResetAsync(request);
+        }
+        
+        public System.Threading.Tasks.Task<WebService.UserPasswordReset_Result> UserPasswordResetAsync(string userid)
+        {
+            WebService.UserPasswordReset inValue = new WebService.UserPasswordReset();
+            inValue.userid = userid;
+            return ((WebService.WebServe_Port)(this)).UserPasswordResetAsync(inValue);
         }
         
         [System.ComponentModel.EditorBrowsableAttribute(System.ComponentModel.EditorBrowsableState.Advanced)]

@@ -15,6 +15,7 @@ namespace Tyresoles.Web.GraphQL;
 
 public class AudienceWhatsappFilterInput
 {
+    public string? ContactType { get; set; }
     public string? ContactCategory { get; set; }
     public string? State { get; set; }
     public string? City { get; set; }
@@ -23,6 +24,7 @@ public class AudienceWhatsappFilterInput
     public decimal? MinQualityScore { get; set; }
     public string? Search { get; set; }
     public List<Guid>? SelectedContactIds { get; set; }
+    public bool? OnlyUniqueNumbers { get; set; }
 }
 
 public class CrmContactWhatsappPickerItem
@@ -35,9 +37,21 @@ public class CrmContactWhatsappPickerItem
     public string? CleanWhatsappPhone { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }
+    public string? ContactType { get; set; }
     public string? ContactCategory { get; set; }
     public string? RespCenter { get; set; }
     public decimal? QualityScore { get; set; }
+    public bool IsUniqueNumber { get; set; } = true;
+    public int PreviousCampaignCount { get; set; } = 0;
+}
+
+public class CrmContactsFilterOptionsResult
+{
+    public List<string> ContactTypes { get; set; } = new();
+    public List<string> ContactCategories { get; set; } = new();
+    public List<string> RespCenters { get; set; } = new();
+    public List<string> States { get; set; } = new();
+    public List<string> Cities { get; set; } = new();
 }
 
 public class CrmContactsWhatsappPickerResult
@@ -137,6 +151,7 @@ public class AudienceWhatsappEstimateResult
     public int TotalMatchingContacts { get; set; }
     public int WithValidPhone { get; set; }
     public int SuppressedCount { get; set; }
+    public int PreviouslyCampaignedCount { get; set; }
     public int EligibleRecipients { get; set; }
 }
 
@@ -307,6 +322,8 @@ public class CrmWhatsappCampaignQueryExtension
                                              (c.MobileNo2 != null && c.MobileNo2.Contains(s)) ||
                                              (c.City != null && c.City.Contains(s)));
                 }
+                if (!string.IsNullOrWhiteSpace(filter.ContactType))
+                    query = query.Where(c => c.ContactType == filter.ContactType);
                 if (!string.IsNullOrWhiteSpace(filter.ContactCategory))
                     query = query.Where(c => c.ContactCategory == filter.ContactCategory);
                 if (!string.IsNullOrWhiteSpace(filter.State))
@@ -341,25 +358,123 @@ public class CrmWhatsappCampaignQueryExtension
         }
 
         var phoneList = validPhones.ToList();
-        var suppressedCount = await db.CrmWhatsappSuppressionLists
-            .CountAsync(s => phoneList.Contains(s.PhoneNumber), cancellationToken);
+        var suppressedPhones = await db.CrmWhatsappSuppressionLists
+            .Where(s => phoneList.Contains(s.PhoneNumber))
+            .Select(s => s.PhoneNumber)
+            .ToListAsync(cancellationToken);
+        var suppressedSet = new HashSet<string>(suppressedPhones, StringComparer.OrdinalIgnoreCase);
+
+        // Check against previous campaigns
+        var previousPhones = await db.CrmWhatsappCampaignRecipients
+            .Where(r => phoneList.Contains(r.PhoneNumber))
+            .Select(r => r.PhoneNumber)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var previousPhonesSet = new HashSet<string>(previousPhones, StringComparer.OrdinalIgnoreCase);
+
+        var previouslyCampaignedCount = previousPhonesSet.Count;
+
+        int eligibleRecipients;
+        if (filter?.OnlyUniqueNumbers == true)
+        {
+            eligibleRecipients = validPhones.Count(p => !suppressedSet.Contains(p) && !previousPhonesSet.Contains(p));
+        }
+        else
+        {
+            eligibleRecipients = validPhones.Count(p => !suppressedSet.Contains(p));
+        }
 
         return new AudienceWhatsappEstimateResult
         {
             TotalMatchingContacts = total,
             WithValidPhone = validPhones.Count,
-            SuppressedCount = suppressedCount,
-            EligibleRecipients = Math.Max(0, validPhones.Count - suppressedCount)
+            SuppressedCount = suppressedSet.Count,
+            PreviouslyCampaignedCount = previouslyCampaignedCount,
+            EligibleRecipients = eligibleRecipients
+        };
+    }
+
+    [GraphQLName("getCrmContactsFilterOptions")]
+    public async Task<CrmContactsFilterOptionsResult> GetCrmContactsFilterOptions(
+        [Service] CrmDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var contactTypesFromContacts = await db.CrmContacts
+            .Where(c => c.IsActive && !string.IsNullOrEmpty(c.ContactType))
+            .Select(c => c.ContactType!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var contactTypesFromMaster = await db.CrmContactTypes
+            .Where(t => !string.IsNullOrEmpty(t.Name))
+            .Select(t => t.Name)
+            .ToListAsync(cancellationToken);
+
+        var contactTypes = contactTypesFromContacts
+            .Union(contactTypesFromMaster)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        var contactCategoriesFromContacts = await db.CrmContacts
+            .Where(c => c.IsActive && !string.IsNullOrEmpty(c.ContactCategory))
+            .Select(c => c.ContactCategory!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var contactCategoriesFromMaster = await db.CrmContactCategories
+            .Where(c => !string.IsNullOrEmpty(c.Name))
+            .Select(c => c.Name)
+            .ToListAsync(cancellationToken);
+
+        var contactCategories = contactCategoriesFromContacts
+            .Union(contactCategoriesFromMaster)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        var respCenters = await db.CrmContacts
+            .Where(c => c.IsActive && !string.IsNullOrEmpty(c.RespCenter))
+            .Select(c => c.RespCenter!)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+
+        var states = await db.CrmContacts
+            .Where(c => c.IsActive && !string.IsNullOrEmpty(c.State))
+            .Select(c => c.State!)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+
+        var cities = await db.CrmContacts
+            .Where(c => c.IsActive && !string.IsNullOrEmpty(c.City))
+            .Select(c => c.City!)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+
+        return new CrmContactsFilterOptionsResult
+        {
+            ContactTypes = contactTypes,
+            ContactCategories = contactCategories,
+            RespCenters = respCenters,
+            States = states,
+            Cities = cities
         };
     }
 
     [GraphQLName("getCrmContactsForWhatsappPicker")]
     public async Task<CrmContactsWhatsappPickerResult> GetCrmContactsForWhatsappPicker(
         string? search,
+        string? contactType,
         string? contactCategory,
         string? state,
         string? city,
         string? respCenter,
+        bool? onlyUniqueNumbers,
         int? skip,
         int? take,
         [Service] CrmDbContext db,
@@ -377,6 +492,9 @@ public class CrmWhatsappCampaignQueryExtension
                                      (c.City != null && c.City.Contains(s)));
         }
 
+        if (!string.IsNullOrWhiteSpace(contactType) && contactType != "ALL")
+            query = query.Where(c => c.ContactType == contactType);
+
         if (!string.IsNullOrWhiteSpace(contactCategory) && contactCategory != "ALL")
             query = query.Where(c => c.ContactCategory == contactCategory);
 
@@ -388,6 +506,15 @@ public class CrmWhatsappCampaignQueryExtension
 
         if (!string.IsNullOrWhiteSpace(respCenter) && respCenter != "ALL")
             query = query.Where(c => c.RespCenter == respCenter);
+
+        if (onlyUniqueNumbers == true)
+        {
+            var usedContactIds = db.CrmWhatsappCampaignRecipients
+                .Where(r => r.ContactId != null)
+                .Select(r => r.ContactId!.Value);
+
+            query = query.Where(c => !usedContactIds.Contains(c.Id));
+        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -407,17 +534,44 @@ public class CrmWhatsappCampaignQueryExtension
                 c.MobileNo2,
                 c.City,
                 c.State,
+                c.ContactType,
                 c.ContactCategory,
                 c.RespCenter,
                 c.QualityScore
             })
             .ToListAsync(cancellationToken);
 
+        var contactIds = rawList.Select(c => c.Id).ToList();
+        var phones = rawList.SelectMany(c => new[] {
+            WhatsappCloudApiService.NormalizePhoneNumber(c.MobileNo ?? ""),
+            WhatsappCloudApiService.NormalizePhoneNumber(c.MobileNo2 ?? "")
+        }).Where(p => p.Length >= 10).Distinct().ToList();
+
+        var campaignRecipients = await db.CrmWhatsappCampaignRecipients
+            .Where(r => (r.ContactId.HasValue && contactIds.Contains(r.ContactId.Value)) || phones.Contains(r.PhoneNumber))
+            .Select(r => new { r.ContactId, r.PhoneNumber, r.CampaignId })
+            .ToListAsync(cancellationToken);
+
+        var countByContactId = campaignRecipients
+            .Where(r => r.ContactId.HasValue)
+            .GroupBy(r => r.ContactId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.CampaignId).Distinct().Count());
+
+        var countByPhone = campaignRecipients
+            .GroupBy(r => r.PhoneNumber)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.CampaignId).Distinct().Count());
+
         var items = rawList.Select(c =>
         {
             var p1 = WhatsappCloudApiService.NormalizePhoneNumber(c.MobileNo ?? "");
             var p2 = WhatsappCloudApiService.NormalizePhoneNumber(c.MobileNo2 ?? "");
             var cleanPhone = p1.Length >= 10 ? p1 : (p2.Length >= 10 ? p2 : "");
+
+            var campaignCount = 0;
+            if (countByContactId.TryGetValue(c.Id, out var cCount))
+                campaignCount = Math.Max(campaignCount, cCount);
+            if (!string.IsNullOrEmpty(cleanPhone) && countByPhone.TryGetValue(cleanPhone, out var pCount))
+                campaignCount = Math.Max(campaignCount, pCount);
 
             return new CrmContactWhatsappPickerItem
             {
@@ -429,9 +583,12 @@ public class CrmWhatsappCampaignQueryExtension
                 CleanWhatsappPhone = cleanPhone,
                 City = c.City,
                 State = c.State,
+                ContactType = c.ContactType,
                 ContactCategory = c.ContactCategory,
                 RespCenter = c.RespCenter,
-                QualityScore = c.QualityScore
+                QualityScore = c.QualityScore,
+                IsUniqueNumber = campaignCount == 0,
+                PreviousCampaignCount = campaignCount
             };
         }).ToList();
 
@@ -746,6 +903,8 @@ public class CrmWhatsappCampaignMutationExtension
                                                            (c.MobileNo2 != null && c.MobileNo2.Contains(s)) ||
                                                            (c.City != null && c.City.Contains(s)));
                 }
+                if (!string.IsNullOrWhiteSpace(filter.ContactType))
+                    contactQuery = contactQuery.Where(c => c.ContactType == filter.ContactType);
                 if (!string.IsNullOrWhiteSpace(filter.ContactCategory))
                     contactQuery = contactQuery.Where(c => c.ContactCategory == filter.ContactCategory);
                 if (!string.IsNullOrWhiteSpace(filter.State))
@@ -769,6 +928,20 @@ public class CrmWhatsappCampaignMutationExtension
             .ToListAsync(cancellationToken);
         var suppressedSet = new HashSet<string>(suppressed, StringComparer.OrdinalIgnoreCase);
 
+        // Fetch previous campaign recipients if unique numbers only is requested
+        HashSet<string>? previousCampaignPhones = null;
+        HashSet<Guid>? previousCampaignContactIds = null;
+        if (filter?.OnlyUniqueNumbers == true)
+        {
+            var prevRecipients = await db.CrmWhatsappCampaignRecipients
+                .Where(r => r.CampaignId != campaignId)
+                .Select(r => new { r.ContactId, r.PhoneNumber })
+                .ToListAsync(cancellationToken);
+
+            previousCampaignPhones = new HashSet<string>(prevRecipients.Select(r => r.PhoneNumber), StringComparer.OrdinalIgnoreCase);
+            previousCampaignContactIds = new HashSet<Guid>(prevRecipients.Where(r => r.ContactId.HasValue).Select(r => r.ContactId!.Value));
+        }
+
         // Remove any existing queued recipients
         var existingQueued = await db.CrmWhatsappCampaignRecipients
             .Where(r => r.CampaignId == campaignId && r.Status == "Queued")
@@ -784,6 +957,12 @@ public class CrmWhatsappCampaignMutationExtension
             if (phone.Length < 10) continue;
             if (suppressedSet.Contains(phone)) continue;
             if (seenPhones.Contains(phone)) continue;
+
+            if (filter?.OnlyUniqueNumbers == true)
+            {
+                if (previousCampaignPhones != null && previousCampaignPhones.Contains(phone)) continue;
+                if (previousCampaignContactIds != null && previousCampaignContactIds.Contains(c.Id)) continue;
+            }
 
             seenPhones.Add(phone);
 
@@ -918,9 +1097,43 @@ public class CrmWhatsappCampaignMutationExtension
         var hasMediaHeader = templateHeaderType == "IMAGE" || templateHeaderType == "DOCUMENT" || templateHeaderType == "VIDEO"
             || (campaign.Template == null && !string.IsNullOrEmpty(campaign.HeaderMediaUrl));
 
-        if (hasMediaHeader && !string.IsNullOrEmpty(campaign.HeaderMediaUrl))
+        var effectiveMediaUrl = !string.IsNullOrWhiteSpace(campaign.HeaderMediaUrl)
+            ? campaign.HeaderMediaUrl
+            : campaign.Template?.HeaderMediaUrl;
+
+        if (string.IsNullOrWhiteSpace(effectiveMediaUrl) && hasMediaHeader && !string.IsNullOrWhiteSpace(campaign.Template?.ComponentsJson))
         {
-            var isDoc = templateHeaderType == "DOCUMENT" || campaign.HeaderMediaUrl.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            try
+            {
+                using var doc = JsonDocument.Parse(campaign.Template.ComponentsJson);
+                foreach (var elem in doc.RootElement.EnumerateArray())
+                {
+                    if (elem.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "HEADER" &&
+                        elem.TryGetProperty("example", out var exProp) &&
+                        exProp.TryGetProperty("header_handle", out var hhProp) &&
+                        hhProp.GetArrayLength() > 0)
+                    {
+                        effectiveMediaUrl = hhProp[0].GetString();
+                        break;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (hasMediaHeader)
+        {
+            if (string.IsNullOrWhiteSpace(effectiveMediaUrl))
+            {
+                return new WhatsappSendResult
+                {
+                    Success = false,
+                    ErrorCode = 132012,
+                    ErrorMessage = $"Template requires an {templateHeaderType} header, but no Header Media URL was provided."
+                };
+            }
+
+            var isDoc = templateHeaderType == "DOCUMENT" || effectiveMediaUrl.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
             components.Add(new WhatsappTemplateComponent
             {
                 Type = "header",
@@ -929,8 +1142,8 @@ public class CrmWhatsappCampaignMutationExtension
                     new()
                     {
                         Type = isDoc ? "document" : "image",
-                        Image = isDoc ? null : new WhatsappMediaParam { Link = campaign.HeaderMediaUrl },
-                        Document = isDoc ? new WhatsappMediaParam { Link = campaign.HeaderMediaUrl, Filename = "Offer.pdf" } : null
+                        Image = isDoc ? null : new WhatsappMediaParam { Link = effectiveMediaUrl },
+                        Document = isDoc ? new WhatsappMediaParam { Link = effectiveMediaUrl, Filename = "Offer.pdf" } : null
                     }
                 }
             });

@@ -19,6 +19,7 @@
 		onLoadSummary,
 		onRequestMoreContacts,
 		onQuickLoadContacts,
+		onOpenSearchSingle,
 		onBulkDeallocate,
 		isBulkDeallocating = false
 	}: {
@@ -32,18 +33,22 @@
 		onLoadSummary?: () => void;
 		onRequestMoreContacts: () => void;
 		onQuickLoadContacts?: (limit: number) => Promise<void>;
+		onOpenSearchSingle?: (initialTerm?: string) => void;
 		onBulkDeallocate?: (ids: string[]) => Promise<void>;
 		isBulkDeallocating?: boolean;
 	} = $props();
 
 	let selectedIds = $state<string[]>([]);
-	let isToolbarCollapsed = $state<boolean>(() => {
+
+	function getInitialToolbarCollapsed(): boolean {
 		try {
 			return localStorage.getItem('crm_calling_toolbar_collapsed') === 'true';
 		} catch {
 			return false;
 		}
-	});
+	}
+
+	let isToolbarCollapsed = $state<boolean>(getInitialToolbarCollapsed());
 
 	function toggleToolbar() {
 		isToolbarCollapsed = !isToolbarCollapsed;
@@ -276,6 +281,17 @@
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator class="my-1 bg-border/50" />
 						<DropdownMenu.Item
+							onclick={() => onOpenSearchSingle ? onOpenSearchSingle(list.searchQuery.value) : null}
+							class="flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer hover:bg-muted font-medium text-foreground"
+						>
+							<span class="flex items-center gap-2">
+								<Icon name="search" class="size-3.5 text-amber-500" />
+								<span>Search & Add Contact...</span>
+							</span>
+							<span class="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">On Demand</span>
+						</DropdownMenu.Item>
+						<DropdownMenu.Separator class="my-1 bg-border/50" />
+						<DropdownMenu.Item
 							onclick={onRequestMoreContacts}
 							class="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-muted font-medium text-foreground"
 						>
@@ -485,6 +501,16 @@
 						<Icon name="sliders" class="size-3.5 mr-1 text-muted-foreground" />
 						<span>Filter Options</span>
 					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => onOpenSearchSingle ? onOpenSearchSingle() : null}
+						class="rounded-xl text-xs font-medium px-3 h-9 cursor-pointer border-border"
+						title="Search a single contact by name or number and add to your list"
+					>
+						<Icon name="search" class="size-3.5 mr-1 text-amber-500" />
+						<span>Find Single Contact</span>
+					</Button>
 				</div>
 			</div>
 		{:else if filteredContacts.length === 0}
@@ -492,11 +518,26 @@
 				<p class="text-xs font-medium text-foreground">
 					{#if filterCallDate === 'pending' && allCount > 0}
 						All {allCount} contacts allocated today have been called!
+					{:else if list.searchQuery.value && list.searchQuery.value.trim()}
+						No allocated contacts match "{list.searchQuery.value}".
 					{:else}
 						No contacts match the active filter.
 					{/if}
 				</p>
-				{#if allCount > 0 && filterCallDate !== 'all'}
+				{#if list.searchQuery.value && list.searchQuery.value.trim()}
+					<div class="pt-1">
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => onOpenSearchSingle ? onOpenSearchSingle(list.searchQuery.value) : null}
+							class="rounded-xl text-xs font-semibold px-3.5 h-8.5 cursor-pointer border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary gap-1.5 shadow-2xs"
+						>
+							<Icon name="search" class="size-3.5" />
+							<span>Search CRM database for "{list.searchQuery.value}"</span>
+						</Button>
+					</div>
+				{/if}
+				{#if allCount > 0 && filterCallDate !== 'all' && (!list.searchQuery.value || !list.searchQuery.value.trim())}
 					<Button
 						variant="outline"
 						size="sm"

@@ -1133,6 +1133,7 @@ public class Query
     [UseSorting]
     public IQueryable<Dataverse.NavLive.User> GetUsers(
         bool? duplicateMobileOnly,
+        string? respCenter,
         [Service] IDataverseDataService dataService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -1146,6 +1147,31 @@ public class Query
             // Using a raw SQL exists condition for performance on non-indexed mobile columns if needed,
             // but IQuery.WhereRaw is cleaner here.
             query = query.Where("EXISTS (SELECT 1 FROM " + scope.GetQualifiedTableName("User", isShared: true) + " u2 WHERE u2.[Mobile No_] = t0.[Mobile No_] AND u2.[User Security ID] <> t0.[User Security ID])");
+        }
+
+        if (!string.IsNullOrWhiteSpace(respCenter))
+        {
+            var rcCodes = respCenter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (rcCodes.Length > 0)
+            {
+                var rcTable = scope.GetQualifiedTableName("Resp_ Center User Setup", isShared: false);
+                var usTable = scope.GetQualifiedTableName("User Setup", isShared: false);
+
+                var rcParams = new Dictionary<string, object>();
+                var placeholders = new List<string>(rcCodes.Length);
+                for (var i = 0; i < rcCodes.Length; i++)
+                {
+                    var p = $"@rcParam{i}";
+                    rcParams[p] = rcCodes[i];
+                    placeholders.Add(p);
+                }
+                var inClause = string.Join(", ", placeholders);
+
+                query = query.Where(
+                    $"(EXISTS (SELECT 1 FROM {rcTable} rc WHERE rc.[User ID] = t0.[User Name] AND rc.[Resp_ Center] IN ({inClause})) " +
+                    $"OR EXISTS (SELECT 1 FROM {usTable} us WHERE us.[User ID] = t0.[User Name] AND (us.[Responsibility Center] IN ({inClause}) OR us.[Sales Resp_ Ctr_ Filter] IN ({inClause}))))",
+                    rcParams);
+            }
         }
         
         return query.AsQueryable(scope);

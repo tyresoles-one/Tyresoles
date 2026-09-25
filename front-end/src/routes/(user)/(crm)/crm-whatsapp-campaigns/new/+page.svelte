@@ -16,11 +16,13 @@
 		TEST_SEND_WHATSAPP_CAMPAIGN,
 		TEST_SEND_WHATSAPP_CAMPAIGN_GROUP,
 		GET_CRM_CONTACTS_FOR_WHATSAPP_PICKER,
+		GET_CRM_CONTACTS_FILTER_OPTIONS,
 		type CrmWhatsappTemplate,
 		type AudienceEstimateResult,
 		type WabaHealthStatus,
 		type CrmContactWhatsappPickerItem,
 		type CrmContactsWhatsappPickerResult,
+		type CrmContactsFilterOptionsResult,
 		type WhatsappGroupTestResult
 	} from '../whatsappQueries';
 
@@ -39,6 +41,8 @@
 
 	// Step 3: Audience Filters & Manual Picker
 	let selectionMode = $state<'ALL_FILTERED' | 'MANUAL'>('ALL_FILTERED');
+	let onlyUniqueNumbers = $state(false);
+	let pickerFilterUnique = $state<'ALL' | 'UNIQUE_ONLY'>('ALL');
 	let selectedContactIds = $state<Set<string>>(new Set());
 	let pickerContacts = $state<CrmContactWhatsappPickerItem[]>([]);
 	let pickerTotalCount = $state(0);
@@ -47,6 +51,18 @@
 	let pickerSkip = $state(0);
 	let pickerTake = $state(15);
 
+	// Contact filter options loaded from DB
+	let filterOptions = $state<CrmContactsFilterOptionsResult>({
+		contactTypes: [],
+		contactCategories: [],
+		respCenters: [],
+		states: [],
+		cities: []
+	});
+	let loadingFilterOptions = $state(false);
+
+	// Filter values
+	let filterContactType = $state('');
 	let filterCategory = $state('');
 	let filterState = $state('');
 	let filterCity = $state('');
@@ -54,10 +70,22 @@
 	let filterTag = $state('');
 	let minQualityScore = $state<number | null>(null);
 
+	let hasActiveFilters = $derived(
+		Boolean(
+			pickerSearch.trim() ||
+			filterContactType ||
+			filterCategory ||
+			filterState ||
+			filterCity ||
+			filterRespCenter
+		)
+	);
+
 	let audienceEstimate = $state<AudienceEstimateResult>({
 		totalMatchingContacts: 0,
 		withValidPhone: 0,
 		suppressedCount: 0,
+		previouslyCampaignedCount: 0,
 		eligibleRecipients: 0
 	});
 	let estimatingAudience = $state(false);
@@ -91,6 +119,15 @@
 			});
 		} else {
 			variableMappings = [];
+		}
+
+		if (selectedTemplate) {
+			const hType = selectedTemplate.headerType?.toUpperCase();
+			if ((hType === 'IMAGE' || hType === 'DOCUMENT' || hType === 'VIDEO') && selectedTemplate.headerMediaUrl) {
+				if (!headerMediaUrl.trim()) {
+					headerMediaUrl = selectedTemplate.headerMediaUrl;
+				}
+			}
 		}
 	});
 
@@ -144,9 +181,26 @@
 
 	onMount(() => {
 		loadInitial();
+		loadFilterOptions();
 		runAudienceEstimation();
 		loadPickerContacts();
 	});
+
+	async function loadFilterOptions() {
+		loadingFilterOptions = true;
+		try {
+			const res = await graphqlQuery<{ getCrmContactsFilterOptions: CrmContactsFilterOptionsResult }>(
+				GET_CRM_CONTACTS_FILTER_OPTIONS
+			);
+			if (res.success && res.data?.getCrmContactsFilterOptions) {
+				filterOptions = res.data.getCrmContactsFilterOptions;
+			}
+		} catch (e) {
+			console.error('Failed to load contacts filter options', e);
+		} finally {
+			loadingFilterOptions = false;
+		}
+	}
 
 	async function loadPickerContacts() {
 		pickerLoading = true;
@@ -156,10 +210,12 @@
 				{
 					variables: {
 						search: pickerSearch.trim() || null,
+						contactType: filterContactType || null,
 						contactCategory: filterCategory || null,
 						state: filterState || null,
 						city: filterCity || null,
 						respCenter: filterRespCenter || null,
+						onlyUniqueNumbers: onlyUniqueNumbers || (pickerFilterUnique === 'UNIQUE_ONLY' ? true : null),
 						skip: pickerSkip,
 						take: pickerTake
 					}
@@ -174,6 +230,34 @@
 		} finally {
 			pickerLoading = false;
 		}
+	}
+
+	function handleUniqueNumbersToggle() {
+		onlyUniqueNumbers = !onlyUniqueNumbers;
+		pickerSkip = 0;
+		loadPickerContacts();
+		runAudienceEstimation();
+	}
+
+	function handlePickerUniqueFilterChange(val: 'ALL' | 'UNIQUE_ONLY') {
+		pickerFilterUnique = val;
+		pickerSkip = 0;
+		loadPickerContacts();
+	}
+
+	function selectUniqueOnPage() {
+		const uniqueIds = pickerContacts.filter((c) => c.isUniqueNumber).map((c) => c.id);
+		if (uniqueIds.length === 0) {
+			toast.info('No unique contacts found on this page (all have been messaged in previous campaigns).');
+			return;
+		}
+		const next = new Set(selectedContactIds);
+		for (const id of uniqueIds) next.add(id);
+		selectedContactIds = next;
+		if (selectionMode === 'MANUAL') {
+			runAudienceEstimation();
+		}
+		toast.success(`Selected ${uniqueIds.length} unique contact(s) on this page!`);
 	}
 
 	let searchDebounce: any = null;
@@ -248,6 +332,18 @@
 		}
 	}
 
+	function clearFilters() {
+		pickerSearch = '';
+		filterContactType = '';
+		filterCategory = '';
+		filterState = '';
+		filterCity = '';
+		filterRespCenter = '';
+		pickerSkip = 0;
+		loadPickerContacts();
+		runAudienceEstimation();
+	}
+
 	async function runAudienceEstimation() {
 		estimatingAudience = true;
 		try {
@@ -256,6 +352,7 @@
 				{
 					variables: {
 						filter: {
+							contactType: filterContactType || null,
 							contactCategory: filterCategory || null,
 							state: filterState || null,
 							city: filterCity || null,
@@ -265,7 +362,8 @@
 							search: pickerSearch.trim() || null,
 							selectedContactIds: selectionMode === 'MANUAL' && selectedContactIds.size > 0
 								? Array.from(selectedContactIds)
-								: null
+								: null,
+							onlyUniqueNumbers: onlyUniqueNumbers
 						}
 					}
 				}
@@ -284,6 +382,13 @@
 	async function handleSendTestMessage() {
 		if (!testPhoneNumber.trim()) {
 			toast.error('Please enter a test phone number with country code (+91...)');
+			return;
+		}
+
+		const hType = selectedTemplate?.headerType?.toUpperCase();
+		if ((hType === 'IMAGE' || hType === 'DOCUMENT' || hType === 'VIDEO') && !headerMediaUrl.trim()) {
+			toast.error(`The selected template requires an ${hType} Header URL before sending.`);
+			currentStep = 2;
 			return;
 		}
 
@@ -343,6 +448,13 @@
 
 		if (rawList.length === 0) {
 			toast.error('Please enter at least one test phone number (e.g. 919880334191)');
+			return;
+		}
+
+		const hType = selectedTemplate?.headerType?.toUpperCase();
+		if ((hType === 'IMAGE' || hType === 'DOCUMENT' || hType === 'VIDEO') && !headerMediaUrl.trim()) {
+			toast.error(`The selected template requires an ${hType} Header URL before sending.`);
+			currentStep = 2;
 			return;
 		}
 
@@ -409,6 +521,12 @@
 			currentStep = 2;
 			return;
 		}
+		const launchHType = selectedTemplate?.headerType?.toUpperCase();
+		if ((launchHType === 'IMAGE' || launchHType === 'DOCUMENT' || launchHType === 'VIDEO') && !headerMediaUrl.trim()) {
+			toast.error(`The selected template requires an ${launchHType} Header URL.`);
+			currentStep = 2;
+			return;
+		}
 		if (selectionMode === 'MANUAL' && selectedContactIds.size === 0) {
 			toast.error('Please select at least 1 contact using the checkboxes, or switch to "All Matching Filters" mode.');
 			currentStep = 3;
@@ -432,6 +550,7 @@
 							templateId: selectedTemplateId,
 							headerMediaUrl: headerMediaUrl.trim() || null,
 							targetSegmentFilter: {
+								contactType: filterContactType || null,
 								contactCategory: filterCategory || null,
 								state: filterState || null,
 								city: filterCity || null,
@@ -441,7 +560,8 @@
 								search: pickerSearch.trim() || null,
 								selectedContactIds: selectionMode === 'MANUAL' && selectedContactIds.size > 0
 									? Array.from(selectedContactIds)
-									: null
+									: null,
+								onlyUniqueNumbers: onlyUniqueNumbers
 							},
 							variableMappings: variableMappings
 						}
@@ -583,13 +703,13 @@
 				</div>
 
 				<div class="space-y-1.5 md:col-span-2">
-					<label class="text-xs font-medium text-foreground">Header Media URL (Optional Image or PDF)</label>
+					<label class="text-xs font-medium text-foreground">Header Media URL (Image, Video, or Document)</label>
 					<Input
 						bind:value={headerMediaUrl}
 						placeholder="https://tyresoles.in/assets/campaigns/monsoon_offer.jpg"
 						class="text-xs"
 					/>
-					<p class="text-[11px] text-muted-foreground">Public HTTPS link to banner image (.jpg, .png) or commercial brochure (.pdf) displayed at top of message.</p>
+					<p class="text-[11px] text-muted-foreground">Public HTTPS link to banner image (.jpg, .png) or brochure (.pdf). If your selected template uses a media header, this URL is required by Meta.</p>
 				</div>
 			</div>
 
@@ -634,6 +754,37 @@
 					<p class="text-[11px] text-muted-foreground">Only pre-approved templates can be broadcasted to customers outside 24-hr windows.</p>
 				</div>
 
+				<!-- Required Header Media Configuration -->
+				{#if selectedTemplate && (selectedTemplate.headerType === 'IMAGE' || selectedTemplate.headerType === 'DOCUMENT' || selectedTemplate.headerType === 'VIDEO')}
+					<div class="space-y-2.5 bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl">
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+								<Icon name="image" class="w-4 h-4" />
+								<span>Header {selectedTemplate.headerType} (Required by Meta)</span>
+							</div>
+							<span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+								Required
+							</span>
+						</div>
+						<p class="text-[11px] text-muted-foreground">
+							This template was approved with an <strong>{selectedTemplate.headerType}</strong> header. Meta strictly requires a public HTTPS media URL for every message sent with this template.
+						</p>
+						<div class="space-y-1">
+							<Input
+								bind:value={headerMediaUrl}
+								placeholder="https://tyresoles.in/assets/campaigns/banner.jpg"
+								class="text-xs bg-background"
+							/>
+						</div>
+						{#if headerMediaUrl}
+							<div class="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+								<Icon name="check" class="w-3 h-3" />
+								<span>Header media URL set</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<!-- Variable Mapper -->
 				{#if variableMappings.length > 0}
 					<div class="space-y-3 pt-2">
@@ -671,7 +822,18 @@
 						<Icon name="arrow-left" class="w-4 h-4 mr-1" />
 						Back
 					</Button>
-					<Button size="sm" class="gap-1.5" onclick={() => (currentStep = 3)}>
+					<Button
+						size="sm"
+						class="gap-1.5"
+						onclick={() => {
+							const hType = selectedTemplate?.headerType?.toUpperCase();
+							if ((hType === 'IMAGE' || hType === 'DOCUMENT' || hType === 'VIDEO') && !headerMediaUrl.trim()) {
+								toast.error(`Please provide a Header ${hType} URL. This template cannot be sent without it.`);
+								return;
+							}
+							currentStep = 3;
+						}}
+					>
 						<span>Next: Audience Filter</span>
 						<Icon name="arrow-right" class="w-4 h-4" />
 					</Button>
@@ -820,15 +982,69 @@
 				</button>
 			</div>
 
+			<!-- Unique Numbers Only Option (Never Campaigned) -->
+			<div class="p-4 rounded-xl border transition-all {onlyUniqueNumbers ? 'bg-primary/5 border-primary ring-1 ring-primary/40' : 'bg-card border-border hover:border-border/80'}">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div class="flex items-start gap-3">
+						<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {onlyUniqueNumbers ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}">
+							<Icon name="sparkles" class="w-4 h-4" />
+						</div>
+						<div>
+							<div class="text-xs font-bold text-foreground flex items-center gap-2">
+								<span>Target Unique Numbers Only (Exclude Previous Campaigns)</span>
+								{#if onlyUniqueNumbers}
+									<span class="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+										<Icon name="check" class="w-2.5 h-2.5" />
+										Active (Fresh Leads Only)
+									</span>
+								{/if}
+							</div>
+							<p class="text-[11px] text-muted-foreground mt-0.5">
+								When enabled, only phone numbers that have <strong>never been messaged in any previous campaign</strong> will be included. Avoids messaging existing recipients multiple times and maximizes outreach to fresh contacts.
+							</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2 shrink-0">
+						<label class="relative inline-flex items-center cursor-pointer">
+							<input
+								type="checkbox"
+								checked={onlyUniqueNumbers}
+								onchange={handleUniqueNumbersToggle}
+								class="sr-only peer"
+							/>
+							<div class="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+							<span class="ms-2 text-xs font-semibold text-foreground">
+								{onlyUniqueNumbers ? 'Enabled' : 'Disabled'}
+							</span>
+						</label>
+					</div>
+				</div>
+			</div>
+
 			<!-- Filter Bar -->
 			<div class="space-y-3 pt-1">
 				<div class="text-xs font-semibold text-foreground flex items-center justify-between">
-					<span>Filter Contacts Database</span>
-					<span class="text-[11px] text-muted-foreground">Applies to contact search & estimation</span>
+					<div class="flex items-center gap-2">
+						<Icon name="filter" class="w-3.5 h-3.5 text-primary" />
+						<span>Filter Contacts Database</span>
+					</div>
+					<div class="flex items-center gap-2">
+						{#if hasActiveFilters}
+							<button
+								type="button"
+								onclick={clearFilters}
+								class="text-[11px] text-red-600 hover:text-red-700 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+							>
+								<Icon name="x" class="w-3 h-3" />
+								<span>Reset Filters</span>
+							</button>
+						{/if}
+						<span class="text-[11px] text-muted-foreground">Real-time filtering & audience estimation</span>
+					</div>
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-					<div class="space-y-1 sm:col-span-2">
+					<div class="space-y-1">
 						<label class="text-[11px] font-medium text-foreground">Live Search</label>
 						<div class="relative">
 							<Icon name="search" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -836,50 +1052,80 @@
 								type="text"
 								bind:value={pickerSearch}
 								oninput={handleSearchInput}
-								placeholder="Search name, company, mobile..."
-								class="w-full pl-8 pr-2.5 py-1.5 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+								placeholder="Search name, mobile..."
+								class="w-full pl-8 pr-2.5 py-1.5 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8"
 							/>
 						</div>
 					</div>
 
 					<div class="space-y-1">
+						<label class="text-[11px] font-medium text-foreground">Contact Type</label>
+						<select
+							bind:value={filterContactType}
+							onchange={handleFilterChanged}
+							class="w-full px-2 py-1 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8 cursor-pointer"
+						>
+							<option value="">All Types ({filterOptions.contactTypes.length})</option>
+							{#each filterOptions.contactTypes as t}
+								<option value={t}>{t}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="space-y-1">
 						<label class="text-[11px] font-medium text-foreground">Category</label>
-						<Input
+						<select
 							bind:value={filterCategory}
-							placeholder="Fleet, Transporter..."
-							class="text-xs h-8"
-							oninput={handleFilterChanged}
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<label class="text-[11px] font-medium text-foreground">State</label>
-						<Input
-							bind:value={filterState}
-							placeholder="Maharashtra..."
-							class="text-xs h-8"
-							oninput={handleFilterChanged}
-						/>
-					</div>
-
-					<div class="space-y-1">
-						<label class="text-[11px] font-medium text-foreground">City</label>
-						<Input
-							bind:value={filterCity}
-							placeholder="Pune, Mumbai..."
-							class="text-xs h-8"
-							oninput={handleFilterChanged}
-						/>
+							onchange={handleFilterChanged}
+							class="w-full px-2 py-1 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8 cursor-pointer"
+						>
+							<option value="">All Categories ({filterOptions.contactCategories.length})</option>
+							{#each filterOptions.contactCategories as cat}
+								<option value={cat}>{cat}</option>
+							{/each}
+						</select>
 					</div>
 
 					<div class="space-y-1">
 						<label class="text-[11px] font-medium text-foreground">Depot / RC</label>
-						<Input
+						<select
 							bind:value={filterRespCenter}
-							placeholder="HO-MUM, RC-PUN..."
-							class="text-xs h-8"
-							oninput={handleFilterChanged}
-						/>
+							onchange={handleFilterChanged}
+							class="w-full px-2 py-1 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8 cursor-pointer"
+						>
+							<option value="">All Depots ({filterOptions.respCenters.length})</option>
+							{#each filterOptions.respCenters as rc}
+								<option value={rc}>{rc}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="space-y-1">
+						<label class="text-[11px] font-medium text-foreground">State</label>
+						<select
+							bind:value={filterState}
+							onchange={handleFilterChanged}
+							class="w-full px-2 py-1 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8 cursor-pointer"
+						>
+							<option value="">All States ({filterOptions.states.length})</option>
+							{#each filterOptions.states as s}
+								<option value={s}>{s}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="space-y-1">
+						<label class="text-[11px] font-medium text-foreground">City</label>
+						<select
+							bind:value={filterCity}
+							onchange={handleFilterChanged}
+							class="w-full px-2 py-1 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-primary h-8 cursor-pointer"
+						>
+							<option value="">All Cities ({filterOptions.cities.length})</option>
+							{#each filterOptions.cities as city}
+								<option value={city}>{city}</option>
+							{/each}
+						</select>
 					</div>
 				</div>
 			</div>
@@ -896,6 +1142,11 @@
 								{selectedContactIds.size} Handpicked
 							</span>
 						{/if}
+						{#if onlyUniqueNumbers}
+							<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+								Unique Numbers Only
+							</span>
+						{/if}
 					</div>
 					<Button
 						variant="ghost"
@@ -909,7 +1160,7 @@
 					</Button>
 				</div>
 
-				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+				<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
 					<div class="bg-background border border-border rounded-xl p-3">
 						<div class="text-[11px] text-muted-foreground">
 							{selectionMode === 'MANUAL' ? 'Selected Rows' : 'Total Filter Matches'}
@@ -933,8 +1184,22 @@
 						</div>
 					</div>
 
-					<div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3">
-						<div class="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">Target Recipients</div>
+					<div class="bg-background border border-border rounded-xl p-3 {onlyUniqueNumbers ? 'ring-1 ring-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20' : ''}">
+						<div class="text-[11px] text-muted-foreground flex items-center justify-center gap-1">
+							<span>Previous Campaigns</span>
+							{#if onlyUniqueNumbers}
+								<span class="text-[9px] font-bold text-amber-700 dark:text-amber-400 uppercase">Excluded</span>
+							{/if}
+						</div>
+						<div class="text-lg font-bold mt-0.5 {onlyUniqueNumbers ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}">
+							{onlyUniqueNumbers ? `-${(audienceEstimate.previouslyCampaignedCount || 0).toLocaleString()}` : (audienceEstimate.previouslyCampaignedCount || 0).toLocaleString()}
+						</div>
+					</div>
+
+					<div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 col-span-2 sm:col-span-1">
+						<div class="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+							{onlyUniqueNumbers ? 'Target Unique Recipients' : 'Target Recipients'}
+						</div>
 						<div class="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
 							{audienceEstimate.eligibleRecipients.toLocaleString()}
 						</div>
@@ -954,21 +1219,51 @@
 			<div class="border border-border rounded-xl overflow-hidden bg-card space-y-0">
 				<!-- Table Control Bar -->
 				<div class="p-3 bg-muted/40 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-2 flex-wrap">
 						<span class="font-semibold text-foreground">
 							{selectionMode === 'MANUAL' ? 'Tick Checkboxes to Select Contacts' : 'Matching CRM Contacts Preview'}
 						</span>
 						<span class="text-muted-foreground">({pickerTotalCount.toLocaleString()} found)</span>
+
+						<!-- Table Quick Filter: All vs Unique Only -->
+						<div class="flex items-center gap-1 bg-background border border-border p-0.5 rounded-lg text-xs ml-2">
+							<button
+								type="button"
+								class="px-2 py-0.5 rounded text-[10px] font-medium transition-colors {pickerFilterUnique === 'ALL' && !onlyUniqueNumbers ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => handlePickerUniqueFilterChange('ALL')}
+								disabled={onlyUniqueNumbers}
+								title={onlyUniqueNumbers ? 'Unique Numbers Only is enabled at the campaign filter level' : 'Show all matching contacts'}
+							>
+								All Numbers
+							</button>
+							<button
+								type="button"
+								class="px-2 py-0.5 rounded text-[10px] font-medium transition-colors {pickerFilterUnique === 'UNIQUE_ONLY' || onlyUniqueNumbers ? 'bg-emerald-600 text-white font-semibold' : 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => handlePickerUniqueFilterChange('UNIQUE_ONLY')}
+								title="Filter table to contacts never messaged in previous campaigns"
+							>
+								Unique Only
+							</button>
+						</div>
 					</div>
 
 					{#if selectionMode === 'MANUAL'}
-						<div class="flex items-center gap-2">
+						<div class="flex items-center flex-wrap gap-2">
 							<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
 								{selectedContactIds.size} Selected
 							</span>
 							<Button variant="outline" size="sm" class="h-7 text-xs" onclick={toggleSelectPage}>
 								<Icon name="check" class="w-3.5 h-3.5 mr-1" />
 								Select Page
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								class="h-7 text-xs border-emerald-600 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-medium"
+								onclick={selectUniqueOnPage}
+							>
+								<Icon name="sparkles" class="w-3.5 h-3.5 mr-1 text-emerald-600" />
+								Select Unique on Page
 							</Button>
 							{#if selectedContactIds.size > 0}
 								<Button variant="ghost" size="sm" class="h-7 text-xs text-red-600" onclick={clearAllSelection}>
@@ -979,7 +1274,7 @@
 					{:else}
 						<div class="text-[11px] text-muted-foreground flex items-center gap-1.5">
 							<Icon name="info" class="w-3.5 h-3.5 text-primary" />
-							<span>All matching contacts will receive this campaign. Switch to "Handpicked Contacts" to select manually.</span>
+							<span>{onlyUniqueNumbers ? 'Only unique numbers (never used in previous campaigns) will receive this campaign.' : 'All matching contacts will receive this campaign. Switch to "Handpicked Contacts" to select manually.'}</span>
 						</div>
 					{/if}
 				</div>
@@ -1013,7 +1308,7 @@
 									<th class="py-2.5 px-3 font-semibold">Company</th>
 									<th class="py-2.5 px-3 font-semibold">Clean WhatsApp Mobile</th>
 									<th class="py-2.5 px-3 font-semibold">Location</th>
-									<th class="py-2.5 px-3 font-semibold">Category / Depot</th>
+									<th class="py-2.5 px-3 font-semibold">Type / Category / Depot</th>
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-border">
@@ -1052,12 +1347,26 @@
 
 										<td class="py-2.5 px-3">
 											{#if c.cleanWhatsappPhone}
-												<div class="flex items-center gap-1.5 font-mono text-[11px] text-foreground">
-													<span class="text-emerald-600 font-bold">+{c.cleanWhatsappPhone}</span>
-													<span class="text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-sans font-medium flex items-center gap-0.5">
-														<Icon name="check" class="w-2.5 h-2.5" />
-														Verified
-													</span>
+												<div class="space-y-1">
+													<div class="flex items-center gap-1.5 font-mono text-[11px] text-foreground">
+														<span class="text-emerald-600 font-bold">+{c.cleanWhatsappPhone}</span>
+														<span class="text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-sans font-medium flex items-center gap-0.5">
+															<Icon name="check" class="w-2.5 h-2.5" />
+															Verified
+														</span>
+													</div>
+													<div>
+														{#if c.isUniqueNumber}
+															<span class="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800">
+																<Icon name="sparkles" class="w-2.5 h-2.5" />
+																Unique (New)
+															</span>
+														{:else}
+															<span class="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800">
+																Used in {c.previousCampaignCount || 1} campaign(s)
+															</span>
+														{/if}
+													</div>
 												</div>
 											{:else}
 												<span class="text-red-500 font-mono text-[11px]">{c.mobileNo || c.mobileNo2 || 'No Phone'}</span>
@@ -1069,11 +1378,18 @@
 										</td>
 
 										<td class="py-2.5 px-3 text-muted-foreground">
-											<span class="px-2 py-0.5 rounded bg-muted text-[10px]">
-												{c.contactCategory || 'Contact'}
-											</span>
+											<div class="flex items-center gap-1 flex-wrap">
+												{#if c.contactType}
+													<span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+														{c.contactType}
+													</span>
+												{/if}
+												<span class="px-1.5 py-0.5 rounded bg-muted text-[10px]">
+													{c.contactCategory || 'Contact'}
+												</span>
+											</div>
 											{#if c.respCenter}
-												<span class="text-[10px] text-muted-foreground ml-1">({c.respCenter})</span>
+												<div class="text-[10px] text-muted-foreground mt-0.5">{c.respCenter}</div>
 											{/if}
 										</td>
 									</tr>
@@ -1286,11 +1602,16 @@
 				<!-- Summary Card -->
 				<div class="border-t border-border pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
 					<div>
-						<div class="text-xs font-bold text-foreground flex items-center gap-2">
+						<div class="text-xs font-bold text-foreground flex items-center gap-2 flex-wrap">
 							<span>Ready to broadcast to {audienceEstimate.eligibleRecipients.toLocaleString()} WhatsApp recipients</span>
 							{#if selectionMode === 'MANUAL'}
 								<span class="px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-semibold">
 									Handpicked Mode ({selectedContactIds.size})
+								</span>
+							{/if}
+							{#if onlyUniqueNumbers}
+								<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold">
+									Unique Numbers Only
 								</span>
 							{/if}
 						</div>

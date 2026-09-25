@@ -15,6 +15,8 @@
 	import { graphqlQuery, graphqlMutation, buildQuery, buildMutation } from '$lib/services/graphql';
 	import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 	import FleetDetails from './components/FleetDetails.svelte';
+	import ContactCallLogs from './components/ContactCallLogs.svelte';
+	import CallStatusBadge from '../../crm-calling/components/CallStatusBadge.svelte';
 
 	const id = $page.params.id;
 	let isNew = $state(id === 'new');
@@ -22,7 +24,8 @@
 	let isSaving = $state(false);
 	let isDeleting = $state(false);
 	
-	let activeTab: 'general' | 'fleet' = $state('general');
+	let activeTab: 'general' | 'fleet' | 'calls' = $state('general');
+	let callLogsCount = $state(0);
 
 	let editingContact: any = $state({
 		id: isNew ? null : id,
@@ -53,7 +56,9 @@
 		leadSourceChannel: null,
 		sourceUrl: null,
 		qualityScore: null,
-		harvestedAt: null
+		harvestedAt: null,
+		lastCallDate: null,
+		lastCallOutcome: null
 	});
 
 	let leadSourceTypeOptions = $state<{ value: string; label: string }[]>([
@@ -135,6 +140,8 @@
 				sourceUrl
 				qualityScore
 				harvestedAt
+				lastCallDate
+				lastCallOutcome
 			}
 		}
 	` as unknown as TypedDocumentNode<any, { id: string }>;
@@ -292,7 +299,7 @@
 				editingContact = { ...res.data.crmContact };
 			} else {
 				toast.error('Failed to load contact');
-				goto('/crm-contacts');
+				handleBack();
 			}
 		} catch (err: any) {
 			toast.error(err.message || 'Error loading contact');
@@ -337,7 +344,8 @@
 			if (res.success && res.data?.saveCrmContact) {
 				toast.success('Contact saved successfully.');
 				if (isNew) {
-					goto(`/crm-contacts/${res.data.saveCrmContact.id}`);
+					const from = callerUrl;
+					goto(`/crm-contacts/${res.data.saveCrmContact.id}${from ? `?from=${encodeURIComponent(from)}` : ''}`);
 				} else {
 					editingContact.modifiedAt = res.data.saveCrmContact.modifiedAt;
 					editingContact.modifiedBy = res.data.saveCrmContact.modifiedBy;
@@ -356,6 +364,28 @@
 		}
 	}
 
+	let callerUrl = $derived.by(() => {
+		return $page.url.searchParams.get('from') || $page.url.searchParams.get('returnUrl') || null;
+	});
+
+	let backButtonLabel = $derived.by(() => {
+		if (!callerUrl) return 'Back';
+		if (callerUrl.includes('crm-calling')) return 'Back to Calling';
+		if (callerUrl.includes('crm-contacts')) return 'Back to Contacts';
+		if (callerUrl.includes('crm-call-logs')) return 'Back to Call Logs';
+		return 'Back';
+	});
+
+	function handleBack() {
+		if (callerUrl) {
+			goto(callerUrl);
+		} else if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer && document.referrer.includes(window.location.host)) {
+			window.history.back();
+		} else {
+			goto('/crm-contacts');
+		}
+	}
+
 	async function confirmDelete() {
 		if (!confirm('Are you sure you want to delete this contact?')) return;
 		
@@ -364,7 +394,7 @@
 			const res = await graphqlMutation<any>(DeleteCrmContactDocument, { variables: { id } });
 			if (res.success && res.data?.deleteCrmContact) {
 				toast.success('Contact deleted successfully.');
-				goto('/crm-contacts');
+				handleBack();
 			} else {
 				toast.error(res.error || 'Failed to delete contact');
 			}
@@ -384,8 +414,8 @@
 	<div class="max-w-6xl mx-auto px-4 md:px-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4 mb-6">
-			<Button variant="ghost" size="sm" class="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" onclick={() => goto('/crm-contacts')}>
-				<Icon name="arrow-left" class="size-4" /> Back
+			<Button variant="ghost" size="sm" class="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" onclick={handleBack}>
+				<Icon name="arrow-left" class="size-4" /> {backButtonLabel}
 			</Button>
 			<div>
 				<div class="flex items-center gap-3">
@@ -395,21 +425,15 @@
 							{editingContact.leadSourceType}
 						</span>
 					{/if}
+					{#if !isNew && (editingContact.lastCallDate || editingContact.lastCallOutcome)}
+						<CallStatusBadge lastCallDate={editingContact.lastCallDate} outcome={editingContact.lastCallOutcome} variant="pill" />
+					{/if}
 				</div>
 				{#if !isNew && editingContact.companyName}
 					<span class="text-muted-foreground text-sm mt-0.5 block">{editingContact.companyName}</span>
 				{/if}
 			</div>
 			<div class="ml-auto flex items-center gap-2">
-				<a
-					href="/crm-masters?category=leads"
-					target="_blank"
-					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-xs"
-					title="Configure Contact Types, Categories, and Sources in CRM Masters"
-				>
-					<Icon name="database" class="size-3.5 text-primary" />
-					<span class="hidden sm:inline">CRM Masters</span>
-				</a>
 				{#if !isNew}
 					<Button variant="destructive" size="sm" class="gap-2 rounded-xl shadow-xs" onclick={confirmDelete} disabled={isDeleting}>
 						{#if isDeleting}<Loader2 class="size-3 animate-spin shrink-0" />{:else}<Icon name="trash" class="size-3.5" />{/if}
@@ -447,6 +471,16 @@
 							<Icon name="truck" class="size-4" />
 							Fleet Details
 						</button>
+						<button
+							onclick={() => (activeTab = 'calls')}
+							class="flex-1 shrink-0 min-w-[130px] py-3.5 px-4 font-semibold text-sm border-b-2 transition-colors flex items-center justify-center gap-2 {activeTab === 'calls' ? 'border-primary text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+						>
+							<Icon name="phone-call" class="size-4" />
+							Call Logs
+							{#if callLogsCount > 0}
+								<span class="text-[10px] bg-muted px-1.5 py-0.5 rounded-full font-bold">{callLogsCount}</span>
+							{/if}
+						</button>
 					{/if}
 				</div>
 
@@ -472,51 +506,21 @@
 								</Field.Field>
 
 								<Field.Field class="w-full">
-									<div class="flex items-center justify-between">
-										<Field.Label for="contact-type" class="text-muted-foreground mb-0">Contact Type</Field.Label>
-										<a
-											href="/crm-masters?tab=CONTACT_TYPE"
-											target="_blank"
-											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-											title="Configure Contact Types in CRM Masters"
-										>
-											Manage <Icon name="external-link" class="size-2.5" />
-										</a>
-									</div>
+									<Field.Label for="contact-type" class="text-muted-foreground">Contact Type</Field.Label>
 									<Field.Content>
 										<Select options={contactTypes} bind:value={editingContact.contactType} placeholder="Select type..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 									</Field.Content>
 								</Field.Field>
 
 								<Field.Field class="w-full">
-									<div class="flex items-center justify-between">
-										<Field.Label for="contact-category" class="text-muted-foreground mb-0">Contact Category</Field.Label>
-										<a
-											href="/crm-masters?tab=CONTACT_CATEGORY"
-											target="_blank"
-											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-											title="Configure Contact Categories in CRM Masters"
-										>
-											Manage <Icon name="external-link" class="size-2.5" />
-										</a>
-									</div>
+									<Field.Label for="contact-category" class="text-muted-foreground">Contact Category</Field.Label>
 									<Field.Content>
 										<Select options={contactCategories} bind:value={editingContact.contactCategory} placeholder="Select category..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 									</Field.Content>
 								</Field.Field>
 
 								<Field.Field class="w-full">
-									<div class="flex items-center justify-between">
-										<Field.Label for="contact-language" class="text-muted-foreground mb-0">Pref Language</Field.Label>
-										<a
-											href="/crm-masters?tab=LANGUAGE"
-											target="_blank"
-											class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-											title="Configure Languages in CRM Masters"
-										>
-											Manage <Icon name="external-link" class="size-2.5" />
-										</a>
-									</div>
+									<Field.Label for="contact-language" class="text-muted-foreground">Pref Language</Field.Label>
 									<Field.Content>
 										<Select options={languages} bind:value={editingContact.prefLanguage} placeholder="Select preferred language..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 									</Field.Content>
@@ -537,34 +541,14 @@
 								<div class="pt-4 border-t border-border/50 space-y-4">
 									<h3 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Lead Source</h3>
 									<Field.Field class="w-full">
-										<div class="flex items-center justify-between">
-											<Field.Label for="contact-lead-source-type" class="text-muted-foreground mb-0">Lead Source Type</Field.Label>
-											<a
-												href="/crm-masters?tab=SOURCE"
-												target="_blank"
-												class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-												title="Configure Lead Sources in CRM Masters"
-											>
-												Manage <Icon name="external-link" class="size-2.5" />
-											</a>
-										</div>
+										<Field.Label for="contact-lead-source-type" class="text-muted-foreground">Lead Source Type</Field.Label>
 										<Field.Content>
 											<Select options={leadSourceTypeOptions} bind:value={editingContact.leadSourceType} placeholder="Select source type..." valueKey="value" labelKey="label" class="rounded-xl w-full h-9" />
 										</Field.Content>
 									</Field.Field>
 
 									<Field.Field class="w-full">
-										<div class="flex items-center justify-between">
-											<Field.Label for="contact-lead-source-channel" class="text-muted-foreground mb-0">Lead Source Channel</Field.Label>
-											<a
-												href="/crm-masters?tab=SOURCE_CHANNEL"
-												target="_blank"
-												class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-												title="Configure Source Channels in CRM Masters"
-											>
-												Manage <Icon name="external-link" class="size-2.5" />
-											</a>
-										</div>
+										<Field.Label for="contact-lead-source-channel" class="text-muted-foreground">Lead Source Channel</Field.Label>
 										<Field.Content>
 											<div class="relative">
 												<Input
@@ -755,6 +739,18 @@
 					{:else if activeTab === 'fleet'}
 						{#if !isNew}
 							<FleetDetails contactId={id || ''} />
+						{/if}
+					{:else if activeTab === 'calls'}
+						{#if !isNew}
+							<ContactCallLogs
+								contactId={id || ''}
+								contact={editingContact}
+								bind:callLogsCount
+								onCallLogged={(data) => {
+									editingContact.lastCallDate = new Date().toISOString();
+									editingContact.lastCallOutcome = data.outcome;
+								}}
+							/>
 						{/if}
 					{/if}
 				</div>

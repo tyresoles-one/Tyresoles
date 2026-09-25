@@ -195,6 +195,7 @@ public class CrmDbContext : DbContext
             e.Property(x => x.InvoiceNos).HasColumnType("nvarchar(max)");
             e.Property(x => x.InvoiceAmount).HasColumnType("decimal(18,2)");
             e.Property(x => x.TyreQuantity).HasColumnType("decimal(18,2)");
+            e.Property(x => x.SalesUserId).HasColumnType("nvarchar(128)");
             e.Property(x => x.CallDate).HasConversion(utcConverter);
             e.HasOne(x => x.Contact)
                 .WithMany()

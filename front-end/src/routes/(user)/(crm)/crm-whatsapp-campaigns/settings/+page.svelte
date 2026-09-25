@@ -43,10 +43,7 @@
 	let addingSuppression = $state(false);
 
 	let webhookCallbackUrl = $derived.by(() => {
-		if (typeof window !== 'undefined') {
-			return `${window.location.origin}/api/campaigns/webhooks/whatsapp`;
-		}
-		return 'https://app.tyresoles.in/api/campaigns/webhooks/whatsapp';
+		return 'https://api.tyresoles.in/api/campaigns/webhooks/whatsapp';
 	});
 
 	async function loadSavedSettings() {

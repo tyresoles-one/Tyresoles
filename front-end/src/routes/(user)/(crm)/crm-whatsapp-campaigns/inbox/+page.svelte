@@ -192,7 +192,7 @@
 	async function checkWebhookHealth() {
 		checkingHealth = true;
 		try {
-			const endpoint = typeof window !== 'undefined' ? `${window.location.origin}/api/campaigns/webhooks/whatsapp` : 'https://app.tyresoles.in/api/campaigns/webhooks/whatsapp';
+			const endpoint = 'https://api.tyresoles.in/api/campaigns/webhooks/whatsapp';
 			const resp = await fetch(endpoint, { method: 'GET' });
 			if (resp.ok) {
 				const json = await resp.json();
@@ -737,7 +737,7 @@
 							<div class="space-y-0.5">
 								<span class="font-semibold text-foreground">Production Webhook Endpoint:</span>
 								<div class="font-mono text-[11px] text-blue-600 dark:text-blue-400 select-all">
-									https://app.tyresoles.in/api/campaigns/webhooks/whatsapp
+									https://api.tyresoles.in/api/campaigns/webhooks/whatsapp
 								</div>
 							</div>
 							<div class="flex items-center gap-2">
@@ -745,7 +745,7 @@
 									variant="outline"
 									size="sm"
 									class="h-7 text-[11px] gap-1"
-									onclick={() => copyToClipboard('https://app.tyresoles.in/api/campaigns/webhooks/whatsapp', 'Webhook URL')}
+									onclick={() => copyToClipboard('https://api.tyresoles.in/api/campaigns/webhooks/whatsapp', 'Webhook URL')}
 								>
 									<Icon name="copy" class="w-3 h-3" />
 									Copy URL

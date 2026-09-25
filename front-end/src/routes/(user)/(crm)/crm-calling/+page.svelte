@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { toast } from '$lib/components/venUI/toast';
 	import { graphqlQuery, graphqlMutation } from '$lib/services/graphql';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import PdfViewer from '$lib/components/venUI/pdf-viewer/PdfViewer.svelte';
 	import AllocateContactsDialog from './AllocateContactsDialog.svelte';
+	import SearchSingleContactDialog from './components/SearchSingleContactDialog.svelte';
 	import ContactList from './components/ContactList.svelte';
 	import Workspace from './components/Workspace.svelte';
 	import CallingStatsBar from './components/CallingStatsBar.svelte';
@@ -16,6 +18,7 @@
 
 	import {
 		GetCrmAgentContactsDocument,
+		GetCrmContactByIdDocument,
 		GetCrmSettingDocument,
 		GetCrmCallLogsDocument,
 		GetCrmCallRemindersDocument,
@@ -23,6 +26,8 @@
 		GetCrmContactClaimsDocument,
 		LogCrmCallDocument,
 		UndoCrmCallDocument,
+		UpdateCrmCallLogNotesDocument,
+		GetSalesUsersDocument,
 		CompleteCrmReminderDocument,
 		AllocateAgentContactsDocument,
 		DeallocateCrmContactDocument,
@@ -52,6 +57,7 @@
 	let isSavingLog = $state(false);
 	let isUndoingLog = $state<string | null>(null);
 	let completingReminderId = $state<string | null>(null);
+	let salesUsersList = $state<{ userName: string; fullName: string }[]>([]);
 	
 	let pdfData = $state<Uint8Array | null>(null);
 	let pdfFileName = $state<string>('');
@@ -62,6 +68,8 @@
 	let isFetchingContactDetails = $derived(loadingHistory || loadingInvoices || loadingClaims);
 
 	let allocateDialogOpen = $state(false);
+	let searchSingleDialogOpen = $state(false);
+	let searchSingleInitialTerm = $state('');
 	let isAllocating = $state(false);
 	let isDeallocating = $state(false);
 	let isBulkDeallocating = $state(false);
@@ -255,12 +263,12 @@
 		}
 	}
 
-	async function loadHistory(contactId: string) {
+	async function loadHistory(contactId: string, skipCache: boolean = true) {
 		loadingHistory = true;
 		try {
 			const [logsRes, remRes] = await Promise.all([
-				graphqlQuery<{ crmCallLogs: CallLog[] }>(GetCrmCallLogsDocument, { variables: { contactId } }),
-				graphqlQuery<{ crmCallReminders: CallReminder[] }>(GetCrmCallRemindersDocument, { variables: { contactId, includeCompleted: false } })
+				graphqlQuery<{ crmCallLogs: CallLog[] }>(GetCrmCallLogsDocument, { variables: { contactId }, skipCache }),
+				graphqlQuery<{ crmCallReminders: CallReminder[] }>(GetCrmCallRemindersDocument, { variables: { contactId, includeCompleted: false }, skipCache })
 			]);
 			if (logsRes.success && logsRes.data) callLogs = logsRes.data.crmCallLogs;
 			if (remRes.success && remRes.data) reminders = remRes.data.crmCallReminders;
@@ -315,13 +323,14 @@
 				notes: data.notes || null,
 				followUpDate: data.scheduleFollowUp ? data.followUpDate : null,
 				followUpNotes: data.scheduleFollowUp ? data.followUpNotes : null,
-				contactIsActive: data.isPositive === false ? false : null
+				contactIsActive: data.isPositive === false ? false : null,
+				salesUserId: data.salesUserId || null
 			};
 			const res = await graphqlMutation<{ logCrmCall: { success: boolean; message: string } }>(LogCrmCallDocument, { variables: input });
 			if (res.success && res.data?.logCrmCall.success) {
 				toast.success('Call log saved successfully.');
-				await loadHistory(selectedContact.id);
 				activeTab = 'history';
+				await loadHistory(selectedContact.id, true);
 
 				const nowIso = new Date().toISOString();
 				selectedContact.lastCallDate = nowIso;
@@ -404,6 +413,27 @@
 		}
 	}
 
+	async function handleUpdateCallLogNotes(callLogId: string, notes: string | null): Promise<boolean> {
+		try {
+			const res = await graphqlMutation<{ updateCrmCallLogNotes: { success: boolean; message: string } }>(
+				UpdateCrmCallLogNotesDocument,
+				{ variables: { callLogId, notes } }
+			);
+			if (res.success && res.data?.updateCrmCallLogNotes.success) {
+				toast.success('Comment updated successfully.');
+				callLogs = callLogs.map((l) => (l.id === callLogId ? { ...l, notes } : l));
+				return true;
+			} else {
+				toast.error(res.error || 'Failed to update comment.');
+				return false;
+			}
+		} catch (err: any) {
+			console.error(err);
+			toast.error(err.message || 'An error occurred while updating comment.');
+			return false;
+		}
+	}
+
 	async function handleCompleteReminder(reminderId: string) {
 		completingReminderId = reminderId;
 		try {
@@ -425,7 +455,7 @@
 	async function handleDeallocateContact(contactId: string) {
 		const target = allocatedAgentContacts.find(c => c.contactId === contactId || c.contact?.id === contactId);
 		const c = target?.contact;
-		const callCount = target?.callCount ?? c?.callCount ?? 0;
+		const callCount = target?.callCount ?? 0;
 		const lastDate = target?.lastCallDate || c?.lastCallDate;
 		const outcome = target?.lastCallOutcome || c?.lastCallOutcome;
 		if (callCount > 0 || lastDate || (outcome && outcome.trim() !== '')) {
@@ -460,7 +490,7 @@
 		const untouchedIds = contactIds.filter(id => {
 			const target = allocatedAgentContacts.find(c => c.contactId === id || c.contact?.id === id);
 			const c = target?.contact;
-			const callCount = target?.callCount ?? c?.callCount ?? 0;
+			const callCount = target?.callCount ?? 0;
 			const lastDate = target?.lastCallDate || c?.lastCallDate;
 			const outcome = target?.lastCallOutcome || c?.lastCallOutcome;
 			return callCount === 0 && !lastDate && (!outcome || outcome.trim() === '');
@@ -578,6 +608,40 @@
 		}
 	}
 
+	function handleOpenSearchSingle(term: string = '') {
+		searchSingleInitialTerm = term;
+		searchSingleDialogOpen = true;
+	}
+
+	function handleContactAllocatedOnDemand(contact: CrmContact, allocation?: CrmAgentContact) {
+		// Check if already present in allocated list
+		const existingIdx = allocatedAgentContacts.findIndex(
+			(ac) => ac.contactId === contact.id || ac.contact?.id === contact.id
+		);
+
+		let targetAlloc: CrmAgentContact;
+		if (existingIdx !== -1) {
+			targetAlloc = allocatedAgentContacts[existingIdx];
+		} else {
+			targetAlloc = allocation || {
+				id: crypto.randomUUID(),
+				agentUsername: cleanUsername($authStore.username),
+				contactId: contact.id,
+				contact: contact,
+				allocatedAt: new Date().toISOString(),
+				callCount: 0
+			};
+			allocatedAgentContacts = [targetAlloc, ...allocatedAgentContacts];
+		}
+
+		selectedContact = targetAlloc.contact || contact;
+		isListCollapsed = true;
+		if (filterCallDate !== 'all' && filterCallDate !== 'today' && filterCallDate !== 'pending') {
+			filterCallDate = 'all';
+		}
+		statsBarRef?.loadData?.();
+	}
+
 	async function handlePrintDocument(docNo: string, view: string) {
 		if (loadingPdf) return;
 		loadingPdf = true;
@@ -605,6 +669,49 @@
 		}
 	}
 
+	async function selectContactFromUrlParam() {
+		const targetContactId = $page.url.searchParams.get('contactId');
+		if (!targetContactId) return;
+
+		const targetAlloc = allocatedAgentContacts.find(
+			(ac) => ac.contactId === targetContactId || ac.contact?.id === targetContactId
+		);
+
+		if (targetAlloc) {
+			selectedContact = targetAlloc.contact;
+			isListCollapsed = true;
+			// Refresh single contact details in case it was modified in master
+			graphqlQuery<{ contact: CrmContact | null }>(GetCrmContactByIdDocument, {
+				variables: { id: targetContactId },
+				skipCache: true
+			}).then((res) => {
+				if (res.success && res.data?.contact) {
+					const updated = res.data.contact;
+					selectedContact = updated;
+					allocatedAgentContacts = allocatedAgentContacts.map((ac) => {
+						if (ac.contactId === targetContactId || ac.contact?.id === targetContactId) {
+							return { ...ac, contact: updated };
+						}
+						return ac;
+					});
+				}
+			});
+		} else {
+			// If not currently in active list, fetch from server and allocate on-demand
+			try {
+				const res = await graphqlQuery<{ contact: CrmContact | null }>(GetCrmContactByIdDocument, {
+					variables: { id: targetContactId },
+					skipCache: true
+				});
+				if (res.success && res.data?.contact) {
+					handleContactAllocatedOnDemand(res.data.contact);
+				}
+			} catch (err) {
+				console.error('Failed to load contact specified in URL', err);
+			}
+		}
+	}
+
 	onMount(async () => {
 		try {
 			const settingRes = await graphqlQuery<{ getCrmSetting: { key: string; value: string } | null }>(GetCrmSettingDocument, { variables: { key: 'ContactsPerAgent' } });
@@ -615,6 +722,20 @@
 			
 			// Initial load of agent's allocated contacts
 			await loadAllocatedContacts();
+			await selectContactFromUrlParam();
+
+			// Fetch sales users list for forwarded sales person name resolution
+			graphqlQuery<any>(GetSalesUsersDocument, {
+				variables: {
+					where: { userType: { eq: 'SALES' } },
+					take: 200
+				},
+				silent: true
+			}).then((res) => {
+				if (res.data?.users?.items) {
+					salesUsersList = res.data.users.items;
+				}
+			}).catch((e) => console.error('Failed to load sales users list', e));
 
 			// Background prefetch Whatsapp data so it loads instantly when requested
 			import('./queries').then((q) => {
@@ -641,6 +762,15 @@
 		});
 	});
 
+	$effect(() => {
+		const targetContactId = $page.url.searchParams.get('contactId');
+		if (targetContactId && (!selectedContact || selectedContact.id !== targetContactId)) {
+			untrack(() => {
+				selectContactFromUrlParam();
+			});
+		}
+	});
+
 	function handleCallMobile(mobile: string) {
 		window.open(`tel:${mobile}`);
 	}
@@ -656,6 +786,7 @@
 		bind:this={statsBarRef}
 		bind:filterCallDate
 		onSelectContactById={handleSelectContactById}
+		{salesUsersList}
 	/>
 
 	<!-- Two-column Calling Center Area -->
@@ -676,6 +807,7 @@
 				}}
 				onRequestMoreContacts={() => (allocateDialogOpen = true)}
 				onQuickLoadContacts={handleQuickLoadContacts}
+				onOpenSearchSingle={handleOpenSearchSingle}
 			/>
 		</div>
 
@@ -699,6 +831,9 @@
 			onCompleteReminder={handleCompleteReminder}
 			{completingReminderId}
 			onPrintDocument={handlePrintDocument}
+			onRefreshHistory={() => selectedContact && loadHistory(selectedContact.id, true)}
+			onUpdateCallLogNotes={handleUpdateCallLogNotes}
+			{salesUsersList}
 			{isSavingLog}
 			{isUndoingLog}
 		/>
@@ -733,6 +868,13 @@
 </Dialog.Root>
 
 <AllocateContactsDialog bind:open={allocateDialogOpen} onAllocate={handleAllocateContacts} />
+
+<SearchSingleContactDialog
+	bind:open={searchSingleDialogOpen}
+	initialSearch={searchSingleInitialTerm}
+	allocatedContactIds={allocatedAgentContacts.map(c => c.contactId || c.contact?.id)}
+	onContactAllocated={handleContactAllocatedOnDemand}
+/>
 
 <style>
 	:global(.scrollbar-hide) {

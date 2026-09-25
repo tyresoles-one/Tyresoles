@@ -16,10 +16,12 @@
 
 	let {
 		filterCallDate = $bindable('pending'),
-		onSelectContactById
+		onSelectContactById,
+		salesUsersList = []
 	}: {
 		filterCallDate?: string;
 		onSelectContactById?: (contactId: string) => void;
+		salesUsersList?: { userName: string; fullName: string }[];
 	} = $props();
 
 	type KpiFilter = 'all' | 'connected' | 'positive' | 'followup' | null;
@@ -63,7 +65,7 @@
 		});
 	});
 
-	type Timeframe = '7d' | 'today' | 'month';
+	type Timeframe = '7d' | 'today' | 'yesterday' | 'month' | 'custom';
 
 	const SETTING_KEY = 'CRM_DAILY_CALL_TARGETS';
 
@@ -97,6 +99,9 @@
 
 	let isCollapsed = $state<boolean>(true);
 	let timeframe = $state<Timeframe>('7d');
+	let customStartDate = $state<string>(new Date().toISOString().slice(0, 10));
+	let customEndDate = $state<string>(new Date().toISOString().slice(0, 10));
+	let isCustomDateOpen = $state<boolean>(false);
 	let loading = $state<boolean>(false);
 	let callLogs = $state<DetailedCallLog[]>([]);
 	let allTargets = $state<CallTargetRule[]>([]);
@@ -122,45 +127,114 @@
 
 	function cleanUsername(raw?: string | null): string {
 		if (!raw) return '';
-		return raw.replace(/^tyresoles\\/i, '').trim();
+		return raw
+			.replace(/^(tyresoles[\\/]|domain[\\/])/i, '')
+			.replace(/^[\\/]+/, '')
+			.trim();
 	}
 
-	function getRange(tf: Timeframe): { start: Date; end: Date; label: string } {
+	function toLocalDateStr(d: Date | string | null | undefined): string {
+		if (!d) return '';
+		const date = typeof d === 'string' ? new Date(d) : d;
+		if (isNaN(date.getTime())) return '';
+		const y = date.getFullYear();
+		const m = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
+	}
+
+	type DateRangeResult = {
+		start: Date;
+		end: Date;
+		label: string;
+		compactLabel: string;
+		fullLabel: string;
+	};
+
+	function getRange(tf: Timeframe, customStart?: string, customEnd?: string): DateRangeResult {
 		const now = new Date();
 		if (tf === 'today') {
 			const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 			const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+			const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+			const compact = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 			return {
 				start,
 				end,
-				label: `Today (${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })})`
+				label: `Today (${dateStr})`,
+				compactLabel: compact,
+				fullLabel: `Today (${dateStr})`
+			};
+		} else if (tf === 'yesterday') {
+			const yDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+			const start = new Date(yDate.getFullYear(), yDate.getMonth(), yDate.getDate(), 0, 0, 0, 0);
+			const end = new Date(yDate.getFullYear(), yDate.getMonth(), yDate.getDate(), 23, 59, 59, 999);
+			const dateStr = yDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+			const compact = yDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+			return {
+				start,
+				end,
+				label: `Yesterday (${dateStr})`,
+				compactLabel: compact,
+				fullLabel: `Yesterday (${dateStr})`
 			};
 		} else if (tf === '7d') {
 			const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
 			const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+			const startShort = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+			const endShort = end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 			return {
 				start,
 				end,
-				label: `Past 7 Days (${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})`
+				label: `Past 7 Days (${startShort} – ${endShort})`,
+				compactLabel: `${startShort} – ${endShort}`,
+				fullLabel: `Past 7 Days (${startShort} – ${endShort})`
 			};
-		} else {
-			// This Month
+		} else if (tf === 'month') {
 			const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
 			const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-			const monthName = start.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+			const monthLong = start.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+			const monthCompact = start.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 			return {
 				start,
 				end,
-				label: `This Month (${monthName})`
+				label: `This Month (${monthLong})`,
+				compactLabel: monthCompact,
+				fullLabel: `This Month (${monthLong})`
+			};
+		} else {
+			// Custom
+			const sStr = customStart || now.toISOString().slice(0, 10);
+			const eStr = customEnd || sStr;
+			const [sY, sM, sD] = sStr.split('-').map(Number);
+			const [eY, eM, eD] = eStr.split('-').map(Number);
+			const start = new Date(sY, sM - 1, sD, 0, 0, 0, 0);
+			const end = new Date(eY, eM - 1, eD, 23, 59, 59, 999);
+			const isSame = sStr === eStr;
+			const sShort = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+			const eShort = end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+			const compact = isSame ? sShort : `${sShort} – ${eShort}`;
+			return {
+				start,
+				end,
+				label: isSame ? `Custom Date (${sShort})` : `Custom Range (${sShort} – ${eShort})`,
+				compactLabel: compact,
+				fullLabel: isSame
+					? `Custom Date: ${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
+					: `Custom Range: ${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} – ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
 			};
 		}
 	}
 
-	let activeDateRange = $derived(getRange(timeframe));
+	let activeDateRange = $derived(getRange(timeframe, customStartDate, customEndDate));
 
 	let currentTarget = $derived.by(() => {
-		if (timeframe === 'today') return dailyTarget;
+		if (timeframe === 'today' || timeframe === 'yesterday') return dailyTarget;
 		if (timeframe === '7d') return weeklyTarget;
+		if (timeframe === 'month') return monthlyTarget;
+		const diffDays = Math.max(1, Math.round((activeDateRange.end.getTime() - activeDateRange.start.getTime()) / (1000 * 60 * 60 * 24)));
+		if (diffDays <= 1) return dailyTarget;
+		if (diffDays <= 7) return weeklyTarget;
 		return monthlyTarget;
 	});
 
@@ -223,7 +297,37 @@
 			});
 
 			if (res.success && res.data?.crmCallLogs?.items) {
-				callLogs = res.data.crmCallLogs.items;
+				let allLogs = [...res.data.crmCallLogs.items];
+				const total = res.data.crmCallLogs.totalCount || allLogs.length;
+
+				// Guarantee 100% complete records: fetch remaining batches if records exceed 1000
+				if (total > allLogs.length) {
+					const batchSize = 1000;
+					const pages = Math.ceil((total - allLogs.length) / batchSize);
+					const promises = [];
+					for (let p = 1; p <= pages; p++) {
+						promises.push(
+							graphqlQuery<any>(GetAllCrmCallLogsDocument, {
+								variables: {
+									skip: p * batchSize,
+									take: batchSize,
+									where: {
+										callDate: { gte: startIso, lte: endIso }
+									},
+									order: [{ callDate: 'DESC' }]
+								}
+							})
+						);
+					}
+					const results = await Promise.all(promises);
+					for (const r of results) {
+						if (r.success && r.data?.crmCallLogs?.items) {
+							allLogs = allLogs.concat(r.data.crmCallLogs.items);
+						}
+					}
+				}
+
+				callLogs = allLogs;
 			} else {
 				callLogs = [];
 			}
@@ -366,6 +470,7 @@
 		positiveRate: number;
 		connectedCount: number;
 		isCurrentUser: boolean;
+		rank: number;
 	};
 
 	let leaderboard = $derived.by(() => {
@@ -378,7 +483,11 @@
 			const norm = clean.toLowerCase();
 
 			if (!map.has(norm)) {
-				map.set(norm, { raw, display: clean, calls: 0, positive: 0, connected: 0 });
+				const userMatch = salesUsersList?.find(
+					(u) => cleanUsername(u.userName).toLowerCase() === norm
+				);
+				const display = userMatch?.fullName?.trim() || clean;
+				map.set(norm, { raw, display, calls: 0, positive: 0, connected: 0 });
 			}
 			const entry = map.get(norm)!;
 			entry.calls++;
@@ -394,13 +503,43 @@
 				displayUsername: data.display,
 				calls: data.calls,
 				positiveCount: data.positive,
-				positiveRate: (data.positive / data.calls) * 100,
+				positiveRate: data.calls > 0 ? (data.positive / data.calls) * 100 : 0,
 				connectedCount: data.connected,
-				isCurrentUser: norm === currentCleanUsername.toLowerCase()
+				isCurrentUser: norm === currentCleanUsername.toLowerCase(),
+				rank: 1
 			}));
 
-		// Sort by calls DESC, then positiveCount DESC
-		list.sort((a, b) => b.calls - a.calls || b.positiveCount - a.positiveCount);
+		// Multi-tier deterministic sorting:
+		// 1. Total Calls DESC
+		// 2. Positive Leads Won DESC
+		// 3. Connected Calls DESC
+		// 4. Display Name ASC (stable deterministic tie-breaking)
+		list.sort(
+			(a, b) =>
+				b.calls - a.calls ||
+				b.positiveCount - a.positiveCount ||
+				b.connectedCount - a.connectedCount ||
+				a.displayUsername.localeCompare(b.displayUsername)
+		);
+
+		// 100% correct competition ranking: identical records share the exact same rank
+		for (let i = 0; i < list.length; i++) {
+			if (i === 0) {
+				list[0].rank = 1;
+			} else {
+				const prev = list[i - 1];
+				const curr = list[i];
+				if (
+					curr.calls === prev.calls &&
+					curr.positiveCount === prev.positiveCount &&
+					curr.connectedCount === prev.connectedCount
+				) {
+					curr.rank = prev.rank;
+				} else {
+					curr.rank = i + 1;
+				}
+			}
+		}
 
 		return list;
 	});
@@ -419,11 +558,15 @@
 		leaderboard.length > 0 && leaderboard[0].calls > 0 ? leaderboard[0] : null
 	);
 
+	let myAgentItem = $derived(leaderboard.find((a) => a.isCurrentUser));
 	let myRank = $derived.by(() => {
-		const idx = leaderboard.findIndex((a) => a.isCurrentUser);
-		if (idx !== -1) return idx + 1;
-		// If current user made 0 calls in this window:
+		if (myAgentItem) return myAgentItem.rank;
+		if (myTotalCalls === 0) return null;
 		return leaderboard.length + 1;
+	});
+
+	let isTiedForFirst = $derived.by(() => {
+		return leaderboard.filter((a) => a.rank === 1).length > 1;
 	});
 
 	let gapToLeader = $derived.by(() => {
@@ -432,8 +575,11 @@
 	});
 
 	let leadOverSecond = $derived.by(() => {
-		if (myRank === 1 && leaderboard.length > 1) {
-			return myTotalCalls - leaderboard[1].calls;
+		if (myRank === 1) {
+			const nextRankAgent = leaderboard.find((a) => a.rank > 1);
+			if (nextRankAgent) {
+				return myTotalCalls - nextRankAgent.calls;
+			}
 		}
 		return 0;
 	});
@@ -443,11 +589,13 @@
 		if (myTotalCalls > 0) {
 			if (myRank === 1) {
 				return {
-					title: `Team Leader (${currentCleanUsername})`,
-					detail: leadOverSecond > 0
+					title: isTiedForFirst ? `Tied for #1 (${currentCleanUsername})` : `Team Leader (${currentCleanUsername})`,
+					detail: isTiedForFirst
+						? `Co-leading the team with ${myTotalCalls} calls and ${myPositiveCalls} positive outcomes.`
+						: leadOverSecond > 0
 						? `Leading the team by +${leadOverSecond} calls with ${myPositiveCalls} positive outcomes.`
 						: `Ranked #1 on the team with ${myTotalCalls} calls in this period.`,
-					badge: 'Rank #1 Champion',
+					badge: isTiedForFirst ? 'Rank #1 Co-Leader' : 'Rank #1 Champion',
 					badgeClass: 'bg-amber-100 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 border-2 border-amber-400 dark:border-amber-500 font-extrabold shadow-2xs',
 					bannerAccent: 'from-amber-500/15 via-yellow-500/10 to-amber-500/5 border-amber-500/30',
 					icon: 'trophy',
@@ -518,7 +666,7 @@
 	let chartBars = $derived.by(() => {
 		const { start, end } = activeDateRange;
 		const bars: ChartBar[] = [];
-		const todayKey = new Date().toISOString().slice(0, 10);
+		const todayKey = toLocalDateStr(new Date());
 
 		if (timeframe === 'today') {
 			// Single day: show today with total calls
@@ -537,18 +685,36 @@
 				connected,
 				unreachable
 			});
+		} else if (timeframe === 'yesterday') {
+			// Single day: show yesterday with total calls
+			const yesterdayKey = toLocalDateStr(start);
+			const total = myLogs.length;
+			const positive = myLogs.filter((l) => isPositiveOutcome(l.outcome)).length;
+			const unreachable = myLogs.filter((l) => isUnreachableOutcome(l.outcome)).length;
+			const connected = Math.max(0, total - unreachable);
+
+			bars.push({
+				label: 'Yesterday',
+				subLabel: start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+				dateStr: yesterdayKey,
+				isCurrent: true,
+				total,
+				positive,
+				connected,
+				unreachable
+			});
 		} else if (timeframe === '7d') {
 			// 7 rolling days from start to end
 			const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 			for (let i = 0; i < 7; i++) {
 				const d = new Date(start);
 				d.setDate(start.getDate() + i);
-				const dateStr = d.toISOString().slice(0, 10);
+				const dateStr = toLocalDateStr(d);
 				const isCurrent = dateStr === todayKey;
 
 				const dayLogs = myLogs.filter((l) => {
 					if (!l.callDate) return false;
-					return l.callDate.slice(0, 10) === dateStr;
+					return toLocalDateStr(l.callDate) === dateStr;
 				});
 
 				const total = dayLogs.length;
@@ -567,7 +733,7 @@
 					unreachable
 				});
 			}
-		} else {
+		} else if (timeframe === 'month') {
 			// Monthly: weekly blocks of the month
 			const curr = new Date(start);
 			let weekNum = 1;
@@ -577,13 +743,13 @@
 				blockEnd.setDate(blockEnd.getDate() + 6);
 				if (blockEnd > end) blockEnd.setTime(end.getTime());
 
-				const blockStartStr = blockStart.toISOString().slice(0, 10);
-				const blockEndStr = blockEnd.toISOString().slice(0, 10);
+				const blockStartStr = toLocalDateStr(blockStart);
+				const blockEndStr = toLocalDateStr(blockEnd);
 				const isCurrent = todayKey >= blockStartStr && todayKey <= blockEndStr;
 
 				const blockLogs = myLogs.filter((l) => {
 					if (!l.callDate) return false;
-					const lDate = l.callDate.slice(0, 10);
+					const lDate = toLocalDateStr(l.callDate);
 					return lDate >= blockStartStr && lDate <= blockEndStr;
 				});
 
@@ -606,6 +772,93 @@
 				curr.setDate(curr.getDate() + 7);
 				weekNum++;
 			}
+		} else {
+			// Custom
+			const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+			if (diffDays <= 1) {
+				const total = myLogs.length;
+				const positive = myLogs.filter((l) => isPositiveOutcome(l.outcome)).length;
+				const unreachable = myLogs.filter((l) => isUnreachableOutcome(l.outcome)).length;
+				const connected = Math.max(0, total - unreachable);
+
+				bars.push({
+					label: 'Custom',
+					subLabel: start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+					dateStr: toLocalDateStr(start),
+					isCurrent: true,
+					total,
+					positive,
+					connected,
+					unreachable
+				});
+			} else if (diffDays <= 14) {
+				const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+				for (let i = 0; i < diffDays; i++) {
+					const d = new Date(start);
+					d.setDate(start.getDate() + i);
+					const dateStr = toLocalDateStr(d);
+					const isCurrent = dateStr === todayKey;
+
+					const dayLogs = myLogs.filter((l) => {
+						if (!l.callDate) return false;
+						return toLocalDateStr(l.callDate) === dateStr;
+					});
+
+					const total = dayLogs.length;
+					const positive = dayLogs.filter((l) => isPositiveOutcome(l.outcome)).length;
+					const unreachable = dayLogs.filter((l) => isUnreachableOutcome(l.outcome)).length;
+					const connected = Math.max(0, total - unreachable);
+
+					bars.push({
+						label: dayNames[d.getDay()],
+						subLabel: `${d.getDate()} ${d.toLocaleDateString('en-IN', { month: 'short' })}`,
+						dateStr,
+						isCurrent,
+						total,
+						positive,
+						connected,
+						unreachable
+					});
+				}
+			} else {
+				const curr = new Date(start);
+				let weekNum = 1;
+				while (curr <= end) {
+					const blockStart = new Date(curr);
+					const blockEnd = new Date(curr);
+					blockEnd.setDate(blockEnd.getDate() + 6);
+					if (blockEnd > end) blockEnd.setTime(end.getTime());
+
+					const blockStartStr = toLocalDateStr(blockStart);
+					const blockEndStr = toLocalDateStr(blockEnd);
+					const isCurrent = todayKey >= blockStartStr && todayKey <= blockEndStr;
+
+					const blockLogs = myLogs.filter((l) => {
+						if (!l.callDate) return false;
+						const lDate = toLocalDateStr(l.callDate);
+						return lDate >= blockStartStr && lDate <= blockEndStr;
+					});
+
+					const total = blockLogs.length;
+					const positive = blockLogs.filter((l) => isPositiveOutcome(l.outcome)).length;
+					const unreachable = blockLogs.filter((l) => isUnreachableOutcome(l.outcome)).length;
+					const connected = Math.max(0, total - unreachable);
+
+					bars.push({
+						label: `W${weekNum}`,
+						subLabel: `${blockStart.getDate()}-${blockEnd.getDate()}`,
+						dateStr: `${blockStartStr} to ${blockEndStr}`,
+						isCurrent,
+						total,
+						positive,
+						connected,
+						unreachable
+					});
+
+					curr.setDate(curr.getDate() + 7);
+					weekNum++;
+				}
+			}
 		}
 
 		return bars;
@@ -626,9 +879,14 @@
 			}
 
 			const savedTf = localStorage.getItem('crm_stats_timeframe') as Timeframe;
-			if (savedTf && ['7d', 'today', 'month'].includes(savedTf)) {
+			if (savedTf && ['7d', 'today', 'yesterday', 'month', 'custom'].includes(savedTf)) {
 				timeframe = savedTf;
 			}
+
+			const savedStart = localStorage.getItem('crm_stats_custom_start');
+			const savedEnd = localStorage.getItem('crm_stats_custom_end');
+			if (savedStart) customStartDate = savedStart;
+			if (savedEnd) customEndDate = savedEnd;
 		} catch (e) {
 			console.error(e);
 		}
@@ -655,6 +913,19 @@
 		loadData();
 	}
 
+	function applyCustomDate() {
+		timeframe = 'custom';
+		isCustomDateOpen = false;
+		try {
+			localStorage.setItem('crm_stats_timeframe', 'custom');
+			localStorage.setItem('crm_stats_custom_start', customStartDate);
+			localStorage.setItem('crm_stats_custom_end', customEndDate);
+		} catch (e) {
+			console.error(e);
+		}
+		loadData();
+	}
+
 	function startEditTarget() {
 		tempTargetInput = currentTarget;
 		isEditingTarget = true;
@@ -662,7 +933,7 @@
 
 	async function saveTarget() {
 		if (tempTargetInput > 0) {
-			if (timeframe === 'today') {
+			if (timeframe === 'today' || timeframe === 'yesterday') {
 				dailyTarget = tempTargetInput;
 			} else if (timeframe === '7d') {
 				weeklyTarget = tempTargetInput;
@@ -1008,7 +1279,7 @@
 						<div class="flex items-center gap-2 flex-wrap">
 							<Icon name="bar-chart-2" class="size-4 text-primary" />
 							<span class="font-bold text-xs text-foreground">
-								{timeframe === 'month' ? 'Weekly Call Distribution' : 'Daily Call Activity'}
+								{timeframe === 'month' || (timeframe === 'custom' && chartBars.length > 7) ? 'Weekly Call Distribution' : 'Daily Call Activity'}
 							</span>
 							<!-- Timeframe Switcher in Expanded View -->
 							<div class="flex items-center bg-muted/40 p-0.5 rounded-lg border border-border/60 text-[10px] font-medium">
@@ -1030,15 +1301,119 @@
 								</button>
 								<button
 									type="button"
+									onclick={() => handleTimeframeChange('yesterday')}
+									class="px-2 py-0.5 rounded-md transition-all {timeframe === 'yesterday' ? 'bg-background shadow-2xs font-bold text-primary' : 'text-muted-foreground hover:text-foreground'}"
+									title="Show yesterday's activity"
+								>
+									Yesterday
+								</button>
+								<button
+									type="button"
 									onclick={() => handleTimeframeChange('month')}
 									class="px-2 py-0.5 rounded-md transition-all {timeframe === 'month' ? 'bg-background shadow-2xs font-bold text-primary' : 'text-muted-foreground hover:text-foreground'}"
 									title="Show this month"
 								>
 									Month
 								</button>
+								<!-- Custom Date Button with Popover -->
+								<div class="relative">
+									<button
+										type="button"
+										onclick={() => {
+											if (timeframe !== 'custom') {
+												timeframe = 'custom';
+												loadData();
+											}
+											isCustomDateOpen = !isCustomDateOpen;
+										}}
+										class="px-2 py-0.5 rounded-md transition-all flex items-center gap-1 {timeframe === 'custom' ? 'bg-background shadow-2xs font-bold text-primary' : 'text-muted-foreground hover:text-foreground'}"
+										title="Choose a custom date or date range"
+									>
+										<span>Custom</span>
+										<Icon name="chevron-down" class="size-2.5 opacity-60 {isCustomDateOpen ? 'rotate-180' : ''} transition-transform" />
+									</button>
+
+									{#if isCustomDateOpen}
+										<!-- Backdrop to dismiss -->
+										<div
+											class="fixed inset-0 z-40"
+											onclick={() => (isCustomDateOpen = false)}
+											role="presentation"
+										></div>
+
+										<!-- Popover right under Custom button -->
+										<div class="absolute left-0 top-full mt-1.5 z-50 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl p-3 w-64 text-xs space-y-2.5">
+											<div class="flex items-center justify-between border-b border-border pb-1.5">
+												<span class="font-bold text-[11px] text-foreground flex items-center gap-1.5">
+													<Icon name="calendar" class="size-3.5 text-primary" />
+													Custom Date
+												</span>
+												<button
+													type="button"
+													onclick={() => (isCustomDateOpen = false)}
+													class="size-5 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+												>
+													<Icon name="x" class="size-3" />
+												</button>
+											</div>
+
+											<div class="grid grid-cols-2 gap-2">
+												<div>
+													<label class="text-[10px] text-muted-foreground font-medium block mb-1">From Date</label>
+													<input
+														type="date"
+														bind:value={customStartDate}
+														onchange={() => {
+															if (!customEndDate || customEndDate < customStartDate) {
+																customEndDate = customStartDate;
+															}
+														}}
+														class="w-full h-7 px-2 text-[11px] rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+													/>
+												</div>
+												<div>
+													<label class="text-[10px] text-muted-foreground font-medium block mb-1">To Date</label>
+													<input
+														type="date"
+														bind:value={customEndDate}
+														min={customStartDate}
+														class="w-full h-7 px-2 text-[11px] rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+													/>
+												</div>
+											</div>
+
+											<!-- Actions -->
+											<div class="flex items-center gap-1 pt-1 border-t border-border/50">
+												<button
+													type="button"
+													onclick={() => {
+														const today = new Date().toISOString().slice(0, 10);
+														customStartDate = today;
+														customEndDate = today;
+														applyCustomDate();
+													}}
+													class="px-2 py-1 text-[10px] rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+												>
+													Single Day
+												</button>
+												<button
+													type="button"
+													onclick={applyCustomDate}
+													class="ml-auto px-3 py-1 text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-md shadow-2xs cursor-pointer"
+												>
+													Apply
+												</button>
+											</div>
+										</div>
+									{/if}
+								</div>
 							</div>
-							<span class="text-[10px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
-								{activeDateRange.label}
+							<span
+								class="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap flex items-center gap-1 cursor-default"
+								title={activeDateRange.fullLabel}
+							>
+								<Icon name="calendar" class="size-2.5 opacity-60 shrink-0" />
+								<span>{activeDateRange.compactLabel}</span>
 							</span>
 						</div>
 						<!-- Contrast Soothing Semantic Legend -->
@@ -1200,16 +1575,91 @@
 										: 'bg-muted/20 hover:bg-muted/40 border border-border/40'}"
 								>
 									<div class="flex items-center gap-2 min-w-0">
-										<!-- Rank Badge -->
-										<div class="size-6 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 {idx === 0
-											? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950 shadow-2xs'
-											: idx === 1
-											? 'bg-gradient-to-r from-slate-200 to-zinc-300 text-slate-900 shadow-2xs'
-											: idx === 2
-											? 'bg-gradient-to-r from-amber-600 to-orange-500 text-white shadow-2xs'
-											: 'bg-muted text-muted-foreground font-semibold'}">
-											{#if idx === 0}🥇{:else if idx === 1}🥈{:else if idx === 2}🥉{:else}{idx + 1}{/if}
-										</div>
+										<!-- Rank Badge: Ultra-Clear, Bold Numbers on 3D Minted Metallic Medallions -->
+										{#if agent.rank === 1}
+											<!-- Rank 1: Gold Champion Medallion -->
+											<svg class="size-8 shrink-0 drop-shadow-[0_2px_4px_rgba(217,119,6,0.35)]" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+												<title>Rank 1 (Gold)</title>
+												<defs>
+													<linearGradient id="rank-gold-base" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FEF08A" />
+														<stop offset="25%" stop-color="#FBBF24" />
+														<stop offset="70%" stop-color="#F59E0B" />
+														<stop offset="100%" stop-color="#B45309" />
+													</linearGradient>
+													<linearGradient id="rank-gold-inner" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FFFBEB" />
+														<stop offset="50%" stop-color="#FEF3C7" />
+														<stop offset="100%" stop-color="#FDE68A" />
+													</linearGradient>
+												</defs>
+												<!-- Outer Coin Rim -->
+												<circle cx="16" cy="16" r="14.5" fill="url(#rank-gold-base)" stroke="#FEF08A" stroke-width="1.2" />
+												<!-- Inner Minted Surface -->
+												<circle cx="16" cy="16" r="11.5" fill="url(#rank-gold-inner)" stroke="#D97706" stroke-width="0.75" />
+												<!-- Specular Highlight Arc -->
+												<path d="M5.5 13C6.5 8 10.5 5 16 5C21.5 5 25.5 8 26.5 13C22.5 9.5 19.5 8 16 8C12.5 8 9.5 9.5 5.5 13Z" fill="#FFFFFF" opacity="0.6" />
+												<!-- Big, Bold, Crystal-Clear Rank Number 1 -->
+												<text x="16" y="22" text-anchor="middle" font-size="17" font-weight="900" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fill="#78350F">1</text>
+											</svg>
+										{:else if agent.rank === 2}
+											<!-- Rank 2: Silver Elite Medallion -->
+											<svg class="size-8 shrink-0 drop-shadow-[0_2px_4px_rgba(100,116,139,0.3)]" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+												<title>Rank 2 (Silver)</title>
+												<defs>
+													<linearGradient id="rank-silver-base" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FFFFFF" />
+														<stop offset="25%" stop-color="#E2E8F0" />
+														<stop offset="70%" stop-color="#94A3B8" />
+														<stop offset="100%" stop-color="#475569" />
+													</linearGradient>
+													<linearGradient id="rank-silver-inner" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FFFFFF" />
+														<stop offset="50%" stop-color="#F8FAFC" />
+														<stop offset="100%" stop-color="#E2E8F0" />
+													</linearGradient>
+												</defs>
+												<!-- Outer Coin Rim -->
+												<circle cx="16" cy="16" r="14.5" fill="url(#rank-silver-base)" stroke="#FFFFFF" stroke-width="1.2" />
+												<!-- Inner Minted Surface -->
+												<circle cx="16" cy="16" r="11.5" fill="url(#rank-silver-inner)" stroke="#64748B" stroke-width="0.75" />
+												<!-- Specular Highlight Arc -->
+												<path d="M5.5 13C6.5 8 10.5 5 16 5C21.5 5 25.5 8 26.5 13C22.5 9.5 19.5 8 16 8C12.5 8 9.5 9.5 5.5 13Z" fill="#FFFFFF" opacity="0.65" />
+												<!-- Big, Bold, Crystal-Clear Rank Number 2 -->
+												<text x="16" y="22" text-anchor="middle" font-size="17" font-weight="900" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fill="#0F172A">2</text>
+											</svg>
+										{:else if agent.rank === 3}
+											<!-- Rank 3: Bronze Podium Medallion -->
+											<svg class="size-8 shrink-0 drop-shadow-[0_2px_4px_rgba(194,65,12,0.3)]" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+												<title>Rank 3 (Bronze)</title>
+												<defs>
+													<linearGradient id="rank-bronze-base" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FFEDD5" />
+														<stop offset="25%" stop-color="#FB923C" />
+														<stop offset="70%" stop-color="#EA580C" />
+														<stop offset="100%" stop-color="#9A3412" />
+													</linearGradient>
+													<linearGradient id="rank-bronze-inner" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+														<stop offset="0%" stop-color="#FFF7ED" />
+														<stop offset="50%" stop-color="#FFEDD5" />
+														<stop offset="100%" stop-color="#FED7AA" />
+													</linearGradient>
+												</defs>
+												<!-- Outer Coin Rim -->
+												<circle cx="16" cy="16" r="14.5" fill="url(#rank-bronze-base)" stroke="#FFEDD5" stroke-width="1.2" />
+												<!-- Inner Minted Surface -->
+												<circle cx="16" cy="16" r="11.5" fill="url(#rank-bronze-inner)" stroke="#C2410C" stroke-width="0.75" />
+												<!-- Specular Highlight Arc -->
+												<path d="M5.5 13C6.5 8 10.5 5 16 5C21.5 5 25.5 8 26.5 13C22.5 9.5 19.5 8 16 8C12.5 8 9.5 9.5 5.5 13Z" fill="#FFFFFF" opacity="0.6" />
+												<!-- Big, Bold, Crystal-Clear Rank Number 3 -->
+												<text x="16" y="22" text-anchor="middle" font-size="17" font-weight="900" font-family="system-ui, -apple-system, sans-serif" fill="#7C2D12">3</text>
+											</svg>
+										{:else}
+											<!-- Rank 4+ -->
+											<div class="size-8 rounded-full flex items-center justify-center font-black text-sm shrink-0 bg-muted/60 text-muted-foreground border border-border/60" title="Rank {agent.rank}">
+												{agent.rank}
+											</div>
+										{/if}
 
 										<div class="min-w-0">
 											<div class="flex items-center gap-1.5">

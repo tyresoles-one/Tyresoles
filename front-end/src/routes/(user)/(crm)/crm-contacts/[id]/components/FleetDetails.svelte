@@ -245,15 +245,6 @@
 			<p class="text-xs text-muted-foreground">Manage customer vehicle fleet taxonomy, makes, models and application</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<a
-				href="/crm-masters?category=fleet"
-				target="_blank"
-				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shadow-xs"
-				title="Configure Vehicle Types, Makes, Models & Applications in CRM Masters"
-			>
-				<Icon name="truck" class="size-3.5 text-primary" />
-				<span>Fleet Masters</span>
-			</a>
 			<Button size="sm" class="gap-2 bg-primary text-primary-foreground rounded-xl shadow-xs" onclick={openAddDialog}>
 				<Icon name="plus" class="size-3.5" />
 				Add Fleet Record
@@ -283,17 +274,7 @@
 
 		<div class="grid grid-cols-1 gap-4 py-3 select-none">
 			<Field.Field class="w-full">
-				<div class="flex items-center justify-between">
-					<Field.Label for="fleet-type" class="text-muted-foreground mb-0">Vehicle Type <span class="text-rose-500">*</span></Field.Label>
-					<a
-						href="/crm-masters?tab=VEHICLE_TYPE"
-						target="_blank"
-						class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-						title="Configure Vehicle Types in CRM Masters"
-					>
-						Manage <Icon name="external-link" class="size-2.5" />
-					</a>
-				</div>
+				<Field.Label for="fleet-type" class="text-muted-foreground">Vehicle Type <span class="text-rose-500">*</span></Field.Label>
 				<Field.Content>
 					<Select options={vehicleTypes} bind:value={editingItem.vehicleType} valueKey="name" labelKey="name" placeholder="Select Type..." class="rounded-xl w-full h-9" />
 				</Field.Content>
@@ -301,34 +282,14 @@
 
 			<div class="grid grid-cols-2 gap-4">
 				<Field.Field class="w-full">
-					<div class="flex items-center justify-between">
-						<Field.Label for="fleet-make" class="text-muted-foreground mb-0">Make</Field.Label>
-						<a
-							href="/crm-masters?tab=VEHICLE_MAKE"
-							target="_blank"
-							class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-							title="Configure Vehicle Makes in CRM Masters"
-						>
-							Manage <Icon name="external-link" class="size-2.5" />
-						</a>
-					</div>
+					<Field.Label for="fleet-make" class="text-muted-foreground">Make</Field.Label>
 					<Field.Content>
 						<Select options={filteredMakes} bind:value={editingItem.make} valueKey="name" labelKey="name" placeholder="Select Make..." class="rounded-xl w-full h-9" />
 					</Field.Content>
 				</Field.Field>
 				
 				<Field.Field class="w-full">
-					<div class="flex items-center justify-between">
-						<Field.Label for="fleet-model" class="text-muted-foreground mb-0">Model</Field.Label>
-						<a
-							href="/crm-masters?tab=VEHICLE_MODEL"
-							target="_blank"
-							class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-							title="Configure Vehicle Models in CRM Masters"
-						>
-							Manage <Icon name="external-link" class="size-2.5" />
-						</a>
-					</div>
+					<Field.Label for="fleet-model" class="text-muted-foreground">Model</Field.Label>
 					<Field.Content>
 						<Select options={filteredModels} bind:value={editingItem.model} valueKey="name" labelKey="name" placeholder="Select Model..." class="rounded-xl w-full h-9" />
 					</Field.Content>
@@ -347,17 +308,7 @@
 			</div>
 
 			<Field.Field class="w-full">
-				<div class="flex items-center justify-between">
-					<Field.Label for="fleet-app" class="text-muted-foreground mb-0">Application</Field.Label>
-					<a
-						href="/crm-masters?tab=APPLICATION"
-						target="_blank"
-						class="text-[11px] text-primary hover:underline flex items-center gap-0.5 font-medium"
-						title="Configure Fleet Applications in CRM Masters"
-					>
-						Manage <Icon name="external-link" class="size-2.5" />
-					</a>
-				</div>
+				<Field.Label for="fleet-app" class="text-muted-foreground">Application</Field.Label>
 				<Field.Content>
 					<Select options={applications} bind:value={editingItem.application} valueKey="name" labelKey="name" placeholder="Select Application..." class="rounded-xl w-full h-9" />
 				</Field.Content>

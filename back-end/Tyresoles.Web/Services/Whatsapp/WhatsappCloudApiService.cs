@@ -286,6 +286,7 @@ public class WhatsappCloudApiService : IWhatsappCloudApiService
 
                 string? headerType = "NONE";
                 string? headerText = null;
+                string? headerMediaUrl = null;
                 string? bodyText = null;
                 string? footerText = null;
                 string? buttonsJson = null;
@@ -299,6 +300,13 @@ public class WhatsappCloudApiService : IWhatsappCloudApiService
                         {
                             headerType = c.TryGetProperty("format", out var f) ? f.GetString() : "TEXT";
                             if (headerType == "TEXT" && c.TryGetProperty("text", out var ht)) headerText = ht.GetString();
+                            if ((headerType == "IMAGE" || headerType == "DOCUMENT" || headerType == "VIDEO") &&
+                                c.TryGetProperty("example", out var exObj) &&
+                                exObj.TryGetProperty("header_handle", out var hh) &&
+                                hh.GetArrayLength() > 0)
+                            {
+                                headerMediaUrl = hh[0].GetString();
+                            }
                         }
                         else if (compType == "BODY")
                         {
@@ -342,6 +350,7 @@ public class WhatsappCloudApiService : IWhatsappCloudApiService
                 match.QualityScore = qualityScore ?? match.QualityScore;
                 match.HeaderType = headerType ?? "NONE";
                 match.HeaderText = headerText;
+                match.HeaderMediaUrl = headerMediaUrl ?? match.HeaderMediaUrl;
                 match.BodyText = bodyText;
                 match.FooterText = footerText;
                 match.ButtonsJson = buttonsJson;

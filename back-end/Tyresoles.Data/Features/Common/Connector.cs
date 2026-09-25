@@ -400,4 +400,11 @@ public class Connector
             var result = await client.ReqItemBOMAsync(parentItemNo, itemNo, variantCode, qty);
             return result.return_value;
         });
+    /// <summary>NAV WebServe <c>UserPasswordResetAsync</c> — User Password Reset.</summary>
+    public Task<bool> UserPasswordResetAsync(string userid) =>
+        ExecuteWithRetryAsync(async client =>
+        {
+            var result = await client.UserPasswordResetAsync(userid);
+            return result.return_value;
+        });
 }

@@ -31,6 +31,9 @@
 		onUndoCallLog,
 		onCompleteReminder,
 		onPrintDocument,
+		onRefreshHistory,
+		onUpdateCallLogNotes,
+		salesUsersList = [],
 		isSavingLog,
 		isUndoingLog
 	}: {
@@ -55,6 +58,9 @@
 		onUndoCallLog: (id: string) => void;
 		onCompleteReminder: (id: string) => void;
 		onPrintDocument: (no: string, type: string) => void;
+		onRefreshHistory?: () => void;
+		onUpdateCallLogNotes?: (callLogId: string, notes: string | null) => Promise<boolean>;
+		salesUsersList?: { userName: string; fullName: string }[];
 		isSavingLog: boolean;
 		isUndoingLog: string | null;
 	} = $props();
@@ -64,7 +70,6 @@
 		if (callLogs && callLogs.length > 0) return false;
 		if (selectedContact.lastCallOutcome && selectedContact.lastCallOutcome.trim() !== '') return false;
 		if (selectedContact.lastCallDate) return false;
-		if ((selectedContact.callCount ?? 0) > 0) return false;
 		return true;
 	});
 
@@ -114,7 +119,14 @@
 						</div>
 
 						<h2 class="text-base sm:text-lg font-bold text-foreground truncate flex items-center gap-1.5">
-							<span>{selectedContact.fullName}</span>
+							<a
+								href="/crm-contacts/{selectedContact.id}?from={encodeURIComponent('/crm-calling?contactId=' + selectedContact.id)}"
+								class="hover:text-primary hover:underline transition-colors flex items-center gap-1.5 truncate group"
+								title="Open contact master"
+							>
+								<span class="truncate">{selectedContact.fullName}</span>
+								<Icon name="external-link" class="size-3.5 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:text-primary transition-opacity shrink-0" />
+							</a>
 							{#if loadingHistory || loadingInvoices || loadingClaims}
 								<span title="Loading contact data..."><Loader2 class="size-3.5 animate-spin text-primary/70 shrink-0" /></span>
 							{/if}
@@ -221,7 +233,10 @@
 						Log Response
 					</button>
 					<button
-						onclick={() => (activeTab = 'history')}
+						onclick={() => {
+							activeTab = 'history';
+							if (selectedContact) onRefreshHistory?.();
+						}}
 						class="flex-1 shrink-0 py-2.5 px-3 font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 {activeTab === 'history' ? 'border-primary text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground'}"
 					>
 						<Icon name="history" class="size-3.5" />
@@ -233,7 +248,10 @@
 						{/if}
 					</button>
 					<button
-						onclick={() => (activeTab = 'reminders')}
+						onclick={() => {
+							activeTab = 'reminders';
+							if (selectedContact) onRefreshHistory?.();
+						}}
 						class="flex-1 shrink-0 py-2.5 px-3 font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 {activeTab === 'reminders' ? 'border-primary text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground'}"
 					>
 						<Icon name="calendar" class="size-3.5" />
@@ -286,6 +304,9 @@
 							{isUndoingLog}
 							{onCompleteReminder}
 							{completingReminderId}
+							{onRefreshHistory}
+							{onUpdateCallLogNotes}
+							{salesUsersList}
 						/>
 					{:else if activeTab === 'business' || activeTab === 'claims'}
 						<BusinessDataViewer

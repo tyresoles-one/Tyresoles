@@ -15,5 +15,6 @@ public class CrmCallLog
     public string? InvoiceNos { get; set; }
     public decimal? InvoiceAmount { get; set; }
     public decimal? TyreQuantity { get; set; }
+    public string? SalesUserId { get; set; }
     public List<CrmCallLogInvoice> Invoices { get; set; } = new();
 }

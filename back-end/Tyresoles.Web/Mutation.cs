@@ -1584,6 +1584,7 @@ public class Mutation
         string? followUpNotes,
         bool? contactIsActive,
         List<string>? invoiceNos,
+        string? salesUserId,
         [Service] CrmDbContext db,
         [Service] IDataverseDataService dataService,
         ClaimsPrincipal claimsPrincipal,
@@ -1635,6 +1636,7 @@ public class Mutation
                 Outcome = outcome,
                 Notes = notes,
                 CreatedBy = callerUserId,
+                SalesUserId = string.IsNullOrWhiteSpace(salesUserId) ? null : salesUserId.Trim(),
                 InvoiceNos = cleanInvoices.Count > 0 ? string.Join(",", cleanInvoices) : null,
                 InvoiceAmount = cleanInvoices.Count > 0 ? totalAmount : null,
                 TyreQuantity = cleanInvoices.Count > 0 ? totalTyres : null
@@ -1678,6 +1680,21 @@ public class Mutation
                 agentContact.LastCallDate = callLog.CallDate;
                 agentContact.LastCallNotes = notes;
                 agentContact.CallCount += 1;
+            }
+            else
+            {
+                var newAc = new CrmAgentContact
+                {
+                    Id = Guid.NewGuid(),
+                    AgentUsername = callerUserId,
+                    ContactId = contactId,
+                    AllocatedAt = DateTime.UtcNow,
+                    LastCallOutcome = outcome,
+                    LastCallDate = callLog.CallDate,
+                    LastCallNotes = notes,
+                    CallCount = 1
+                };
+                db.CrmAgentContacts.Add(newAc);
             }
 
             // Create reminder if followUpDate is specified
@@ -1795,6 +1812,32 @@ public class Mutation
 
             await db.SaveChangesAsync(ct);
             return new MutationResult { Success = true, Message = "Call log invoices updated successfully." };
+        }
+        catch (Exception ex)
+        {
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    [GraphQLName("updateCrmCallLogNotes")]
+    public async Task<MutationResult> UpdateCrmCallLogNotes(
+        Guid callLogId,
+        string? notes,
+        [Service] CrmDbContext db,
+        CancellationToken ct)
+    {
+        try
+        {
+            var callLog = await db.CrmCallLogs.FirstOrDefaultAsync(x => x.Id == callLogId, ct);
+            if (callLog == null)
+            {
+                return new MutationResult { Success = false, Message = "Call log not found." };
+            }
+
+            callLog.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+            await db.SaveChangesAsync(ct);
+            return new MutationResult { Success = true, Message = "Comment updated successfully." };
         }
         catch (Exception ex)
         {
@@ -2149,6 +2192,74 @@ public class Mutation
                 }
 
             return new AllocateAgentContactsPayload { Success = true, Message = "No contacts found matching the criteria." };
+        }
+        catch (Exception ex)
+        {
+            return new AllocateAgentContactsPayload { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    [Authorize]
+    [GraphQLName("allocateSingleCrmContact")]
+    public async Task<AllocateAgentContactsPayload> AllocateSingleCrmContact(
+        Guid contactId,
+        [Service] CrmDbContext db,
+        ClaimsPrincipal claimsPrincipal,
+        CancellationToken ct)
+    {
+        try
+        {
+            var callerUserId = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? claimsPrincipal.FindFirst("sub")?.Value
+                ?? claimsPrincipal.Identity?.Name
+                ?? "";
+
+            if (string.IsNullOrEmpty(callerUserId))
+            {
+                return new AllocateAgentContactsPayload { Success = false, Message = "User username not found in claims." };
+            }
+
+            var contact = await db.CrmContacts.FindAsync(new object[] { contactId }, ct);
+            if (contact == null)
+            {
+                return new AllocateAgentContactsPayload { Success = false, Message = "Contact not found." };
+            }
+
+            // Check if active allocation exists for this user
+            var existingAlloc = await db.CrmAgentContacts
+                .Include(ac => ac.Contact)
+                .FirstOrDefaultAsync(ac => ac.ContactId == contactId && ac.AgentUsername == callerUserId && ac.DeallocatedAt == null, ct);
+
+            if (existingAlloc != null)
+            {
+                existingAlloc.Contact = contact;
+                return new AllocateAgentContactsPayload
+                {
+                    Success = true,
+                    Message = $"Contact {contact.FullName} is already in your allocated list.",
+                    AllocatedContacts = new List<CrmAgentContact> { existingAlloc }
+                };
+            }
+
+            // Create fresh allocation for today
+            var newAlloc = new CrmAgentContact
+            {
+                Id = Guid.NewGuid(),
+                AgentUsername = callerUserId,
+                ContactId = contact.Id,
+                Contact = contact,
+                AllocatedAt = DateTime.UtcNow,
+                CallCount = 0
+            };
+            db.CrmAgentContacts.Add(newAlloc);
+            await db.SaveChangesAsync(ct);
+
+            return new AllocateAgentContactsPayload
+            {
+                Success = true,
+                Message = $"Successfully added {contact.FullName} to your allocated contact list.",
+                AllocatedContacts = new List<CrmAgentContact> { newAlloc }
+            };
         }
         catch (Exception ex)
         {

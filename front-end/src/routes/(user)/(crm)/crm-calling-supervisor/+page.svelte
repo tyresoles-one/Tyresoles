@@ -148,6 +148,7 @@
 	let filterAgent = $state('');
 	let filterStatus = $state<'all' | 'active' | 'deallocated'>('all');
 	let isDeallocating = $state<string | null>(null);
+	let isBulkDeallocating = $state(false);
 	let selectedIds = $state<string[]>([]);
 
 	function buildWhereClause(agent: string, status: string) {

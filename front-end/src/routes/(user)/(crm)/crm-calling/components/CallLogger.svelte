@@ -8,7 +8,7 @@
 	import { Icon } from '$lib/components/venUI/icon';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import type { CrmContact } from '../queries';
-	import { GetCrmMasterItemsDocument } from '../queries';
+	import { GetCrmMasterItemsDocument, GetSalesUsersDocument } from '../queries';
 	import WhatsappWidget from './WhatsappWidget.svelte';
 	import { graphqlQuery } from '$lib/services/graphql';
 	import { onMount } from 'svelte';
@@ -19,11 +19,14 @@
 		isSavingLog
 	}: {
 		selectedContact: CrmContact | null;
-		onSaveCallLog: (data: { outcome: string, notes: string, scheduleFollowUp: boolean, followUpDate: string, followUpNotes: string, isPositive: boolean }) => Promise<void>;
+		onSaveCallLog: (data: { outcome: string, notes: string, scheduleFollowUp: boolean, followUpDate: string, followUpNotes: string, isPositive: boolean, salesUserId?: string | null }) => Promise<void>;
 		isSavingLog: boolean;
 	} = $props();
 
 	let outcome = $state('Answered');
+	let salesUserId = $state('');
+	let loadingSalesUsers = $state(true);
+	let salesUsers = $state<{ value: string; label: string }[]>([]);
 	let notes = $state('');
 	let scheduleFollowUp = $state(false);
 	let followUpDate = $state('');
@@ -35,10 +38,81 @@
 		{ value: 'Answered', label: 'Answered', isPositive: true } // default fallback
 	]);
 
+	let lastContactId = $state<string | null>(null);
+	let lastRespCenter = $state<string | null>(null);
+	const salesUsersCache = new Map<string, { value: string; label: string }[]>();
+
+	async function loadSalesUsers(rc: string | null) {
+		const cacheKey = rc ? rc.toUpperCase() : '__ALL__';
+		if (salesUsersCache.has(cacheKey)) {
+			salesUsers = salesUsersCache.get(cacheKey)!;
+			loadingSalesUsers = false;
+			return;
+		}
+
+		loadingSalesUsers = true;
+		try {
+			const usersRes = await graphqlQuery<any>(GetSalesUsersDocument, {
+				variables: {
+					where: {
+						and: [
+							{ state: { eq: 0 } },
+							{ userType: { eq: 'SALES' } }
+						]
+					},
+					take: 200,
+					respCenter: rc || null
+				}
+			});
+
+			if (usersRes.data?.users?.items?.length) {
+				const mapped = usersRes.data.users.items.map((u: any) => ({
+					value: u.userName,
+					label: u.fullName ? `${u.fullName} (${u.userName})` : u.userName
+				}));
+				salesUsersCache.set(cacheKey, mapped);
+				salesUsers = mapped;
+			} else {
+				salesUsersCache.set(cacheKey, []);
+				salesUsers = [];
+			}
+		} catch (e) {
+			console.error('Failed to load sales users for respCenter', rc, e);
+			salesUsers = [];
+		} finally {
+			loadingSalesUsers = false;
+		}
+	}
+
+	$effect(() => {
+		const currentId = selectedContact?.id ?? null;
+		const currentRc = selectedContact?.respCenter?.trim() || null;
+
+		// If contact changed, reset the form
+		if (currentId !== lastContactId) {
+			lastContactId = currentId;
+			lastRespCenter = currentRc;
+			outcome = 'Answered';
+			salesUserId = '';
+			notes = '';
+			scheduleFollowUp = false;
+			followUpDate = '';
+			followUpNotes = '';
+			showWhatsapp = false;
+			loadSalesUsers(currentRc);
+		} else if (currentRc !== lastRespCenter) {
+			lastRespCenter = currentRc;
+			loadSalesUsers(currentRc);
+			if (salesUserId && !salesUsers.some(u => u.value === salesUserId)) {
+				salesUserId = '';
+			}
+		}
+	});
+
 	onMount(async () => {
 		loadingOutcomes = true;
 		try {
-			// First fetch "Phone Call" activity type ID
+			// Fetch "Phone Call" activity type ID
 			const typesRes = await graphqlQuery<any>(GetCrmMasterItemsDocument, {
 				variables: { type: 'ACTIVITY_TYPE', where: { name: { eq: 'Phone Call' } } }
 			});
@@ -73,10 +147,12 @@
 			scheduleFollowUp,
 			followUpDate,
 			followUpNotes,
-			isPositive: selectedOutcome?.isPositive ?? true
+			isPositive: selectedOutcome?.isPositive ?? true,
+			salesUserId: salesUserId || null
 		});
 		// reset
 		outcome = 'Answered';
+		salesUserId = '';
 		notes = '';
 		scheduleFollowUp = false;
 		followUpDate = '';
@@ -86,25 +162,15 @@
 </script>
 
 <div class="space-y-3">
-	<!-- Row 1: Outcome & Follow-up Reminder Toggle (2-column ergonomic layout) -->
-	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+	<!-- Row 1: Outcome, Sales Person & Follow-up Reminder Toggle (3-column ergonomic layout) -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 		<div class="space-y-1">
-			<div class="flex items-center justify-between">
-				<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-					<span>Call Outcome</span>
-					{#if loadingOutcomes}
-						<Loader2 class="size-3 animate-spin text-primary shrink-0" />
-					{/if}
-				</span>
-				<a
-					href="/crm-masters?tab=ACTIVITY_OUTCOME"
-					target="_blank"
-					class="text-[11px] text-primary hover:underline flex items-center gap-0.5"
-					title="Configure Call Outcomes in CRM Masters"
-				>
-					Outcomes <Icon name="external-link" class="size-2.5" />
-				</a>
-			</div>
+			<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 h-4.5">
+				<span>Call Outcome</span>
+				{#if loadingOutcomes}
+					<Loader2 class="size-3 animate-spin text-primary shrink-0" />
+				{/if}
+			</span>
 			<Select
 				options={outcomes}
 				bind:value={outcome}
@@ -117,11 +183,35 @@
 		</div>
 
 		<div class="space-y-1">
-			<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Follow-up Task</span>
+			<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 h-4.5">
+				<span>Sales Person</span>
+				{#if selectedContact?.respCenter}
+					<span class="text-[10px] font-normal text-muted-foreground/80 normal-case">({selectedContact.respCenter})</span>
+				{/if}
+				{#if loadingSalesUsers}
+					<Loader2 class="size-3 animate-spin text-primary shrink-0" />
+				{/if}
+			</span>
+			<Select
+				options={salesUsers}
+				bind:value={salesUserId}
+				valueKey="value"
+				labelKey="label"
+				disabled={loadingSalesUsers}
+				clearable={true}
+				placeholder={loadingSalesUsers ? "Loading sales persons..." : (salesUsers.length === 0 ? "No sales persons for this RC" : "Select sales person...")}
+				class="rounded-lg h-9 w-full bg-background text-xs"
+			/>
+		</div>
+
+		<div class="space-y-1">
+			<span class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center h-4.5">
+				<span>Follow-up Task</span>
+			</span>
 			<div class="flex items-center justify-between h-9 px-3 rounded-lg border border-border bg-muted/20">
 				<label for="schedule-followup" class="text-xs font-semibold cursor-pointer flex items-center gap-1.5">
 					<Icon name="calendar-clock" class="size-3.5 text-primary" />
-					Schedule Follow-up Reminder
+					Schedule Follow-up
 				</label>
 				<Switch id="schedule-followup" bind:checked={scheduleFollowUp} />
 			</div>
