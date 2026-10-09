@@ -3,11 +3,20 @@
 	import { Icon } from '$lib/components/venUI/icon';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import EmptyState from '$lib/components/venUI/emptyState/EmptyState.svelte';
-	import type { CrmContact, CallLog, CallReminder, ContactInvoice, ContactClaim } from '../queries';
+	import type {
+		CrmContact,
+		CallLog,
+		CallReminder,
+		ContactInvoice,
+		ContactClaim,
+		CrmContactFleetDetail,
+		CrmContactFleetDetailInput
+	} from '../queries';
 	import CallLogger from './CallLogger.svelte';
 	import HistoryTimeline from './HistoryTimeline.svelte';
 	import BusinessDataViewer from './BusinessDataViewer.svelte';
 	import CallStatusBadge from './CallStatusBadge.svelte';
+	import FleetManager from './FleetManager.svelte';
 
 	let {
 		selectedContact = $bindable(null),
@@ -21,6 +30,8 @@
 		reminders,
 		invoices,
 		claims,
+		fleetDetails = [],
+		loadingFleet = false,
 		loadingHistory,
 		loadingInvoices,
 		loadingClaims,
@@ -33,6 +44,8 @@
 		onPrintDocument,
 		onRefreshHistory,
 		onUpdateCallLogNotes,
+		onSaveFleetItem,
+		onDeleteFleetItem,
 		salesUsersList = [],
 		isSavingLog,
 		isUndoingLog
@@ -43,11 +56,13 @@
 		onDeallocate: (id: string) => void;
 		onCallMobile: (mobile: string) => void;
 		
-		activeTab: 'log' | 'history' | 'reminders' | 'business' | 'claims';
+		activeTab: 'log' | 'history' | 'reminders' | 'business' | 'claims' | 'fleet';
 		callLogs: CallLog[];
 		reminders: CallReminder[];
 		invoices: ContactInvoice[];
 		claims: ContactClaim[];
+		fleetDetails?: CrmContactFleetDetail[];
+		loadingFleet?: boolean;
 		loadingHistory: boolean;
 		loadingInvoices: boolean;
 		loadingClaims: boolean;
@@ -60,6 +75,8 @@
 		onPrintDocument: (no: string, type: string) => void;
 		onRefreshHistory?: () => void;
 		onUpdateCallLogNotes?: (callLogId: string, notes: string | null) => Promise<boolean>;
+		onSaveFleetItem?: (input: CrmContactFleetDetailInput) => Promise<boolean>;
+		onDeleteFleetItem?: (id: string) => Promise<boolean>;
 		salesUsersList?: { userName: string; fullName: string }[];
 		isSavingLog: boolean;
 		isUndoingLog: string | null;
@@ -72,6 +89,10 @@
 		if (selectedContact.lastCallDate) return false;
 		return true;
 	});
+
+	let totalFleetVehicles = $derived(
+		(fleetDetails || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+	);
 
 </script>
 
@@ -218,6 +239,20 @@
 							<span><strong class="font-semibold">Products:</strong> {selectedContact.products}</span>
 						</span>
 					{/if}
+
+					<!-- Customer Fleet Badge / Fast Shortcut Button -->
+					<button
+						type="button"
+						onclick={() => (activeTab = 'fleet')}
+						class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border transition-all cursor-pointer {totalFleetVehicles > 0 ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/20' : 'bg-muted/70 text-muted-foreground border-dashed border-border hover:bg-muted'}"
+						title="Click to view or record customer fleet details"
+					>
+						<Icon name="truck" class="size-3.5 {totalFleetVehicles > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}" />
+						<span>Fleet: <strong class="font-bold font-mono">{totalFleetVehicles}</strong> {totalFleetVehicles === 1 ? 'vehicle' : 'vehicles'}</span>
+						{#if totalFleetVehicles === 0}
+							<span class="text-[9px] text-primary font-bold underline ml-0.5">+ Record</span>
+						{/if}
+					</button>
 				</div>
 			</div>
 
@@ -231,6 +266,20 @@
 					>
 						<Icon name="activity" class="size-3.5" />
 						Log Response
+					</button>
+					<button
+						onclick={() => (activeTab = 'fleet')}
+						class="flex-1 shrink-0 py-2.5 px-3 font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 {activeTab === 'fleet' ? 'border-primary text-primary bg-background' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+					>
+						<Icon name="truck" class="size-3.5" />
+						Fleet Details
+						{#if loadingFleet}
+							<Loader2 class="size-3 animate-spin text-amber-500 shrink-0" />
+						{:else if totalFleetVehicles > 0}
+							<span class="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded-full font-bold font-mono">
+								{totalFleetVehicles}
+							</span>
+						{/if}
 					</button>
 					<button
 						onclick={() => {
@@ -293,7 +342,27 @@
 				<!-- Tab Content -->
 				<div class="p-3.5 sm:p-4">
 					{#if activeTab === 'log'}
-						<CallLogger {selectedContact} {onSaveCallLog} {isSavingLog} />
+						<CallLogger
+							{selectedContact}
+							{onSaveCallLog}
+							{isSavingLog}
+							{fleetDetails}
+							{loadingFleet}
+							{onSaveFleetItem}
+							{onDeleteFleetItem}
+							onOpenFleetTab={() => (activeTab = 'fleet')}
+						/>
+					{:else if activeTab === 'fleet'}
+						{#if onSaveFleetItem && onDeleteFleetItem}
+							<FleetManager
+								contactId={selectedContact.id}
+								{fleetDetails}
+								loading={loadingFleet}
+								{onSaveFleetItem}
+								{onDeleteFleetItem}
+								mode="full"
+							/>
+						{/if}
 					{:else if activeTab === 'history' || activeTab === 'reminders'}
 						<HistoryTimeline 
 							type={activeTab} 

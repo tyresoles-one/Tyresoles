@@ -518,7 +518,7 @@ public class CrmWhatsappCampaignQueryExtension
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var pageSize = Math.Min(100, Math.Max(1, take ?? 25));
+        var pageSize = Math.Min(2000, Math.Max(1, take ?? 25));
         var pageSkip = Math.Max(0, skip ?? 0);
 
         var rawList = await query

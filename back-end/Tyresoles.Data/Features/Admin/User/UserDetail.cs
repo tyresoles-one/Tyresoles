@@ -50,8 +50,9 @@ public sealed class UserDetail
     public string? NavConfigName { get; init; }
     /// <summary>SSL-VPN / FortiClient logon id from NAV User (Vpn UserID).</summary>
     public string? VpnUserId { get; init; }
-    /// <summary>SSL-VPN password from NAV User (Vpn Password).</summary>
     public string? VpnPassword { get; init; }
+    public int SecurityPin { get; init; }
+    public string? Dashboards { get; init; }
 
     public IReadOnlyList<UserDetailRespCenterRow> RespCenterSetup { get; init; } = [];
     public IReadOnlyList<UserDetailPostingRow> PostingSetup { get; init; } = [];

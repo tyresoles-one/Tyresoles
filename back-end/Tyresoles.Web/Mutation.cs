@@ -1134,20 +1134,55 @@ public class Mutation
     public async Task<ResetPasswordResult> ResetPassword(
         string userId,
         [Service] IUserService userService,
+        [Service] Connector Connect,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var newPassword = await userService.ResetPasswordAsync(userId, cancellationToken);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new ResetPasswordResult { Success = false, Message = "User ID is required." };
+            }
+
+            var trimmedUserId = userId.Trim();
+
+            // Resolve canonical user ID if mobile or alternate id was supplied
+            var targetNavUserId = trimmedUserId;
+            var userDetail = await userService.GetUserAsync(trimmedUserId, cancellationToken);
+            if (userDetail != null && !string.IsNullOrWhiteSpace(userDetail.UserId))
+            {
+                targetNavUserId = userDetail.UserId;
+            }
+
+            var navSuccess = await Connect.UserPasswordResetAsync(targetNavUserId);
+            var newPassword = await userService.ResetPasswordAsync(trimmedUserId, cancellationToken);
+
             if (newPassword != null)
             {
-                return new ResetPasswordResult { Success = true, NewPassword = newPassword, Message = "Password reset successfully." };
+                return new ResetPasswordResult
+                {
+                    Success = true,
+                    NewPassword = newPassword,
+                    Message = navSuccess
+                        ? "Password reset successfully in NAV and portal."
+                        : "Password reset in portal (NAV returned false)."
+                };
             }
+
+            if (navSuccess)
+            {
+                return new ResetPasswordResult
+                {
+                    Success = true,
+                    Message = "Password reset successfully in NAV."
+                };
+            }
+
             return new ResetPasswordResult { Success = false, Message = "User not found or operation failed." };
         }
         catch (Exception ex)
         {
-            return new ResetPasswordResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+            return new ResetPasswordResult { Success = false, Message = NavConnectorErrorFormatting.FormatMessage(ex) };
         }
     }
 
@@ -1548,6 +1583,68 @@ public class Mutation
         }
     }
 
+    /// <summary>
+    /// Generates next month sales targets for teams based on current month sales from GetSalesAndBalanceAsync
+    /// and the Responsibility Center Target Multiplier. Commits the targets to the NAV Team table.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("generateTeamSalesTargets")]
+    public async Task<GenerateTeamSalesTargetsResult> GenerateTeamSalesTargets(
+        GenerateTeamSalesTargetsRequest request,
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            return await salesService.GenerateTeamSalesTargetsAsync(scope, request, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "generateTeamSalesTargets failed");
+            return new GenerateTeamSalesTargetsResult
+            {
+                Success = false,
+                Message = ex.InnerException?.Message ?? ex.Message
+            };
+        }
+    }
+
+    /// <summary>
+    /// Updates the Target Multiplier for a Responsibility Center in Dynamics NAV.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("updateRespCenterTargetMultiplier")]
+    public async Task<MutationResult> UpdateRespCenterTargetMultiplier(
+        string respCenter,
+        decimal targetMultiplier,
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var scope = dataService.ForTenant("NavLive");
+            var ok = await salesService.UpdateRespCenterTargetMultiplierAsync(scope, respCenter, targetMultiplier, cancellationToken);
+            return new MutationResult
+            {
+                Success = ok,
+                Message = ok ? $"Target multiplier for {respCenter} updated successfully." : $"Failed to update multiplier for {respCenter}."
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "updateRespCenterTargetMultiplier failed");
+            return new MutationResult
+            {
+                Success = false,
+                Message = ex.InnerException?.Message ?? ex.Message
+            };
+        }
+    }
 
     /// <summary>
     /// Fetches unique mobile numbers from SalesInvoiceHeader (NavLive) and imports them as new CrmContact records,
@@ -1571,6 +1668,78 @@ public class Mutation
         {
             logger.LogError(ex, "importCrmContactsFromInvoices failed");
             return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Aligns contact state codes to standard 2-letter uppercase codes (e.g. Karnataka -> KA).
+    /// </summary>
+    [Authorize]
+    [GraphQLName("alignCrmContactStateCodes")]
+    public async Task<MutationResult> AlignCrmContactStateCodes(
+        int? limit,
+        [Service] Tyresoles.Data.Features.Crm.Services.ICrmContactSanitizationService sanitizationService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await sanitizationService.AlignStateCodesAsync(limit, cancellationToken);
+            return new MutationResult { Success = true, Message = $"Successfully aligned state codes for {updated} contact(s)." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "alignCrmContactStateCodes failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Removes unwanted 'Tyresoles' tag across contact records.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("cleanCrmContactTags")]
+    public async Task<MutationResult> CleanCrmContactTags(
+        int? limit,
+        [Service] Tyresoles.Data.Features.Crm.Services.ICrmContactSanitizationService sanitizationService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await sanitizationService.CleanUnwantedTagsAsync(limit, cancellationToken);
+            return new MutationResult { Success = true, Message = $"Successfully removed 'Tyresoles' tag from {updated} contact(s)." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "cleanCrmContactTags failed");
+            return new MutationResult { Success = false, Message = ex.InnerException?.Message ?? ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Scrapes features/tags from web links (TransportFamily) in batches, aligns states, cleans unwanted tags, and enriches contacts.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("enrichCrmContactTagsFromWeb")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrmBatchEnrichmentResultDto> EnrichCrmContactTagsFromWeb(
+        int batchSize,
+        [Service] Tyresoles.Data.Features.Crm.Services.ICrmContactSanitizationService sanitizationService,
+        [Service] ILogger<Mutation> logger,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await sanitizationService.EnrichTagsFromWebBatchAsync(batchSize, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "enrichCrmContactTagsFromWeb failed");
+            return new Tyresoles.Data.Features.Crm.Models.CrmBatchEnrichmentResultDto
+            {
+                Success = false,
+                Message = ex.InnerException?.Message ?? ex.Message
+            };
         }
     }
 

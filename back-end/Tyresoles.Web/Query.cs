@@ -215,6 +215,16 @@ public class Query
     }
 
     [Authorize]
+    [GraphQLName("crmContactSanitizationStats")]
+    public async Task<Tyresoles.Data.Features.Crm.Models.CrmContactSanitizationStatsDto> GetCrmContactSanitizationStats(
+        [Service] Tyresoles.Data.Features.Crm.Services.ICrmContactSanitizationService sanitizationService,
+        CancellationToken ct)
+    {
+        return await sanitizationService.GetStatsAsync(ct);
+    }
+
+
+    [Authorize]
     [GraphQLName("getCrmContactById")]
     public async Task<CrmContact?> GetCrmContactById(
         Guid id,
@@ -1030,6 +1040,41 @@ public class Query
         return salesService.GetMyRegionsQuery(scope, entityType, entityCode, department, respCenters);
     }
 
+    /// <summary>
+    /// Returns the sales subordinates hierarchy for a given supervisor employee code based on Dynamics NAV Team Salesperson table:
+    /// UnitHead (4) -> RegionManager (3) -> ZoneManager (2) -> AreaManager (1) -> Salesman (0).
+    /// </summary>
+    [Authorize]
+    [GraphQLName("salesHierarchy")]
+    public async Task<SalesHierarchySummaryDto> GetSalesHierarchy(
+        string employeeCode,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken ct = default)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await salesService.GetSubordinateSalespersonsAsync(scope, employeeCode, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Returns the list of subordinate employee codes for a given supervisor.
+    /// </summary>
+    [Authorize]
+    [GraphQLName("subordinateEmployeeCodes")]
+    public async Task<List<string>> GetSubordinateEmployeeCodes(
+        string employeeCode,
+        [Service] IDataverseDataService dataService,
+        [Service] ISalesService salesService,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        CancellationToken ct = default)
+    {
+        var scope = dataService.ForNavLive();
+        httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
+        return await salesService.GetSubordinateEmployeeCodesAsync(scope, employeeCode, ct).ConfigureAwait(false);
+    }
+
     /// <summary>Get a single dealer by code.</summary>
     [Authorize]
     [GraphQLName("dealerByCode")]
@@ -1326,6 +1371,31 @@ public class Query
         var scope = dataService.ForNavLive();
         httpContextAccessor.HttpContext?.Response.RegisterForDispose(scope);
         return scope.Query<Dataverse.NavLive.ResponsibilityCenter>().AsQueryable(scope);
+    }
+
+    /// <summary>Calculates current month sales and previews next month sales targets for teams.</summary>
+    [Authorize]
+    [GraphQLName("previewTeamSalesTargets")]
+    public async Task<TeamSalesTargetsPreviewResult> PreviewTeamSalesTargets(
+        PreviewTeamSalesTargetsRequest request,
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        CancellationToken cancellationToken = default)
+    {
+        using var scope = dataService.ForTenant("NavLive");
+        return await salesService.PreviewTeamSalesTargetsAsync(scope, request, cancellationToken);
+    }
+
+    /// <summary>Gets all Responsibility Centers and their Target Multipliers.</summary>
+    [Authorize]
+    [GraphQLName("getRespCenterTargetMultipliers")]
+    public async Task<List<ResponsibilityCenterTargetMultiplierDto>> GetRespCenterTargetMultipliers(
+        [Service] ISalesService salesService,
+        [Service] IDataverseDataService dataService,
+        CancellationToken cancellationToken = default)
+    {
+        using var scope = dataService.ForTenant("NavLive");
+        return await salesService.GetAllRespCentersWithMultipliersAsync(scope, cancellationToken);
     }
 
     /// <summary>Paged permission sets for assignment.</summary>

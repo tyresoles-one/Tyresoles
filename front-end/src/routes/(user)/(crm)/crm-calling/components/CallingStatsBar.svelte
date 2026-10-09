@@ -228,6 +228,19 @@
 
 	let activeDateRange = $derived(getRange(timeframe, customStartDate, customEndDate));
 
+	let periodDays = $derived.by(() => {
+		if (timeframe === 'today' || timeframe === 'yesterday') return 1;
+		if (timeframe === '7d') return 7;
+		const now = new Date();
+		const start = activeDateRange.start;
+		const effectiveEnd = activeDateRange.end > now ? now : activeDateRange.end;
+		
+		const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+		const e = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate());
+		const days = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+		return days;
+	});
+
 	let currentTarget = $derived.by(() => {
 		if (timeframe === 'today' || timeframe === 'yesterday') return dailyTarget;
 		if (timeframe === '7d') return weeklyTarget;
@@ -466,6 +479,8 @@
 		rawUsername: string;
 		displayUsername: string;
 		calls: number;
+		dailyAvg: number;
+		activeDaysCount: number;
 		positiveCount: number;
 		positiveRate: number;
 		connectedCount: number;
@@ -474,7 +489,7 @@
 	};
 
 	let leaderboard = $derived.by(() => {
-		const map = new Map<string, { raw: string; display: string; calls: number; positive: number; connected: number }>();
+		const map = new Map<string, { raw: string; display: string; calls: number; positive: number; connected: number; dates: Set<string> }>();
 
 		for (const log of callLogs) {
 			const raw = log.createdBy?.trim() || '';
@@ -487,27 +502,38 @@
 					(u) => cleanUsername(u.userName).toLowerCase() === norm
 				);
 				const display = userMatch?.fullName?.trim() || clean;
-				map.set(norm, { raw, display, calls: 0, positive: 0, connected: 0 });
+				map.set(norm, { raw, display, calls: 0, positive: 0, connected: 0, dates: new Set<string>() });
 			}
 			const entry = map.get(norm)!;
 			entry.calls++;
 			if (isPositiveOutcome(log.outcome)) entry.positive++;
 			if (!isUnreachableOutcome(log.outcome)) entry.connected++;
+			if (log.callDate) {
+				const dStr = toLocalDateStr(log.callDate);
+				if (dStr) entry.dates.add(dStr);
+			}
 		}
+
+		const days = periodDays;
 
 		// Convert to list - only agents who actually made calls!
 		const list: AgentRankItem[] = Array.from(map.entries())
 			.filter(([_, data]) => data.calls > 0)
-			.map(([norm, data]) => ({
-				rawUsername: data.raw,
-				displayUsername: data.display,
-				calls: data.calls,
-				positiveCount: data.positive,
-				positiveRate: data.calls > 0 ? (data.positive / data.calls) * 100 : 0,
-				connectedCount: data.connected,
-				isCurrentUser: norm === currentCleanUsername.toLowerCase(),
-				rank: 1
-			}));
+			.map(([norm, data]) => {
+				const avg = days > 0 ? Math.round(data.calls / days) : data.calls;
+				return {
+					rawUsername: data.raw,
+					displayUsername: data.display,
+					calls: data.calls,
+					dailyAvg: avg,
+					activeDaysCount: data.dates.size,
+					positiveCount: data.positive,
+					positiveRate: data.calls > 0 ? (data.positive / data.calls) * 100 : 0,
+					connectedCount: data.connected,
+					isCurrentUser: norm === currentCleanUsername.toLowerCase(),
+					rank: 1
+				};
+			});
 
 		// Multi-tier deterministic sorting:
 		// 1. Total Calls DESC
@@ -553,6 +579,13 @@
 		const totalPos = callLogs.filter((l) => isPositiveOutcome(l.outcome)).length;
 		return parseFloat(((totalPos / teamTotalCalls) * 100).toFixed(1));
 	});
+
+	let myDailyAvg = $derived(periodDays > 0 ? Math.round(myTotalCalls / periodDays) : 0);
+	let teamDailyAvg = $derived(
+		activeTeamRepsCount > 0 && periodDays > 0
+			? Math.round(teamTotalCalls / activeTeamRepsCount / periodDays)
+			: 0
+	);
 
 	let topPerformer = $derived<AgentRankItem | null>(
 		leaderboard.length > 0 && leaderboard[0].calls > 0 ? leaderboard[0] : null
@@ -1516,14 +1549,22 @@
 							<div class="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 shadow-2xs">
 								<div class="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">You ({currentCleanUsername})</div>
 								<div class="text-lg font-black text-foreground mt-0.5">{myTotalCalls} <span class="text-[10px] font-normal text-muted-foreground">calls</span></div>
-								<div class="text-[10px] text-amber-600 dark:text-amber-400 font-bold">{myPositiveRate}% pos</div>
+								<div class="text-[10px] text-muted-foreground font-semibold flex items-center justify-center gap-1.5 mt-0.5">
+									<span class="text-sky-600 dark:text-sky-400 font-bold">{myDailyAvg}/d</span>
+									<span>•</span>
+									<span class="text-amber-600 dark:text-amber-400 font-bold">{myPositiveRate}% pos</span>
+								</div>
 							</div>
 
 							<!-- Col 2: Team Average -->
 							<div class="p-2.5 rounded-xl bg-muted/40 border border-border/60 shadow-2xs">
 								<div class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Team Average</div>
 								<div class="text-lg font-black text-foreground mt-0.5">{teamAvgCalls} <span class="text-[10px] font-normal text-muted-foreground">calls</span></div>
-								<div class="text-[10px] text-muted-foreground font-semibold">{teamAvgPositiveRate}% pos</div>
+								<div class="text-[10px] text-muted-foreground font-semibold flex items-center justify-center gap-1.5 mt-0.5">
+									<span class="text-sky-600 dark:text-sky-400 font-bold">{teamDailyAvg}/d</span>
+									<span>•</span>
+									<span>{teamAvgPositiveRate}% pos</span>
+								</div>
 							</div>
 
 							<!-- Col 3: Top Performer -->
@@ -1534,8 +1575,10 @@
 								<div class="text-lg font-black text-foreground mt-0.5">
 									{topPerformer ? topPerformer.calls : 0} <span class="text-[10px] font-normal text-muted-foreground">calls</span>
 								</div>
-								<div class="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
-									{topPerformer ? `${topPerformer.positiveRate.toFixed(1)}% pos` : '—'}
+								<div class="text-[10px] text-muted-foreground font-semibold flex items-center justify-center gap-1.5 mt-0.5">
+									<span class="text-sky-600 dark:text-sky-400 font-bold">{topPerformer ? `${topPerformer.dailyAvg}/d` : '—'}</span>
+									<span>•</span>
+									<span class="text-amber-600 dark:text-amber-400 font-bold">{topPerformer ? `${topPerformer.positiveRate.toFixed(1)}% pos` : '—'}</span>
 								</div>
 							</div>
 						</div>
@@ -1679,8 +1722,14 @@
 									</div>
 
 									<div class="text-right shrink-0">
-										<div class="text-xs font-mono font-bold text-foreground">
-											{agent.calls} <span class="text-[10px] font-normal text-muted-foreground">calls</span>
+										<div class="text-xs font-mono font-bold text-foreground flex items-center justify-end gap-1.5">
+											<span>{agent.calls} <span class="text-[10px] font-normal text-muted-foreground">calls</span></span>
+											<span
+												class="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.2 rounded"
+												title="Daily average: {agent.dailyAvg} calls/day across {periodDays} day{periodDays > 1 ? 's' : ''} in period ({agent.activeDaysCount} active day{agent.activeDaysCount > 1 ? 's' : ''})"
+											>
+												{agent.dailyAvg}/day
+											</span>
 										</div>
 										<div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
 											{agent.positiveCount} leads won

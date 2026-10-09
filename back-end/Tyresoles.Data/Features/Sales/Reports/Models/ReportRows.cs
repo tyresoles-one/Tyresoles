@@ -164,9 +164,12 @@ public class SalesAndBalanceRow
     public string? Period { get; set; }
     public string? CustomerNo { get; set; }
     public string? CustomerName { get; set; }
+    public string? RespCenter { get; set; }
     public string? DealerNo { get; set; }
     public string? DealerName { get; set; }
+    public string? AreaCode { get; set; }
     public string? AreaName { get; set; }
+    public string? TeamCode { get; set; }
     public string? RegionCode { get; set; }
     public string? RegionName { get; set; }
     public string? NetSaleName { get; set; }

@@ -12,6 +12,7 @@ using Tyresoles.Data.Infrastructure;
 using Tyresoles.Sql;
 using Tyresoles.Sql.Abstractions;
 using Tyresoles.Sql.GraphQL;
+using Tyresoles.Data.Features.Sales.Reports;
 using Tyresoles.Data;
 using NavLiveVendor = Dataverse.NavLive.Vendor;
 using NavLiveVehicles = Dataverse.NavLive.Vehicles;
@@ -24,6 +25,7 @@ public sealed class SalesService : ISalesService
     private readonly ILogger<SalesService> _logger;
     private readonly Connector _connector;
     private readonly CrmDbContext _crmDb;
+    private readonly ISalesReportService _salesReportService;
 
     // Typical NAV/BC nvarchar caps on Salesperson Purchaser (Table 13 / 5714); prevents SQL 8152 on MERGE.
     // Name / Dealership Name are often Text[30] in older DBs; BC may allow 50—truncate to 30 to match strict SQL.
@@ -42,12 +44,18 @@ public sealed class SalesService : ISalesService
         return s.Length <= maxLen ? s : s[..maxLen];
     }
 
-    public SalesService(GlobalQueryCache cache, ILogger<SalesService> logger, Connector connector, CrmDbContext crmDb)
+    public SalesService(
+        GlobalQueryCache cache,
+        ILogger<SalesService> logger,
+        Connector connector,
+        CrmDbContext crmDb,
+        ISalesReportService salesReportService)
     {
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _connector = connector ?? throw new ArgumentNullException(nameof(connector));
         _crmDb = crmDb ?? throw new ArgumentNullException(nameof(crmDb));
+        _salesReportService = salesReportService ?? throw new ArgumentNullException(nameof(salesReportService));
     }
 
     /// <inheritdoc />
@@ -1182,5 +1190,481 @@ public sealed class SalesService : ISalesService
         public string? State { get; set; }
         public string? Products { get; set; }
         public string? ERPAreaCode { get; set; }
+    }
+
+    public async Task<SalesHierarchySummaryDto> GetSubordinateSalespersonsAsync(
+        ITenantScope scope,
+        string supervisorEmployeeCode,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var cleanCode = (supervisorEmployeeCode ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(cleanCode))
+        {
+            return new SalesHierarchySummaryDto();
+        }
+
+        var teamSalespersonTable = scope.GetQualifiedTableName("Team Salesperson", isShared: false);
+        var employeeTable = scope.GetQualifiedTableName("Employee", isShared: false);
+
+        // 1. Get Supervisor Info and Max Role Type
+        var supervisorSql = $@"
+            SELECT 
+                MAX(ts.[Type]) AS SupervisorMaxRoleType,
+                MAX(ts.[Name]) AS SupervisorName
+            FROM {teamSalespersonTable} ts
+            WHERE ts.[Code] = @cleanCode
+              AND ts.[Type] IN (0, 1, 2, 3, 4);";
+
+        var supRows = await scope.RawQueryToArrayAsync<SupervisorInfoRow>(supervisorSql, new { cleanCode }, ct).ConfigureAwait(false);
+        var supervisorInfo = supRows.FirstOrDefault();
+
+        var maxRoleType = supervisorInfo?.SupervisorMaxRoleType ?? 0;
+        var supName = (supervisorInfo?.SupervisorName ?? "").Trim();
+
+        if (string.IsNullOrEmpty(supName))
+        {
+            // Fallback: check Employee table for supervisor's name
+            var empNameSql = $"SELECT [First Name] + ' ' + [Last Name] AS SupervisorName FROM {employeeTable} WHERE [No_] = @cleanCode;";
+            var empNameRows = await scope.RawQueryToArrayAsync<SupervisorInfoRow>(empNameSql, new { cleanCode }, ct).ConfigureAwait(false);
+            supName = (empNameRows.FirstOrDefault()?.SupervisorName ?? cleanCode).Trim();
+        }
+
+        var result = new SalesHierarchySummaryDto
+        {
+            SupervisorCode = cleanCode,
+            SupervisorName = supName,
+            SupervisorMaxRoleType = maxRoleType,
+            SupervisorRoleName = SalesRoleHelper.GetRoleName(maxRoleType),
+            SupervisorDisplayTitle = SalesRoleHelper.GetDisplayTitle(maxRoleType)
+        };
+
+        // If the supervisor is a pure salesman (Type 0) or has no roles above salesman, they have no subordinates.
+        if (maxRoleType <= 0)
+        {
+            return result;
+        }
+
+        // 2. Query Subordinates who have a lower role than supervisor in shared teams
+        var subordinatesSql = $@"
+            SELECT 
+                tsSub.[Code] AS Code,
+                MAX(tsSub.[Name]) AS Name,
+                MAX(tsSub.[Type]) AS RoleType,
+                MAX(e.[Job Title]) AS JobTitle,
+                MAX(e.[Mobile Phone No_]) AS MobilePhoneNo,
+                MAX(e.[Company E-Mail]) AS CompanyEmail,
+                COUNT(DISTINCT tsSub.[Team Code]) AS SharedTeamsCount
+            FROM {teamSalespersonTable} tsSup
+            INNER JOIN {teamSalespersonTable} tsSub
+                ON tsSup.[Team Code] = tsSub.[Team Code]
+            LEFT JOIN {employeeTable} e
+                ON tsSub.[Code] = e.[No_]
+            WHERE tsSup.[Code] = @cleanCode
+              AND tsSub.[Type] IN (0, 1, 2, 3, 4)
+              AND tsSub.[Type] < tsSup.[Type]
+              AND tsSub.[Code] <> @cleanCode
+              AND (e.[Status] IS NULL OR e.[Status] = 0)
+            GROUP BY tsSub.[Code]
+            ORDER BY RoleType DESC, Name ASC;";
+
+        var subRows = await scope.RawQueryToArrayAsync<SubordinateRawRow>(subordinatesSql, new { cleanCode }, ct).ConfigureAwait(false);
+
+        // 3. Query shared team codes for each subordinate
+        var teamsSql = $@"
+            SELECT DISTINCT
+                tsSub.[Code] AS Code,
+                tsSub.[Team Code] AS TeamCode
+            FROM {teamSalespersonTable} tsSup
+            INNER JOIN {teamSalespersonTable} tsSub
+                ON tsSup.[Team Code] = tsSub.[Team Code]
+            WHERE tsSup.[Code] = @cleanCode
+              AND tsSub.[Type] IN (0, 1, 2, 3, 4)
+              AND tsSub.[Type] < tsSup.[Type]
+              AND tsSub.[Code] <> @cleanCode;";
+
+        var teamRows = await scope.RawQueryToArrayAsync<SubordinateSharedTeamRow>(teamsSql, new { cleanCode }, ct).ConfigureAwait(false);
+
+        var teamsLookup = teamRows
+            .Where(r => !string.IsNullOrEmpty(r.Code) && !string.IsNullOrEmpty(r.TeamCode))
+            .GroupBy(r => r.Code.Trim().ToUpperInvariant())
+            .ToDictionary(g => g.Key, g => g.Select(x => x.TeamCode.Trim()).Distinct().ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var subordinates = new List<SubordinateSalespersonDto>(subRows.Length);
+        foreach (var r in subRows)
+        {
+            var code = (r.Code ?? "").Trim();
+            if (string.IsNullOrEmpty(code)) continue;
+
+            teamsLookup.TryGetValue(code, out var sharedTeams);
+
+            subordinates.Add(new SubordinateSalespersonDto
+            {
+                Code = code,
+                Name = (r.Name ?? "").Trim(),
+                RoleType = r.RoleType,
+                RoleName = SalesRoleHelper.GetRoleName(r.RoleType),
+                DisplayTitle = SalesRoleHelper.GetDisplayTitle(r.RoleType),
+                JobTitle = (r.JobTitle ?? "").Trim(),
+                MobilePhoneNo = (r.MobilePhoneNo ?? "").Trim(),
+                CompanyEmail = (r.CompanyEmail ?? "").Trim(),
+                SharedTeamsCount = r.SharedTeamsCount,
+                SharedTeamCodes = sharedTeams ?? new List<string>()
+            });
+        }
+
+        result.Subordinates = subordinates;
+        result.SubordinateCodes = subordinates.Select(s => s.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        result.TotalSubordinatesCount = subordinates.Count;
+
+        return result;
+    }
+
+    public async Task<List<string>> GetSubordinateEmployeeCodesAsync(
+        ITenantScope scope,
+        string supervisorEmployeeCode,
+        CancellationToken ct = default)
+    {
+        var hierarchy = await GetSubordinateSalespersonsAsync(scope, supervisorEmployeeCode, ct).ConfigureAwait(false);
+        return hierarchy.SubordinateCodes;
+    }
+
+    private sealed class SupervisorInfoRow
+    {
+        public int? SupervisorMaxRoleType { get; set; }
+        public string? SupervisorName { get; set; }
+    }
+
+    private sealed class SubordinateRawRow
+    {
+        public string Code { get; set; } = "";
+        public string? Name { get; set; }
+        public int RoleType { get; set; }
+        public string? JobTitle { get; set; }
+        public string? MobilePhoneNo { get; set; }
+        public string? CompanyEmail { get; set; }
+        public int SharedTeamsCount { get; set; }
+    }
+
+    private sealed class SubordinateSharedTeamRow
+    {
+        public string Code { get; set; } = "";
+        public string TeamCode { get; set; } = "";
+    }
+
+    private sealed class TeamRecord
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string RespCenter { get; set; } = string.Empty;
+        public decimal ExistingTarget { get; set; }
+        public DateTime? ExistingTargetEndDate { get; set; }
+    }
+
+    /// <summary>
+    /// Calculates proposed target rounded up to the specified step (e.g. 50,000 for 0.5 Lakh)
+    /// to form a meaningful, clean sales target and stretch growth on the grand total.
+    /// </summary>
+    private static decimal CalculateRoundedProposedTarget(decimal currentSale, decimal multiplier, decimal roundingStep)
+    {
+        if (currentSale <= 0m) return 0m;
+        decimal effectiveMultiplier = multiplier == 0m ? 1m : multiplier;
+        decimal rawTarget = currentSale * effectiveMultiplier;
+        if (rawTarget <= 0m) return 0m;
+
+        if (roundingStep == -1m) // Smart Adaptive
+        {
+            if (rawTarget >= 200000m) // >= 2 Lakhs: round up to nearest 0.5 Lakh (50,000)
+                return Math.Ceiling(rawTarget / 50000m) * 50000m;
+            if (rawTarget >= 50000m) // 50k - 2 Lakhs: round up to nearest 0.25 Lakh (25,000)
+                return Math.Ceiling(rawTarget / 25000m) * 25000m;
+            return Math.Ceiling(rawTarget / 5000m) * 5000m; // < 50k: round up to nearest 5,000
+        }
+
+        if (roundingStep > 0m)
+        {
+            return Math.Ceiling(rawTarget / roundingStep) * roundingStep;
+        }
+
+        return Math.Max(0m, Math.Round(rawTarget, 2));
+    }
+
+    /// <inheritdoc />
+    public async Task<TeamSalesTargetsPreviewResult> PreviewTeamSalesTargetsAsync(
+        ITenantScope scope,
+        PreviewTeamSalesTargetsRequest request,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(request);
+
+        DateTime fromDt;
+        if (!DateTime.TryParse(request.FromDate, out fromDt))
+        {
+            fromDt = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        }
+
+        DateTime toDt;
+        if (!DateTime.TryParse(request.ToDate, out toDt))
+        {
+            toDt = DateTime.Today;
+        }
+
+        DateTime targetEndDate;
+        if (!string.IsNullOrWhiteSpace(request.TargetEndDate) && DateTime.TryParse(request.TargetEndDate, out var parsedEndDate))
+        {
+            targetEndDate = parsedEndDate.Date;
+        }
+        else
+        {
+            // Default to last day of next month after toDt
+            var nextMonthStart = new DateTime(toDt.Year, toDt.Month, 1).AddMonths(1);
+            targetEndDate = nextMonthStart.AddMonths(1).AddDays(-1);
+        }
+
+        decimal roundingStep = request.RoundingStep ?? 50000m;
+
+        string rcTable = scope.GetQualifiedTableName("Responsibility Center", isShared: false);
+        string teamTable = scope.GetQualifiedTableName("Team", isShared: false);
+
+        // Fetch Responsibility Center multipliers
+        var rcSql = $"SELECT [Code], [Name], ISNULL([Target Multiplier], 0) AS TargetMultiplier FROM {rcTable} ORDER BY [Code]";
+        var rcRows = await scope.RawQueryToArrayAsync<ResponsibilityCenterTargetMultiplierDto>(rcSql, null, ct).ConfigureAwait(false);
+        var rcLookup = rcRows.ToDictionary(r => r.Code, r => r, StringComparer.OrdinalIgnoreCase);
+
+        decimal respCenterMultiplier = 0m;
+        if (!string.IsNullOrWhiteSpace(request.RespCenter) && !string.Equals(request.RespCenter, "ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            if (rcLookup.TryGetValue(request.RespCenter.Trim(), out var selectedRc))
+            {
+                respCenterMultiplier = selectedRc.TargetMultiplier;
+            }
+        }
+
+        // Fetch teams
+        var teamWhere = new List<string> { "1=1" };
+        var teamParams = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(request.RespCenter) && !string.Equals(request.RespCenter, "ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            teamParams["respCenter"] = request.RespCenter.Trim();
+            teamWhere.Add("[Responsibility Center] = @respCenter");
+        }
+
+        var teamSql = $@"
+        SELECT 
+            [Code], 
+            [Name], 
+            [Responsibility Center] AS RespCenter, 
+            ISNULL([Target (Sale)], 0) AS ExistingTarget, 
+            [Target End Date] AS ExistingTargetEndDate 
+        FROM {teamTable}
+        WHERE {string.Join(" AND ", teamWhere)}
+        ORDER BY [Responsibility Center], [Code]
+        ";
+        var teams = await scope.RawQueryToArrayAsync<TeamRecord>(teamSql, teamParams, ct).ConfigureAwait(false);
+
+        // Fetch sales using GetSalesAndBalanceRowsAsync
+        var reportParams = new SalesReportParams
+        {
+            From = fromDt.ToString("yyyy-MM-dd"),
+            To = toDt.ToString("yyyy-MM-dd"),
+            RespCenters = (!string.IsNullOrWhiteSpace(request.RespCenter) && !string.Equals(request.RespCenter, "ALL", StringComparison.OrdinalIgnoreCase))
+                ? new[] { request.RespCenter.Trim() }
+                : null,
+            Type = request.SaleType ?? "retread-ecomile",
+            View = "All"
+        };
+        var salesRows = await _salesReportService.GetSalesAndBalanceRowsAsync(scope, reportParams, ct).ConfigureAwait(false);
+
+        // Group sales by TeamCode (which was mapped from Customer."Area Code" -> Area.Team)
+        var salesByTeam = salesRows
+            .Where(r => !string.IsNullOrWhiteSpace(r.TeamCode))
+            .GroupBy(r => r.TeamCode!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Sum(r => r.TotalSale), StringComparer.OrdinalIgnoreCase);
+
+        var items = new List<TeamSalesTargetDto>();
+        decimal totalCurrentSale = 0m;
+        decimal totalNextTarget = 0m;
+
+        foreach (var t in teams)
+        {
+            salesByTeam.TryGetValue(t.Code, out var currentSale);
+
+            decimal rawMultiplier = 0m;
+            if (rcLookup.TryGetValue(t.RespCenter, out var rcInfo))
+            {
+                rawMultiplier = rcInfo.TargetMultiplier;
+            }
+
+            // Next target formula: current sale * respCenter."Target Multiplier" [if 0 then 1], rounded UP to step
+            decimal nextTarget = CalculateRoundedProposedTarget(currentSale, rawMultiplier, roundingStep);
+
+            totalCurrentSale += currentSale;
+            totalNextTarget += nextTarget;
+
+            items.Add(new TeamSalesTargetDto
+            {
+                TeamCode = t.Code,
+                TeamName = t.Name,
+                RespCenter = t.RespCenter,
+                CurrentSale = Math.Round(currentSale, 2),
+                TargetMultiplier = rawMultiplier,
+                NextTarget = nextTarget,
+                ExistingTarget = Math.Round(t.ExistingTarget, 2),
+                ExistingTargetEndDate = t.ExistingTargetEndDate > new DateTime(2000, 1, 1) ? t.ExistingTargetEndDate : null,
+                NextTargetEndDate = targetEndDate
+            });
+        }
+
+        // Sort: teams with sales first descending, then team code
+        items = items.OrderByDescending(i => i.CurrentSale).ThenBy(i => i.TeamCode).ToList();
+
+        decimal effectiveGrowthPercent = totalCurrentSale > 0m
+            ? Math.Round(((totalNextTarget / totalCurrentSale) - 1m) * 100m, 2)
+            : 0m;
+
+        return new TeamSalesTargetsPreviewResult
+        {
+            Success = true,
+            Message = $"Calculated sales targets for {items.Count} team(s).",
+            RespCenter = request.RespCenter,
+            RespCenterMultiplier = respCenterMultiplier,
+            FromDate = fromDt,
+            ToDate = toDt,
+            NextTargetEndDate = targetEndDate,
+            TotalCurrentSale = Math.Round(totalCurrentSale, 2),
+            TotalNextTarget = Math.Round(totalNextTarget, 2),
+            RoundingStep = roundingStep,
+            EffectiveGrowthPercent = effectiveGrowthPercent,
+            Items = items
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<GenerateTeamSalesTargetsResult> GenerateTeamSalesTargetsAsync(
+        ITenantScope scope,
+        GenerateTeamSalesTargetsRequest request,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var preview = await PreviewTeamSalesTargetsAsync(scope, new PreviewTeamSalesTargetsRequest
+        {
+            RespCenter = request.RespCenter,
+            FromDate = request.FromDate,
+            ToDate = request.ToDate,
+            TargetEndDate = request.TargetEndDate,
+            SaleType = request.SaleType,
+            RoundingStep = request.RoundingStep
+        }, ct).ConfigureAwait(false);
+
+        var overrides = request.TargetOverrides?.ToDictionary(o => o.TeamCode, o => o.Target, StringComparer.OrdinalIgnoreCase);
+
+        string teamTable = scope.GetQualifiedTableName("Team", isShared: false);
+        int updatedCount = 0;
+        decimal totalGenerated = 0m;
+
+        foreach (var item in preview.Items)
+        {
+            decimal targetToSet = item.NextTarget;
+            if (overrides != null && overrides.TryGetValue(item.TeamCode, out var ovr))
+            {
+                targetToSet = Math.Max(0m, Math.Round(ovr, 2));
+                item.NextTarget = targetToSet;
+            }
+
+            var sql = $@"
+            UPDATE {teamTable}
+            SET [Target (Sale)] = @targetSale,
+                [Target End Date] = @targetEndDate
+            WHERE [Code] = @teamCode
+            ";
+
+            var param = new Dictionary<string, object?>
+            {
+                ["targetSale"] = targetToSet,
+                ["targetEndDate"] = preview.NextTargetEndDate,
+                ["teamCode"] = item.TeamCode
+            };
+
+            var affected = await scope.ExecuteNonQueryAsync(sql, param, ct).ConfigureAwait(false);
+            if (affected > 0)
+            {
+                updatedCount += affected;
+                totalGenerated += targetToSet;
+            }
+        }
+
+        decimal effectiveGrowth = preview.TotalCurrentSale > 0m
+            ? Math.Round(((totalGenerated / preview.TotalCurrentSale) - 1m) * 100m, 2)
+            : 0m;
+
+        return new GenerateTeamSalesTargetsResult
+        {
+            Success = true,
+            Message = $"Successfully generated and saved sales targets for {updatedCount} team(s) with total target of ₹{totalGenerated:N2}.",
+            UpdatedCount = updatedCount,
+            TotalGeneratedTarget = Math.Round(totalGenerated, 2),
+            RoundingStep = preview.RoundingStep,
+            EffectiveGrowthPercent = effectiveGrowth,
+            Items = preview.Items
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateRespCenterTargetMultiplierAsync(
+        ITenantScope scope,
+        string respCenterCode,
+        decimal targetMultiplier,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (string.IsNullOrWhiteSpace(respCenterCode))
+            throw new ArgumentException("Responsibility center code is required.", nameof(respCenterCode));
+
+        string rcTable = scope.GetQualifiedTableName("Responsibility Center", isShared: false);
+        var sql = $@"
+        UPDATE {rcTable}
+        SET [Target Multiplier] = @multiplier
+        WHERE [Code] = @code
+        ";
+
+        var param = new Dictionary<string, object?>
+        {
+            ["multiplier"] = targetMultiplier,
+            ["code"] = respCenterCode.Trim()
+        };
+
+        var affected = await scope.ExecuteNonQueryAsync(sql, param, ct).ConfigureAwait(false);
+        return affected > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<decimal> GetRespCenterTargetMultiplierAsync(
+        ITenantScope scope,
+        string respCenterCode,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (string.IsNullOrWhiteSpace(respCenterCode)) return 0m;
+
+        string rcTable = scope.GetQualifiedTableName("Responsibility Center", isShared: false);
+        var sql = $"SELECT ISNULL([Target Multiplier], 0) FROM {rcTable} WHERE [Code] = @code";
+        var res = await scope.ExecuteScalarAsync<decimal?>(sql, new { code = respCenterCode.Trim() }, ct).ConfigureAwait(false);
+        return res ?? 0m;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ResponsibilityCenterTargetMultiplierDto>> GetAllRespCentersWithMultipliersAsync(
+        ITenantScope scope,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        string rcTable = scope.GetQualifiedTableName("Responsibility Center", isShared: false);
+        var sql = $"SELECT [Code], [Name], ISNULL([Target Multiplier], 0) AS TargetMultiplier FROM {rcTable} ORDER BY [Code]";
+        var rows = await scope.RawQueryToArrayAsync<ResponsibilityCenterTargetMultiplierDto>(sql, null, ct).ConfigureAwait(false);
+        return rows.ToList();
     }
 }

@@ -1046,7 +1046,7 @@ public sealed class SalesReportService : ISalesReportService
         return ("PostedClaimForm", ToDataTable(records));
     }
 
-    private async Task<(string rdlcName, object? data)> GetSalesAndBalanceAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    public async Task<List<SalesAndBalanceRow>> GetSalesAndBalanceRowsAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct = default)
     {
         DateTime fromDt = DateTime.TryParse(p.From, out var fd) ? fd : DateTime.Today.AddMonths(-1);
         DateTime toDt = DateTime.TryParse(p.To, out var td) ? td : DateTime.Today;
@@ -1083,7 +1083,7 @@ public sealed class SalesReportService : ISalesReportService
         string[] accounts2 = Array.Empty<string>();
         string netSaleName = "", netSaleName2 = "";
 
-        if (string.Equals(p.Type, "retread-ecomile", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(p.Type) || string.Equals(p.Type, "retread-ecomile", StringComparison.OrdinalIgnoreCase))
         {
             accounts1 = GetGLAccountForSale(SaleType.Retread).ToArray();
             accounts2 = GetGLAccountForSale(SaleType.Ecomile).ToArray();
@@ -1106,6 +1106,15 @@ public sealed class SalesReportService : ISalesReportService
                 netSaleName = "Trade (Tube/Flap)";
                 netSaleName2 = "Other (Scrap)";
             }
+        }
+        else if (string.Equals(p.Type, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var retreadAccounts = GetGLAccountForSale(SaleType.Retread).Concat(GetGLAccountForSale(SaleType.Ecomile)).Distinct().ToArray();
+            var otherAccounts = GetGLAccountForSale(SaleType.FlapTube).Concat(GetGLAccountForSale(SaleType.Scrap)).Concat(GetGLAccountForSale(SaleType.Ecoflex)).Concat(GetGLAccountForSale(SaleType.IcEcoflex)).Distinct().ToArray();
+            accounts1 = retreadAccounts;
+            accounts2 = otherAccounts;
+            netSaleName = "Retread & Ecomile";
+            netSaleName2 = "Trade & Other";
         }
 
         param["accounts1"] = accounts1.Length > 0 ? accounts1 : new[] { "-1" };
@@ -1173,9 +1182,12 @@ public sealed class SalesReportService : ISalesReportService
         string sql = $@"
         SELECT 
             Cust.[Name] AS CustomerName,
+            Cust.[Responsibility Center] AS RespCenter,
             Dealer.[Code] AS DealerNo,
             Dealer.[Dealership Name] AS DealerName,
+            Area.[Code] AS AreaCode,
             Area.[Name] AS AreaName,
+            Area.[Team] AS TeamCode,
             Teams.[Code] AS RegionCode,
             Teams.[Name] AS RegionName,
             REPLACE(REPLACE(LEFT(Cust.[No_],3), 'CU','00'), 'C', '0')+RIGHT(Cust.[No_],5) AS CustomerNo,
@@ -1240,6 +1252,12 @@ public sealed class SalesReportService : ISalesReportService
             }).ToList();
         }
 
+        return rows;
+    }
+
+    private async Task<(string rdlcName, object? data)> GetSalesAndBalanceAsync(ITenantScope scope, SalesReportParams p, CancellationToken ct)
+    {
+        var rows = await GetSalesAndBalanceRowsAsync(scope, p, ct).ConfigureAwait(false);
         return ("SalesAndBalance", rows.Count > 0 ? ToDataTable(rows) : null);
     }
 

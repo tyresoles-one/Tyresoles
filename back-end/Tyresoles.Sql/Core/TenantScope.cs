@@ -279,6 +279,11 @@ public class TenantScope : ITenantScope
             
             foreach (var map in mappedProps)
             {
+                if (string.Equals(map.ColumnName, "timestamp", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(map.ColumnName, "rowversion", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 var pt = map.Property.PropertyType;
                 dt.Columns.Add(map.ColumnName, Nullable.GetUnderlyingType(pt) ?? pt);
             }
@@ -288,6 +293,11 @@ public class TenantScope : ITenantScope
                 var row = dt.NewRow();
                 foreach (var map in mappedProps)
                 {
+                    if (string.Equals(map.ColumnName, "timestamp", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(map.ColumnName, "rowversion", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
                     row[map.ColumnName] = map.Property.GetValue(entity) ?? DBNull.Value;
                 }
                 dt.Rows.Add(row);

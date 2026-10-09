@@ -41,4 +41,5 @@ public sealed class ProfileUpdateInput
     public decimal? BackupStorageQuotaGB { get; init; }
     public string? BackupAllowedFileTypes { get; init; }
     public string? BackupGDriveFolderID { get; init; }
+    public string? Dashboards { get; init; }
 }

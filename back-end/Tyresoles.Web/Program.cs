@@ -292,6 +292,7 @@ builder.Services.PostConfigure<Tyresoles.Reporting.Configuration.ReportingOption
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<Tyresoles.Data.Features.Crm.Services.ILiveLeadDiscoveryService, Tyresoles.Data.Features.Crm.Services.LiveLeadDiscoveryService>();
+builder.Services.AddScoped<Tyresoles.Data.Features.Crm.Services.ICrmContactSanitizationService, Tyresoles.Data.Features.Crm.Services.CrmContactSanitizationService>();
 
 // Email Campaign Marketing Services
 builder.Services.Configure<AmazonSesSmtpSettings>(builder.Configuration.GetSection(AmazonSesSmtpSettings.SectionName));

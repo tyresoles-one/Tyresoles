@@ -42,4 +42,12 @@ public interface ISalesReportService
         ITenantScope scope,
         string? reports = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Executes the Sales &amp; Balance report calculation and returns the detailed rows (including customer, area, team, and net sales).
+    /// </summary>
+    Task<List<SalesAndBalanceRow>> GetSalesAndBalanceRowsAsync(
+        ITenantScope scope,
+        SalesReportParams parameters,
+        CancellationToken cancellationToken = default);
 }

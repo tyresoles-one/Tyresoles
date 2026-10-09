@@ -164,5 +164,64 @@ public interface ISalesService
     /// only creating if the mobile number is not already present under CrmContacts.
     /// </summary>
     Task<int> ImportUniqueCrmContactsFromInvoicesAsync(ITenantScope scope, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves all subordinates of a sales employee based on Dynamics NAV Team Salesperson hierarchy:
+    /// UnitHead (4) -> RegionManager (3) -> ZoneManager (2) -> AreaManager (1) -> Salesman (0).
+    /// Finds all shared teams where the candidate's role type is strictly lower than the supervisor's role type.
+    /// </summary>
+    Task<SalesHierarchySummaryDto> GetSubordinateSalespersonsAsync(
+        ITenantScope scope,
+        string supervisorEmployeeCode,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves just the list of subordinate employee codes for a supervisor.
+    /// </summary>
+    Task<List<string>> GetSubordinateEmployeeCodesAsync(
+        ITenantScope scope,
+        string supervisorEmployeeCode,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Previews calculated team sales for the selected date range and responsibility center using GetSalesAndBalanceAsync logic,
+    /// multiplying current sales by the responsibility center's Target Multiplier (1 if 0).
+    /// </summary>
+    Task<TeamSalesTargetsPreviewResult> PreviewTeamSalesTargetsAsync(
+        ITenantScope scope,
+        PreviewTeamSalesTargetsRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates and commits next month sales targets into the Dynamics NAV Team table.
+    /// </summary>
+    Task<GenerateTeamSalesTargetsResult> GenerateTeamSalesTargetsAsync(
+        ITenantScope scope,
+        GenerateTeamSalesTargetsRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates the Target Multiplier for a Responsibility Center in Dynamics NAV.
+    /// </summary>
+    Task<bool> UpdateRespCenterTargetMultiplierAsync(
+        ITenantScope scope,
+        string respCenterCode,
+        decimal targetMultiplier,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the Target Multiplier for a single Responsibility Center.
+    /// </summary>
+    Task<decimal> GetRespCenterTargetMultiplierAsync(
+        ITenantScope scope,
+        string respCenterCode,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets all Responsibility Centers and their current Target Multipliers.
+    /// </summary>
+    Task<List<ResponsibilityCenterTargetMultiplierDto>> GetAllRespCentersWithMultipliersAsync(
+        ITenantScope scope,
+        CancellationToken ct = default);
 }
 

@@ -573,4 +573,63 @@ export const GetSalesUsersDocument = buildQuery`
 	};
 }, { where?: any; take?: number; respCenter?: string | null }>;
 
+export type CrmContactFleetDetail = {
+	id: string;
+	contactId: string;
+	vehicleType: string;
+	make?: string | null;
+	model?: string | null;
+	quantity: number;
+	tyreSize?: string | null;
+	application?: string | null;
+};
+
+export type CrmContactFleetDetailInput = {
+	id?: string | null;
+	contactId: string;
+	vehicleType: string;
+	make?: string | null;
+	model?: string | null;
+	quantity: number;
+	tyreSize?: string | null;
+	application?: string | null;
+};
+
+export const GetCrmContactFleetDetailsDocument = buildQuery`
+	query GetCrmContactFleetDetails($contactId: UUID!) {
+		crmContactFleetDetails: getCrmContactFleetDetails(contactId: $contactId) {
+			id
+			contactId
+			vehicleType
+			make
+			model
+			quantity
+			tyreSize
+			application
+		}
+	}
+` as unknown as TypedDocumentNode<{ crmContactFleetDetails: CrmContactFleetDetail[] }, { contactId: string }>;
+
+export const SaveCrmContactFleetDetailDocument = buildMutation`
+	mutation SaveCrmContactFleetDetail($input: CrmContactFleetDetailInput!) {
+		saveCrmContactFleetDetail(input: $input) {
+			id
+			contactId
+			vehicleType
+			make
+			model
+			quantity
+			tyreSize
+			application
+		}
+	}
+` as unknown as TypedDocumentNode<{ saveCrmContactFleetDetail: CrmContactFleetDetail }, { input: CrmContactFleetDetailInput }>;
+
+export const DeleteCrmContactFleetDetailDocument = buildMutation`
+	mutation DeleteCrmContactFleetDetail($id: UUID!) {
+		deleteCrmContactFleetDetail(id: $id)
+	}
+` as unknown as TypedDocumentNode<{ deleteCrmContactFleetDetail: boolean }, { id: string }>;
+
+
 

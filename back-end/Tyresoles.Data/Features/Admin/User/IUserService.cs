@@ -39,6 +39,7 @@ public class UserPermissionInput
     public string RoleId { get; set; } = "";
     public string Values { get; set; } = "";
     public byte HomePath { get; set; }
+    public DateTime? RoleExpiryDate { get; set; }
 }
 
 public class UserRespCenterInput

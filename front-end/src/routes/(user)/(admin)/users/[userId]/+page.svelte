@@ -129,6 +129,17 @@
 	` as any;
 	type ProvisionDriveSyncBackupFolderMutation = any;
 
+	const ResetPasswordDocument = gql`
+		mutation ResetPassword($userId: String!) {
+			resetPassword(userId: $userId) {
+				success
+				message
+				newPassword
+			}
+		}
+	` as any;
+	type ResetPasswordMutation = any;
+
 	const GetReportsDocument = gql`
 		query GetReports($category: String!) {
 			reports: reportsByCategory(category: $category) {
@@ -168,6 +179,8 @@
 				backupStorageQuotaGB
 				backupAllowedFileTypes
 				backupGDriveFolderID
+				securityPin
+				dashboards
 				respCenterSetup {
 					userId
 					respCenter
@@ -243,6 +256,10 @@
 		ProvisionDriveSyncBackupFolderDocument,
 		{ silent: true },
 	);
+	const resetPasswordMut = useAppMutation<ResetPasswordMutation, any>(
+		ResetPasswordDocument,
+		{ silent: true },
+	);
 
 	/** Optional override for the new Drive subfolder name (default: Nav user name without TYRESOLES\\ and whole-word Backup). */
 	let backupFolderCreateLabel = $state('');
@@ -277,6 +294,8 @@
 		backupStorageQuotaGb: 0,
 		backupAllowedFileTypes: '',
 		backupGDriveFolderId: '',
+		securityPin: '' as string | number,
+		dashboards: '',
 		respCenterSetup: [] as RespCenterSetupEntry[],
 		postingSetup: [] as PostingSetupEntry[],
 		permissions: [] as { 
@@ -301,7 +320,8 @@
 			rcMut.isPending ||
 			postingMut.isPending ||
 			userMut.isPending ||
-			provisionDriveMut.isPending,
+			provisionDriveMut.isPending ||
+			resetPasswordMut.isPending,
 	);
 	let error = $derived(
 		!isNewUser && userQuery.isError
@@ -358,6 +378,8 @@
                 backupStorageQuotaGb: foundUser.backupStorageQuotaGB ?? 0,
                 backupAllowedFileTypes: foundUser.backupAllowedFileTypes ?? '',
                 backupGDriveFolderId: foundUser.backupGDriveFolderID ?? '',
+                securityPin: foundUser.securityPin !== undefined && foundUser.securityPin !== null ? foundUser.securityPin : '',
+                dashboards: foundUser.dashboards ?? '',
                 lastActive: new Date().toISOString(),
                 respCenterSetup: (foundUser.respCenterSetup ?? []).map((r: any) => ({
                     userId: userId,
@@ -414,8 +436,8 @@
 	function removePostingSetup(index: number) {
 		user.postingSetup = user.postingSetup.filter((_, i) => i !== index);
 	}
-	function toIsoDate(s: string): string {
-		if (!s) return new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
+	function toIsoDate(s: string | null | undefined): string | null {
+		if (!s) return null;
 		if (s.includes('T')) return s;
 		return s + 'T00:00:00.000Z';
 	}
@@ -454,13 +476,14 @@
 				type: navRespCenterSetupTypeToGraphQL(Number(r.type) || 0),
 				code: r.code || ''
 			}));
-            await Promise.all([
+            const [permsRes, rcRes, postingRes, userRes] = await Promise.all([
                 permsMut.mutateAsync({
                     userName: user.userName,
                     permissions: user.permissions.filter(p => p.roleId).map(p => ({
                         roleId: p.roleId,
                         values: p.values || '',
-                        homePath: p.homePath || 0
+                        homePath: p.homePath || 0,
+                        roleExpiryDate: p.roleExipryDate ? toIsoDate(p.roleExipryDate) : null
                     }))
                 }),
                 rcMut.mutateAsync({
@@ -488,14 +511,36 @@
                         allowAllMasters: user.allowAllMasters ? 1 : 0,
                         backupStorageQuotaGB: user.backupStorageQuotaGb,
                         backupAllowedFileTypes: user.backupAllowedFileTypes,
-                        backupGDriveFolderID: user.backupGDriveFolderId
+                        backupGDriveFolderID: user.backupGDriveFolderId,
+                        securityPIN: user.securityPin !== '' && !isNaN(Number(user.securityPin)) ? Number(user.securityPin) : 0,
+                        dashboards: user.dashboards ?? ''
                     }
                 })
             ]);
             
+            // Check for individual mutation failures
+            const failures: string[] = [];
+            if (permsRes?.updateUserPermissions && !permsRes.updateUserPermissions.success) {
+                failures.push(`Permissions: ${permsRes.updateUserPermissions.message}`);
+            }
+            if (rcRes?.updateUserResponsibilityCenters && !rcRes.updateUserResponsibilityCenters.success) {
+                failures.push(`Responsibility Centers: ${rcRes.updateUserResponsibilityCenters.message}`);
+            }
+            if (postingRes?.updateUserPostingSetup && !postingRes.updateUserPostingSetup.success) {
+                failures.push(`Posting Setup: ${postingRes.updateUserPostingSetup.message}`);
+            }
+            if (userRes?.updateUserDetails && !userRes.updateUserDetails.success) {
+                failures.push(`User Details: ${userRes.updateUserDetails.message}`);
+            }
+
             // Refetch fresh data to guarantee UI parity
-            userQuery.refetch();
-			toast.success('User updated successfully');
+            await userQuery.refetch();
+
+            if (failures.length > 0) {
+                toast.error(failures.join('; '));
+            } else {
+                toast.success('User updated successfully');
+            }
 		} catch (e) {
             // Error toasts are handled by queryClient globally, but if something fails here, we can fallback
             console.error("Save failure bubble:", e);
@@ -539,6 +584,82 @@
 		} catch (e) {
 			console.error('provisionBackupFolder', e);
 		}
+	}
+
+	async function resetPassword() {
+		if (isNewUser) {
+			toast.error('Save the user first before resetting password.');
+			return;
+		}
+		if (!user.userName?.trim()) {
+			toast.error('User name is required.');
+			return;
+		}
+
+		const ok = await Dialog.confirm(
+			'Reset Password',
+			`Are you sure you want to reset the password for ${user.userName}? This will trigger NAV password reset and reset the portal password.`,
+			{ confirmLabel: 'Reset Password', cancelLabel: 'Cancel' }
+		);
+		if (!ok) return;
+
+		try {
+			const res = await resetPasswordMut.mutateAsync({
+				userId: user.userName.trim()
+			});
+			const result = res?.resetPassword;
+			if (result?.success) {
+				toast.success(result.message || 'Password reset successfully.');
+				if (result.newPassword) {
+					await Dialog.alert(
+						'Password Reset Successful',
+						`The temporary password for ${user.userName} is: ${result.newPassword}`
+					);
+				}
+				await userQuery.refetch();
+			} else {
+				toast.error(result?.message || 'Failed to reset password.');
+			}
+		} catch (e: any) {
+			console.error('Reset password error:', e);
+			toast.error(e?.message || 'Failed to reset password.');
+		}
+	}
+
+	let showPin = $state(false);
+	let isManagingDashboards = $state(false);
+
+	const STANDARD_DASHBOARDS = [
+		{ no: '1', label: 'My Dashboard', icon: 'layout-grid' },
+		{ no: '2', label: 'Classic Sales', icon: 'panels-left-bottom' },
+		{ no: '3', label: 'Claims', icon: 'file-box' },
+		{ no: '4', label: 'Procurement', icon: 'box' },
+		{ no: '5', label: 'Outstanding', icon: 'wallet' },
+	];
+
+	let userDashboardsList = $derived(
+		user.dashboards
+			? user.dashboards.split(',').map((d) => d.trim()).filter(Boolean)
+			: []
+	);
+
+	function toggleDashboard(no: string) {
+		const current = [...userDashboardsList];
+		const idx = current.indexOf(no);
+		if (idx >= 0) {
+			current.splice(idx, 1);
+		} else {
+			current.push(no);
+		}
+		user.dashboards = current.join(', ');
+	}
+
+	function getDashboardInfo(val: string) {
+		const found = STANDARD_DASHBOARDS.find(
+			(d) => d.no === val || d.label.toLowerCase() === val.toLowerCase()
+		);
+		if (found) return { label: found.label, icon: found.icon };
+		return { label: val, icon: 'layout-dashboard' };
 	}
 </script>
 
@@ -655,13 +776,124 @@
                   <span class="text-muted-foreground">User Type</span>
                   <span class="font-medium">{user.userType}</span>
                 </div>
-                <!-- Dept removed -->
+                <div
+                  class="flex justify-between items-center py-2 border-b border-border/40"
+                >
+                  <span class="text-muted-foreground">Security PIN</span>
+                  <div class="flex items-center gap-1">
+                    <div class="relative flex items-center">
+                      <input
+                        type={showPin ? "text" : "password"}
+                        inputmode="numeric"
+                        bind:value={user.securityPin}
+                        placeholder="Not set"
+                        class="w-24 h-7 text-right font-mono text-xs px-2 pr-7 rounded-md border border-border/60 bg-background/50 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-1 text-muted-foreground hover:text-foreground p-0.5"
+                        onclick={() => (showPin = !showPin)}
+                        title={showPin ? "Hide PIN" : "Show PIN"}
+                      >
+                        <Icon name={showPin ? "eye-off" : "eye"} class="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <div class="flex justify-between pt-2">
                   <span class="text-muted-foreground">Last Active</span>
                   <span class="font-medium"
                     >{new Date(user.lastActive).toLocaleDateString()}</span
                   >
                 </div>
+              </div>
+
+              <!-- Dashboards -->
+              <div class="w-full mt-6 pt-4 border-t border-border/40 text-left">
+                <div class="flex items-center justify-between mb-2">
+                  <p
+                    class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                  >
+                    Dashboards
+                  </p>
+                  <button
+                    type="button"
+                    class="text-xs text-primary hover:underline flex items-center gap-1 font-medium transition-colors"
+                    onclick={() => (isManagingDashboards = !isManagingDashboards)}
+                  >
+                    <Icon
+                      name={isManagingDashboards ? "check" : "settings-2"}
+                      class="size-3"
+                    />
+                    {isManagingDashboards ? "Done" : "Configure"}
+                  </button>
+                </div>
+
+                {#if isManagingDashboards}
+                  <div class="space-y-2.5 pt-1">
+                    <p class="text-[11px] text-muted-foreground leading-tight">
+                      Select dashboards allowed for this user:
+                    </p>
+                    <div class="grid grid-cols-1 gap-1.5">
+                      {#each STANDARD_DASHBOARDS as opt}
+                        {@const isSelected = userDashboardsList.includes(opt.no)}
+                        <button
+                          type="button"
+                          class="flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs text-left transition-colors {isSelected
+                            ? 'bg-primary/10 border-primary/40 text-primary font-medium'
+                            : 'border-border/60 hover:bg-muted/50 text-muted-foreground'}"
+                          onclick={() => toggleDashboard(opt.no)}
+                        >
+                          <div class="flex items-center gap-2">
+                            <Icon
+                              name={opt.icon}
+                              class="size-3.5 {isSelected
+                                ? 'text-primary'
+                                : 'text-muted-foreground'}"
+                            />
+                            <span>{opt.label}</span>
+                          </div>
+                          {#if isSelected}
+                            <Icon name="check" class="size-3.5 text-primary" />
+                          {/if}
+                        </button>
+                      {/each}
+                    </div>
+
+                    <div class="pt-2 border-t border-border/30">
+                      <label class="text-[11px] text-muted-foreground block mb-1">
+                        Manual input / Custom IDs:
+                      </label>
+                      <Input
+                        bind:value={user.dashboards}
+                        placeholder="e.g. 1, 2, 3"
+                        class="h-7 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                {:else}
+                  {#if userDashboardsList.length > 0}
+                    <div class="flex flex-wrap gap-1.5">
+                      {#each userDashboardsList as d}
+                        {@const info = getDashboardInfo(d)}
+                        <Badge
+                          variant="secondary"
+                          class="text-[11px] px-2 py-0.5 flex items-center gap-1 font-normal bg-secondary/60 hover:bg-secondary"
+                        >
+                          <Icon name={info.icon} class="size-3 opacity-70" />
+                          <span>{info.label}</span>
+                        </Badge>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div
+                      class="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 rounded-md px-2.5 py-1.5"
+                    >
+                      <Icon name="globe" class="size-3.5 opacity-70" />
+                      <span>All Dashboards (Default)</span>
+                    </div>
+                  {/if}
+                {/if}
               </div>
 
               {#if user.respCenterSetup.length > 0}
@@ -697,9 +929,19 @@
 
           <!-- Simple Actions -->
           <div class="space-y-2">
-            <Button variant="outline" class="w-full justify-start h-9 text-sm">
-              <Icon name="key" class="size-3.5 mr-2" />
-              Reset Password
+            <Button
+              variant="outline"
+              class="w-full justify-start h-9 text-sm"
+              onclick={resetPassword}
+              disabled={saving || resetPasswordMut.isPending}
+            >
+              {#if resetPasswordMut.isPending}
+                <Icon name="loader-2" class="size-3.5 mr-2 animate-spin" />
+                Resetting Password...
+              {:else}
+                <Icon name="key" class="size-3.5 mr-2" />
+                Reset Password
+              {/if}
             </Button>
             <Button
               variant="outline"

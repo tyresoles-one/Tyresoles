@@ -24,6 +24,9 @@
 		GetCrmCallRemindersDocument,
 		GetCrmContactInvoicesDocument,
 		GetCrmContactClaimsDocument,
+		GetCrmContactFleetDetailsDocument,
+		SaveCrmContactFleetDetailDocument,
+		DeleteCrmContactFleetDetailDocument,
 		LogCrmCallDocument,
 		UndoCrmCallDocument,
 		UpdateCrmCallLogNotesDocument,
@@ -38,21 +41,25 @@
 		type CallReminder,
 		type ContactInvoice,
 		type ContactClaim,
-		type CrmAgentContact
+		type CrmAgentContact,
+		type CrmContactFleetDetail,
+		type CrmContactFleetDetailInput
 	} from './queries';
 
 	// State
 	let selectedContact = $state<CrmContact | null>(null);
-	let activeTab = $state<'log' | 'history' | 'reminders' | 'business' | 'claims'>('log');
+	let activeTab = $state<'log' | 'history' | 'reminders' | 'business' | 'claims' | 'fleet'>('log');
 	
 	let callLogs = $state<CallLog[]>([]);
 	let reminders = $state<CallReminder[]>([]);
 	let invoices = $state<ContactInvoice[]>([]);
 	let claims = $state<ContactClaim[]>([]);
+	let fleetDetails = $state<CrmContactFleetDetail[]>([]);
 	
 	let loadingHistory = $state(false);
 	let loadingInvoices = $state(false);
 	let loadingClaims = $state(false);
+	let loadingFleet = $state(false);
 
 	let isSavingLog = $state(false);
 	let isUndoingLog = $state<string | null>(null);
@@ -65,7 +72,7 @@
 	let loadingPdf = $state(false);
 	let printingDocNo = $state<string | null>(null);
 
-	let isFetchingContactDetails = $derived(loadingHistory || loadingInvoices || loadingClaims);
+	let isFetchingContactDetails = $derived(loadingHistory || loadingInvoices || loadingClaims || loadingFleet);
 
 	let allocateDialogOpen = $state(false);
 	let searchSingleDialogOpen = $state(false);
@@ -210,11 +217,13 @@
 				loadHistory(id);
 				loadInvoices(id);
 				loadClaims(id);
+				loadFleet(id);
 			} else {
 				callLogs = [];
 				reminders = [];
 				invoices = [];
 				claims = [];
+				fleetDetails = [];
 			}
 		});
 	});
@@ -300,6 +309,74 @@
 			console.error(err);
 		} finally {
 			loadingClaims = false;
+		}
+	}
+
+	async function loadFleet(contactId: string) {
+		loadingFleet = true;
+		try {
+			const res = await graphqlQuery<{ crmContactFleetDetails: CrmContactFleetDetail[] }>(
+				GetCrmContactFleetDetailsDocument,
+				{ variables: { contactId }, skipCache: true }
+			);
+			if (res.success && res.data?.crmContactFleetDetails) {
+				fleetDetails = res.data.crmContactFleetDetails;
+			} else {
+				fleetDetails = [];
+			}
+		} catch (err) {
+			console.error('Failed to load fleet details', err);
+			fleetDetails = [];
+		} finally {
+			loadingFleet = false;
+		}
+	}
+
+	async function handleSaveFleetItem(input: CrmContactFleetDetailInput): Promise<boolean> {
+		try {
+			const res = await graphqlMutation<{ saveCrmContactFleetDetail: CrmContactFleetDetail }>(
+				SaveCrmContactFleetDetailDocument,
+				{ variables: { input } }
+			);
+			if (res.success && res.data?.saveCrmContactFleetDetail) {
+				const saved = res.data.saveCrmContactFleetDetail;
+				const idx = fleetDetails.findIndex((f) => f.id === saved.id);
+				if (idx !== -1) {
+					fleetDetails = fleetDetails.map((f) => (f.id === saved.id ? saved : f));
+				} else {
+					fleetDetails = [...fleetDetails, saved];
+				}
+				toast.success('Fleet record saved successfully.');
+				return true;
+			} else {
+				toast.error(res.error || 'Failed to save fleet record');
+				return false;
+			}
+		} catch (err: any) {
+			console.error('Error saving fleet record', err);
+			toast.error(err.message || 'Error saving fleet record');
+			return false;
+		}
+	}
+
+	async function handleDeleteFleetItem(id: string): Promise<boolean> {
+		try {
+			const res = await graphqlMutation<{ deleteCrmContactFleetDetail: boolean }>(
+				DeleteCrmContactFleetDetailDocument,
+				{ variables: { id } }
+			);
+			if (res.success && res.data?.deleteCrmContactFleetDetail) {
+				fleetDetails = fleetDetails.filter((f) => f.id !== id);
+				toast.success('Fleet record removed.');
+				return true;
+			} else {
+				toast.error(res.error || 'Failed to remove fleet record');
+				return false;
+			}
+		} catch (err: any) {
+			console.error('Error deleting fleet record', err);
+			toast.error(err.message || 'Error deleting fleet record');
+			return false;
 		}
 	}
 
@@ -791,7 +868,7 @@
 
 	<!-- Two-column Calling Center Area -->
 	<div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-		<div class={isListCollapsed ? 'hidden' : 'block'}>
+		<div class="{isListCollapsed ? 'hidden' : 'flex'} h-full shrink-0">
 			<ContactList
 				list={listMock}
 				{filteredContacts}
@@ -822,6 +899,8 @@
 			{reminders}
 			{invoices}
 			{claims}
+			{fleetDetails}
+			{loadingFleet}
 			{loadingHistory}
 			{loadingInvoices}
 			{loadingClaims}
@@ -833,6 +912,8 @@
 			onPrintDocument={handlePrintDocument}
 			onRefreshHistory={() => selectedContact && loadHistory(selectedContact.id, true)}
 			onUpdateCallLogNotes={handleUpdateCallLogNotes}
+			onSaveFleetItem={handleSaveFleetItem}
+			onDeleteFleetItem={handleDeleteFleetItem}
 			{salesUsersList}
 			{isSavingLog}
 			{isUndoingLog}

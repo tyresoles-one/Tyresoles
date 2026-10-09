@@ -190,20 +190,20 @@
 	});
 </script>
 
-<div class="w-full md:w-[370px] border-r border-border bg-card flex flex-col h-full min-h-0 shrink-0 {selectedContact ? 'hidden md:flex' : 'flex'}">
+<div class="w-full md:w-[380px] border-r border-border bg-card flex flex-col h-full min-h-0 shrink-0 {selectedContact ? 'hidden md:flex' : 'flex'}">
 	<div class="p-2.5 border-b border-border space-y-2">
 		<!-- Search Input & Total Contacts + Toggle Toolbar + Split Button Get Contacts -->
 		<div class="flex items-center gap-1.5">
-			<div class="relative flex-1">
+			<div class="relative flex-1 min-w-0">
 				{#if list.loading}
 					<Loader2 class="absolute left-2.5 top-2.5 size-4 animate-spin text-primary" />
 				{:else}
 					<Icon name="search" class="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
 				{/if}
 				<Input
-					placeholder="Search contacts..."
+					placeholder="Search..."
 					bind:value={list.searchQuery.value}
-					class="pl-8 pr-12 rounded-xl h-9 bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring border border-border/50 text-xs shadow-none"
+					class="pl-8 pr-10 rounded-xl h-9 bg-muted/30 focus-visible:ring-1 focus-visible:ring-ring border border-border/50 text-xs shadow-none"
 				/>
 				<span class="absolute right-2 top-2 text-[10px] font-bold text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded-md pointer-events-none">
 					{filteredContacts.length}
@@ -228,7 +228,7 @@
 					size="sm"
 					onclick={() => onQuickLoadContacts ? onQuickLoadContacts(10) : onRequestMoreContacts()}
 					disabled={isAllocating}
-					class="h-9 px-2.5 rounded-none text-xs font-semibold flex items-center gap-1.5 hover:bg-muted/60 shrink-0 cursor-pointer border-r border-border/50"
+					class="h-9 px-2 rounded-none text-xs font-semibold flex items-center gap-1.5 hover:bg-muted/60 shrink-0 cursor-pointer border-r border-border/50"
 					title="Quick load next 10 contacts using saved filter"
 				>
 					{#if isAllocating}
@@ -247,7 +247,7 @@
 								variant="ghost"
 								size="sm"
 								disabled={isAllocating}
-								class="h-9 w-7 p-0 rounded-none hover:bg-muted/60 cursor-pointer flex items-center justify-center text-muted-foreground hover:text-foreground"
+								class="h-9 w-6.5 p-0 rounded-none hover:bg-muted/60 cursor-pointer flex items-center justify-center text-muted-foreground hover:text-foreground"
 								title="Load options"
 								{...props}
 							>
@@ -466,7 +466,7 @@
 				<Loader2 class="size-6 animate-spin text-primary" />
 			</div>
 		{:else if list.items.length === 0}
-			<div class="p-8 text-center flex flex-col items-center justify-center space-y-3 my-auto">
+			<div class="p-6 text-center flex flex-col items-center justify-center space-y-3.5 my-auto">
 				<div class="p-3 rounded-full bg-primary/10 text-primary">
 					<Icon name="user-plus" class="size-6" />
 				</div>
@@ -476,18 +476,18 @@
 						Contacts are retrieved on manual demand. Click below to select criteria and fetch contacts to call.
 					</p>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex flex-col gap-2 w-full max-w-[240px] pt-1">
 					<Button
 						size="sm"
 						onclick={() => onQuickLoadContacts ? onQuickLoadContacts(10) : onRequestMoreContacts()}
 						disabled={isAllocating}
-						class="gap-1.5 rounded-xl text-xs font-semibold px-4 h-9 cursor-pointer"
+						class="w-full gap-2 rounded-xl text-xs font-semibold h-9.5 cursor-pointer shadow-xs"
 					>
 						{#if isAllocating}
 							<Loader2 class="size-3.5 animate-spin text-muted-foreground" />
-							<span>Getting...</span>
+							<span>Getting contacts...</span>
 						{:else}
-							<Icon name="user-plus" class="size-3.5" />
+							<Icon name="user-plus" class="size-4" />
 							<span>Get 10 Contacts</span>
 						{/if}
 					</Button>
@@ -496,25 +496,25 @@
 						size="sm"
 						onclick={onRequestMoreContacts}
 						disabled={isAllocating}
-						class="rounded-xl text-xs font-medium px-3 h-9 cursor-pointer border-border"
+						class="w-full rounded-xl text-xs font-medium h-9 cursor-pointer border-border hover:bg-muted/50 gap-2 justify-center"
 					>
-						<Icon name="sliders" class="size-3.5 mr-1 text-muted-foreground" />
+						<Icon name="sliders" class="size-3.5 text-muted-foreground" />
 						<span>Filter Options</span>
 					</Button>
 					<Button
 						variant="outline"
 						size="sm"
 						onclick={() => onOpenSearchSingle ? onOpenSearchSingle() : null}
-						class="rounded-xl text-xs font-medium px-3 h-9 cursor-pointer border-border"
+						class="w-full rounded-xl text-xs font-medium h-9 cursor-pointer border-border hover:bg-muted/50 gap-2 justify-center"
 						title="Search a single contact by name or number and add to your list"
 					>
-						<Icon name="search" class="size-3.5 mr-1 text-amber-500" />
+						<Icon name="search" class="size-3.5 text-amber-500" />
 						<span>Find Single Contact</span>
 					</Button>
 				</div>
 			</div>
 		{:else if filteredContacts.length === 0}
-			<div class="p-8 text-center text-muted-foreground text-sm flex flex-col items-center justify-center space-y-3">
+			<div class="p-6 text-center text-muted-foreground text-sm flex flex-col items-center justify-center space-y-3">
 				<p class="text-xs font-medium text-foreground">
 					{#if filterCallDate === 'pending' && allCount > 0}
 						All {allCount} contacts allocated today have been called!
@@ -525,28 +525,30 @@
 					{/if}
 				</p>
 				{#if list.searchQuery.value && list.searchQuery.value.trim()}
-					<div class="pt-1">
+					<div class="pt-1 w-full max-w-[260px]">
 						<Button
 							variant="outline"
 							size="sm"
 							onclick={() => onOpenSearchSingle ? onOpenSearchSingle(list.searchQuery.value) : null}
-							class="rounded-xl text-xs font-semibold px-3.5 h-8.5 cursor-pointer border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary gap-1.5 shadow-2xs"
+							class="w-full rounded-xl text-xs font-semibold px-3 h-8.5 cursor-pointer border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary gap-1.5 shadow-2xs"
 						>
-							<Icon name="search" class="size-3.5" />
-							<span>Search CRM database for "{list.searchQuery.value}"</span>
+							<Icon name="search" class="size-3.5 shrink-0" />
+							<span class="truncate">Search CRM for "{list.searchQuery.value}"</span>
 						</Button>
 					</div>
 				{/if}
 				{#if allCount > 0 && filterCallDate !== 'all' && (!list.searchQuery.value || !list.searchQuery.value.trim())}
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={() => (filterCallDate = 'all')}
-						class="rounded-xl text-xs font-medium px-3 h-8 cursor-pointer border-border"
-					>
-						<Icon name="users" class="size-3.5 mr-1.5 text-primary" />
-						Show All Contacts Allocated Today ({allCount})
-					</Button>
+					<div class="w-full max-w-[260px]">
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => (filterCallDate = 'all')}
+							class="w-full rounded-xl text-xs font-medium px-3 h-8 cursor-pointer border-border"
+						>
+							<Icon name="users" class="size-3.5 mr-1.5 text-primary shrink-0" />
+							<span class="truncate">Show All Today ({allCount})</span>
+						</Button>
+					</div>
 				{/if}
 			</div>
 		{:else}

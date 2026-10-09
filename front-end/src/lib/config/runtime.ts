@@ -15,8 +15,9 @@ import { writable } from "svelte/store";
 import { isTauri } from "$lib/tauri";
 
 export const AppConfigSchema = z.object({
-  backendBaseUrl: z.string().url().default("http://api.tyresoles.net"),
+  backendBaseUrl: z.string().url().default("http://api.tyresoles.in"),
   frontendUrl: z.string().url().default("http://localhost:5173"),
+  prodBackendBaseUrl: z.string().url().default("https://api.tyresoles.in"),  
   updateUrl: z
     .string()
     .url()
@@ -60,6 +61,7 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 export const DEFAULT_APP_CONFIG: AppConfig = {
   backendBaseUrl: "https://localhost:5002",
   frontendUrl: "http://localhost:5173",
+  prodBackendBaseUrl: "https://api.tyresoles.in",
   updateUrl: "https://app.tyresoles.in/updates/update.json",
   version: "1.0",
   mode: "User",

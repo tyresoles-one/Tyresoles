@@ -7,11 +7,11 @@ export { default as HohrDashboard } from "./HohrDashboard.svelte";
 export { default as MgmtDashboard } from "./MgmtDashboard.svelte";
 export { default as ProdMgmtDashboard } from "./ProdMgmtDashboard.svelte";
 export { default as SalesDashboard } from "./SalesDashboard.svelte";
+export { default as SalesCrmDashboard } from "./sales/SalesCrmDashboard.svelte";
+export { default as SalesPerformanceTracker } from "./sales/components/SalesPerformanceTracker.svelte";
 export { default as SuperDashboard } from "./SuperDashboard.svelte";
 export { default as ClassicDashboard } from "./ClassicDashboard.svelte";
 export { default as EcomileProcMgmtDashboard } from "./EcomileProcMgmtDashboard.svelte";
 export { default as ClaimsDashboard } from "./ClaimsDashboard.svelte";
 export { default as ProcurementDashboard } from "./ProcurementDashboard.svelte";
 export { default as OutstandDashboard } from "./OutstandDashboard.svelte";
-
-

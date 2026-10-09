@@ -596,6 +596,7 @@ public sealed class UserService : IUserService
         if (input.BackupStorageQuotaGB.HasValue) { user.BackupStorageQuotaGB = input.BackupStorageQuotaGB.Value; updates.Add(u => u.BackupStorageQuotaGB); }
         if (input.BackupAllowedFileTypes != null) { user.BackupAllowedFileTypes = input.BackupAllowedFileTypes; updates.Add(u => u.BackupAllowedFileTypes); }
         if (input.BackupGDriveFolderID != null) { user.BackupGDriveFolderID = input.BackupGDriveFolderID; updates.Add(u => u.BackupGDriveFolderID); }
+        if (input.Dashboards != null) { user.Dashboards = input.Dashboards; updates.Add(u => u.Dashboards); }
 
         if (updates.Count > 0)
         {
@@ -958,7 +959,7 @@ public sealed class UserService : IUserService
         }
 
         static string NavDateToUi(DateTime? d) =>
-            d is { } x ? x.ToString("yyyy-MM-dd") : string.Empty;
+            d is { } x && x.Year > 1753 ? x.ToString("yyyy-MM-dd") : string.Empty;
 
         var respSetup = respRows
             .Select(r => new UserDetailRespCenterRow
@@ -1011,6 +1012,8 @@ public sealed class UserService : IUserService
             NavConfigName = user.NavConfigName,
             VpnUserId = user.VpnUserID,
             VpnPassword = user.VpnPassword,
+            SecurityPin = user.SecurityPin,
+            Dashboards = user.Dashboards ?? string.Empty,
             RespCenterSetup = respSetup,
             PostingSetup = postSetup,
             Permissions = perms
@@ -1031,7 +1034,10 @@ public sealed class UserService : IUserService
             {
                 UserSecurityID = user.UserSecurityID,
                 RoleID = p.RoleId,
-                Values = p.Values,
+                RoleExipryDate = p.RoleExpiryDate.HasValue && p.RoleExpiryDate.Value.Year > 1753
+                    ? p.RoleExpiryDate.Value
+                    : new DateTime(1753, 1, 1),
+                Values = p.Values ?? string.Empty,
                 HomePath = p.HomePath,
                 AssignerName = "ADMIN", // Or track current admin
                 CompanyName = "" // Assuming shared across companies or empty for global
@@ -1052,10 +1058,12 @@ public sealed class UserService : IUserService
             var newRecords = assignments.Select(a => new RespCenterUserSetup
             {
                 UserID = username,
-                RespCenter = a.RespCenter,
+                RespCenter = a.RespCenter ?? string.Empty,
                 Default = a.Default,
                 Type = a.Type,
-                Code = a.Code
+                Code = a.Code ?? string.Empty,
+                PostingDateFormula = string.Empty,
+                SkipPostingDateSetup = 0
             });
             await scope.BulkInsertAsync(newRecords, cancellationToken);
         }
@@ -1070,14 +1078,43 @@ public sealed class UserService : IUserService
 
         if (assignments.Count > 0)
         {
-            var newRecords = assignments.Select(a => new UserSetup
+            static DateTime EnsureNavDate(DateTime? d) =>
+                d.HasValue && d.Value.Year > 1753 ? d.Value.Date : new DateTime(1753, 1, 1);
+
+            var validAssignments = assignments
+                .Where(a => !string.IsNullOrWhiteSpace(a.ResponsibilityCenter))
+                .GroupBy(a => a.ResponsibilityCenter.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            if (validAssignments.Count > 0)
             {
-                UserID = username,
-                ResponsibilityCenter = a.ResponsibilityCenter,
-                AllowPostingFrom = a.AllowPostingFrom,
-                AllowPostingTo = a.AllowPostingTo
-            });
-            await scope.BulkInsertAsync(newRecords, cancellationToken);
+                var newRecords = validAssignments.Select(a => new UserSetup
+                {
+                    UserID = username,
+                    ResponsibilityCenter = a.ResponsibilityCenter.Trim(),
+                    AllowPostingFrom = EnsureNavDate(a.AllowPostingFrom),
+                    AllowPostingTo = EnsureNavDate(a.AllowPostingTo),
+                    AllowFAPostingFrom = new DateTime(1753, 1, 1),
+                    AllowFAPostingTo = new DateTime(1753, 1, 1),
+                    RegisterTime = 0,
+                    SalespersPurchCode = string.Empty,
+                    ApproverID = string.Empty,
+                    SalesAmountApprovalLimit = 0,
+                    PurchaseAmountApprovalLimit = 0,
+                    UnlimitedSalesApproval = 0,
+                    UnlimitedPurchaseApproval = 0,
+                    Substitute = string.Empty,
+                    EMail = string.Empty,
+                    RequestAmountApprovalLimit = 0,
+                    UnlimitedRequestApproval = 0,
+                    TimeSheetAdmin = 0,
+                    SalesRespCtrFilter = string.Empty,
+                    PurchaseRespCtrFilter = string.Empty,
+                    ServiceRespCtrFilter = string.Empty
+                });
+                await scope.BulkInsertAsync(newRecords, cancellationToken);
+            }
         }
         return true;
     }

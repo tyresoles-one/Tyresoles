@@ -1,16 +1,13 @@
-<script lang="ts">  
-  import { getUser } from '$lib/stores/auth';
-  import { BalanceWidget } from '$lib/components/venUI/balanceWidget';
-  import Header from './Header.svelte';
-  import SalesOverview from './SalesOverview.svelte'; 
+<script lang="ts">
+  import SalesPerformanceTracker from './sales/components/SalesPerformanceTracker.svelte';
+  import SalesCrmDashboard from './sales/SalesCrmDashboard.svelte';
   import { fade } from 'svelte/transition';
-  import { WeeklyEventDashboardWidget } from '$lib/components/venUI/calendar-view';
-
-  const user = getUser();    
 </script>
 
-<div class="space-y-4 max-w-[1600px] mx-auto p-1" in:fade={{ duration: 400 }}>
-    <Header title="Sales Dashboard" />
-    <SalesOverview />
-    <WeeklyEventDashboardWidget />
+<div class="space-y-4 max-w-[1600px] mx-auto p-1" in:fade={{ duration: 250 }}>
+  <!-- Sales Performance & Run Rate Tracker (My & Team) -->
+  <SalesPerformanceTracker />
+
+  <!-- Sales Activity & CRM Calling Workspace -->
+  <SalesCrmDashboard />
 </div>

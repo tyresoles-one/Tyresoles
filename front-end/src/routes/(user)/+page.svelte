@@ -33,7 +33,7 @@
 
   const userType = $derived($authStore.user?.userType?.toUpperCase());
 
-  type DashboardMode = "role" | "classic" | "claim" | "procurement" | "outstand";
+  type DashboardMode = "role" | "classic" | "claim" | "procurement" | "outstand"| "sales";
   const modeStore = createPersistedStore<DashboardMode>(
     "dashboard-mode",
     "role",
@@ -46,6 +46,7 @@
     {no: 3, id: "claim", label: "Claims", icon: "file-box" },
     {no: 4, id: "procurement", label: "Procurement", icon: "box" },
     {no: 5, id: "outstand", label: "Outstanding", icon: "wallet" },
+    {no: 6, id: "sales", label: "Sales", icon: "wallet" },
   ];
 
   const allowedDashboards = $derived(
@@ -167,7 +168,9 @@
         <ProcurementDashboard />
       {:else if mode === "outstand"}
         <OutstandDashboard />
-      {/if}
+      {:else if mode === "sales"}
+        <SalesDashboard />
+      {/if}      
     </div>
   {/key}
 </div>

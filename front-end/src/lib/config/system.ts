@@ -15,7 +15,10 @@ export function getBackendBaseUrl(): string {
   const config = get(appConfigStore);
   return config?.backendBaseUrl ?? DEFAULT_APP_CONFIG.backendBaseUrl;
 }
-
+export function getProdBackendBaseUrl(): string {
+  const config = get(appConfigStore);
+  return config?.prodBackendBaseUrl ?? DEFAULT_APP_CONFIG.prodBackendBaseUrl;
+}
 /** GraphQL HTTP endpoint. */
 export function getGraphQLEndpoint(): string {
   return `${getBackendBaseUrl()}/graphql`;
@@ -39,7 +42,7 @@ export const DEFAULT_ERROR_MESSAGE = "Oops! Something went wrong.";
 
 /** Image entries with URLs derived from current backend (use after config ready). */
 export function getImages(): { name: string; url: string }[] {
-  const base = getBackendBaseUrl();
+  const base = getProdBackendBaseUrl();
   return [
     { name: "man", url: `${base}/images/man.png` },
     { name: "man-1", url: `${base}/images/man_1.png` },
